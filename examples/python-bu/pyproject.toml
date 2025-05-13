@@ -1,0 +1,12 @@
+[project]
+name = "python-bu"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "browser-use>=0.1.46",
+    "kernel==0.1.0a8",
+    "langchain-openai>=0.3.11",
+    "pydantic>=2.10.6",
+]
