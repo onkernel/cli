@@ -1,15 +1,110 @@
-# cli
+# Kernel CLI
 
-To install dependencies:
+A command-line tool for deploying and invoking Kernel applications.
 
-```bash
-bun install
-```
-
-To run:
+## Installation
 
 ```bash
-bun run index.ts
+brew tap onkernel/homebrew-tap
+brew install kernel
 ```
 
-This project was created using `bun init` in bun v1.2.9. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+## Development Prerequisites
+
+Install the following tools:
+
+- Go 1.22+ ( https://go.dev/doc/install )
+- [Goreleaser](https://goreleaser.com/install/)
+- [chglog](https://github.com/goreleaser/chglog)
+
+Compile the CLI:
+
+```bash
+make build   # compiles the binary to ./bin/kernel
+```
+
+Run the CLI:
+
+```bash
+./bin/kernel --help
+```
+
+## Development workflow
+
+Useful make targets:
+
+- `make build` – compile the project to `./bin/kernel`
+- `make test` – execute unit tests
+- `make lint` – run the linter (requires `golangci-lint`)
+- `make changelog` – generate/update the `CHANGELOG.md` file using **chglog**
+- `make release` – create a release using **goreleaser** (builds archives, homebrew formula, etc. See below)
+
+### Releasing a new version
+
+Prerequisites:
+
+- Make sure you have `goreleaser` _pro_ installed via `brew install goreleaser/tap/goreleaser-pro`. You will need a license key (in 1pw), and then `export GORELEASER_KEY=<the key>`.
+
+- Make sure .npmrc is set up using the NPM token for our org (in 1pw): `echo "//registry.npmjs.org/:_authToken=<the token>" > .npmrc`
+
+- export a `GITHUB_TOKEN` with repo and write:packages permissions: https://github.com/settings/tokens/new?scopes=repo,write:packages.
+
+On main, run:
+
+```bash
+make release-dry-run
+```
+
+This will check that everything is working, but not actually release anything.
+You should see one error about there not being a git tag, and that's fine.
+
+To actually release, run:
+
+```bash
+VERSION=0.1.0
+git tag -a cli/v${VERSION} -m "First release!"
+git push origin cli/v${VERSION}
+make release
+```
+
+### Environment variables
+
+The CLI requires a Kernel API key to interact with the platform:
+
+```bash
+export KERNEL_API_KEY=your_api_key
+```
+
+### Releasing a new version
+
+1. Update the changelog:
+
+   ```bash
+   make changelog
+   ```
+
+2. Tag the release (e.g. `v1.0.0`) and push the tag:
+
+   ```bash
+   git tag cli/v0.1.0
+   git push origin cli/v0.1.0
+   ```
+
+3. Run `make release` – **goreleaser** will:
+
+   - Build binaries for macOS (arm64/amd64), Linux and Windows
+   - Create a GitHub release upload archives
+   - Publish/commit the Homebrew formula to the `onkernel/homebrew-tap` repository
+
+## Directory structure
+
+```
+packages/cli
+├── cmd/          # cobra commands (root, deploy, invoke, …)
+│   └── kernel/
+│       └── main.go
+├── pkg/          # reusable helpers (zip util, etc.)
+├── .goreleaser.yaml
+├── Makefile
+└── README.md
+```

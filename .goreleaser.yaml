@@ -1,0 +1,105 @@
+version: 2
+project_name: kernel
+
+monorepo:
+  tag_prefix: cli/
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: kernel
+    env:
+      - CGO_ENABLED=0
+    main: ./cmd/kernel
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - darwin
+      - linux
+      - windows
+
+archives:
+  - id: archive
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    # files:
+    #   - LICENSE
+
+brews:
+  - name: kernel
+    repository:
+      owner: onkernel
+      name: homebrew-tap
+      branch: main
+    directory: Formula
+    description: "CLI for Kernel deployment and invocation"
+    homepage: "https://docs.onkernel.com"
+    test: |
+      system "#{bin}/kernel", "--version"
+
+npms:
+  - name: "@onkernel/cli"
+    repository: "git+https://github.com/onkernel/kernel.git"
+    bugs: https://github.com/onkernel/kernel/issues
+    description: CLI for Kernel
+    homepage: https://docs.onkernel.com
+    license: MIT
+    author: "Rafael Garcia <raf@onkernel.com>"
+    access: public
+    keywords:
+      - kernel
+      - cli
+      - browsers
+      - automation
+      - ai
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "merge conflict"
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
+      - go mod tidy
+  groups:
+    - title: Dependency updates
+      regexp: "^.*feat\\(deps\\)*:+.*$"
+      order: 300
+    - title: "New Features"
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 100
+    - title: "Bug fixes"
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 200
+    - title: "Documentation updates"
+      regexp: "^.*docs[(\\w)]*:+.*$"
+      order: 400
+    - title: Other work
+      order: 9999
+
+release:
+  name_template: "Kernel CLI v{{ .Version }}"
+  footer: |
+    **Full Changelog**: https://github.com/onkernel/kernel/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+    ## What to do next?
+
+    - Read the [documentation](https://docs.onkernel.com)
+    - Join our [Discord server](https://discord.gg/FBrveQRcud)
+    - Follow us on Twitter [here](https://twitter.com/rfgarcia) and [here](https://x.com/juecd__)
+
+# TODO:
+# announce:
+#   discord:
+#     enabled: true
+#     message_template: "Kernel CLI {{ .Tag }} is out! Check it out: https://github.com/goreleaser/goreleaser/releases/tag/{{ .Tag }}"
