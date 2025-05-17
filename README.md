@@ -5,8 +5,7 @@ A command-line tool for deploying and invoking Kernel applications.
 ## Installation
 
 ```bash
-brew tap onkernel/homebrew-tap
-brew install kernel
+brew install onkernel/tap/kernel
 ```
 
 ## Development Prerequisites
