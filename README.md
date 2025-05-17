@@ -49,6 +49,8 @@ Prerequisites:
 
 - export a `GITHUB_TOKEN` with repo and write:packages permissions: https://github.com/settings/tokens/new?scopes=repo,write:packages.
 
+- Make sure you are logged in to the prod AWS account with `aws sso login --sso-session=kernel` + `export AWS_PROFILE=kernel-prod`. This is necessary to publish releases to S3.
+
 On main, run:
 
 ```bash

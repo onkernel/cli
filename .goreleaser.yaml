@@ -31,6 +31,12 @@ archives:
     # files:
     #   - LICENSE
 
+blobs:
+  - provider: s3
+    region: us-east-1
+    bucket: onkernel-public
+    directory: releases/download/cli/{{ .Version }}
+
 brews:
   - name: kernel
     repository:
@@ -40,12 +46,13 @@ brews:
     directory: Formula
     description: "CLI for Kernel deployment and invocation"
     homepage: "https://docs.onkernel.com"
+    url_template: "https://onkernel-public.s3.us-east-1.amazonaws.com/releases/download/cli/{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}.tar.gz"
     test: |
       system "#{bin}/kernel", "--version"
 
 npms:
   - name: "@onkernel/cli"
-    repository: "git+https://github.com/onkernel/kernel.git"
+    repository: "https://onkernel-public.s3.us-east-1.amazonaws.com/"
     bugs: https://github.com/onkernel/kernel/issues
     description: CLI for Kernel
     homepage: https://docs.onkernel.com
