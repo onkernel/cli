@@ -45,7 +45,7 @@ Prerequisites:
 
 - Make sure you have `goreleaser` _pro_ installed via `brew install goreleaser/tap/goreleaser-pro`. You will need a license key (in 1pw), and then `export GORELEASER_KEY=<the key>`.
 
-- Make sure `NPM_TOKEN` is set up using the NPM token for our org (in 1pw).
+- Grab the NPM token for our org (in 1pw) and run `npm config set '//registry.npmjs.org/:_authToken'=<the token>`
 
 - export a `GITHUB_TOKEN` with repo and write:packages permissions: https://github.com/settings/tokens/new?scopes=repo,write:packages.
 
