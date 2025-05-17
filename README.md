@@ -45,7 +45,7 @@ Prerequisites:
 
 - Make sure you have `goreleaser` _pro_ installed via `brew install goreleaser/tap/goreleaser-pro`. You will need a license key (in 1pw), and then `export GORELEASER_KEY=<the key>`.
 
-- Make sure .npmrc is set up using the NPM token for our org (in 1pw): `echo "//registry.npmjs.org/:_authToken=<the token>" > .npmrc`
+- Make sure `NPM_TOKEN` is set up using the NPM token for our org (in 1pw).
 
 - export a `GITHUB_TOKEN` with repo and write:packages permissions: https://github.com/settings/tokens/new?scopes=repo,write:packages.
 
@@ -61,9 +61,9 @@ You should see one error about there not being a git tag, and that's fine.
 To actually release, run:
 
 ```bash
-VERSION=0.1.0
-git tag -a cli/v${VERSION} -m "First release!"
-git push origin cli/v${VERSION}
+export VERSION=0.1.1
+git tag -a cli/v$VERSION -m "Bugfixes"
+git push origin cli/v$VERSION
 make release
 ```
 
