@@ -68,34 +68,20 @@ git push origin cli/v$VERSION
 make release
 ```
 
+The NPM publish needs some extra steps (hopefully one day goreleaser will support this, but right now it assumes download links are public github releases, which we don't have at the moment):
+
+````bash
+go run scripts/npmpublish/npmpublish.go ./.npmdisttmpl ./dist
+cd .npmdist && npm publish --access public
+```)
+
 ### Environment variables
 
 The CLI requires a Kernel API key to interact with the platform:
 
 ```bash
 export KERNEL_API_KEY=your_api_key
-```
-
-### Releasing a new version
-
-1. Update the changelog:
-
-   ```bash
-   make changelog
-   ```
-
-2. Tag the release (e.g. `v1.0.0`) and push the tag:
-
-   ```bash
-   git tag cli/v0.1.0
-   git push origin cli/v0.1.0
-   ```
-
-3. Run `make release` – **goreleaser** will:
-
-   - Build binaries for macOS (arm64/amd64), Linux and Windows
-   - Create a GitHub release upload archives
-   - Publish/commit the Homebrew formula to the `onkernel/homebrew-tap` repository
+````
 
 ## Directory structure
 

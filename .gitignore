@@ -1,4 +1,6 @@
 bin/
+dist/
+.npmdist/
 
 # dependencies (bun install)
 node_modules

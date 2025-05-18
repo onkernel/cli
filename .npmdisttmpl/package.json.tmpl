@@ -1,0 +1,108 @@
+{
+  "name": "@onkernel/cli",
+  "version": "{{ .Version }}",
+  "description": "{{ .Description }}",
+  "scripts": {
+    "postinstall": "node install.js",
+    "run": "node run-kernel.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/onkernel/kernel.git"
+  },
+  "keywords": [
+    "kernel",
+    "cli",
+    "browsers",
+    "automation",
+    "ai"
+  ],
+  "author": "Rafael Garcia <raf@onkernel.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/onkernel/kernel/issues"
+  },
+  "homepage": "https://docs.onkernel.com",
+  "bin": {
+    "kernel": "run-kernel.js"
+  },
+  "dependencies": {
+    "axios": "^1.8.2",
+    "jszip": "^3.10.1",
+    "tar": "^7.4.3"
+  },
+  "archives": {
+    "darwin-arm64": {
+      "name": "{{ .DarwinArm64Name }}",
+      "url": "{{ .DarwinArm64URL }}",
+      "bins": [
+        "kernel"
+      ],
+      "format": "tar.gz",
+      "checksum": {
+        "algorithm": "sha256",
+        "digest": "{{ .DarwinArm64Checksum }}"
+      }
+    },
+    "darwin-x64": {
+      "name": "{{ .DarwinX64Name }}",
+      "url": "{{ .DarwinX64URL }}",
+      "bins": [
+        "kernel"
+      ],
+      "format": "tar.gz",
+      "checksum": {
+        "algorithm": "sha256",
+        "digest": "{{ .DarwinX64Checksum }}"
+      }
+    },
+    "linux-arm64": {
+      "name": "{{ .LinuxArm64Name }}",
+      "url": "{{ .LinuxArm64URL }}",
+      "bins": [
+        "kernel"
+      ],
+      "format": "tar.gz",
+      "checksum": {
+        "algorithm": "sha256",
+        "digest": "{{ .LinuxArm64Checksum }}"
+      }
+    },
+    "linux-x64": {
+      "name": "{{ .LinuxX64Name }}",
+      "url": "{{ .LinuxX64URL }}",
+      "bins": [
+        "kernel"
+      ],
+      "format": "tar.gz",
+      "checksum": {
+        "algorithm": "sha256",
+        "digest": "{{ .LinuxX64Checksum }}"
+      }
+    },
+    "win32-arm64": {
+      "name": "{{ .Win32Arm64Name }}",
+      "url": "{{ .Win32Arm64URL }}",
+      "bins": [
+        "kernel.exe"
+      ],
+      "format": "tar.gz",
+      "checksum": {
+        "algorithm": "sha256",
+        "digest": "{{ .Win32Arm64Checksum }}"
+      }
+    },
+    "win32-x64": {
+      "name": "{{ .Win32X64Name }}",
+      "url": "{{ .Win32X64URL }}",
+      "bins": [
+        "kernel.exe"
+      ],
+      "format": "tar.gz",
+      "checksum": {
+        "algorithm": "sha256",
+        "digest": "{{ .Win32X64Checksum }}"
+      }
+    }
+  }
+}
