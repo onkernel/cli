@@ -32,21 +32,18 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 	actionName := args[1]
 
 	payloadStr, _ := cmd.Flags().GetString("payload")
-	var payload interface{}
-	if payloadStr == "" {
-		// If no payload specified, default to an empty JSON object
-		payloadStr = "{}"
-	}
-
-	if err := json.Unmarshal([]byte(payloadStr), &payload); err != nil {
-		return fmt.Errorf("invalid JSON payload: %w", err)
+	if payloadStr != "" {
+		var i interface{}
+		if err := json.Unmarshal([]byte(payloadStr), &i); err != nil {
+			return fmt.Errorf("invalid JSON payload: %w", err)
+		}
 	}
 	version, _ := cmd.Flags().GetString("version")
 	pterm.Info.Printf("Invoking \"%s\" (action: %s) ...\n", appName, actionName)
-	resp, err := client.Apps.Invoke(cmd.Context(), kernel.AppInvokeParams{
+	resp, err := client.Apps.Invocations.New(cmd.Context(), kernel.AppInvocationNewParams{
 		AppName:    appName,
 		ActionName: actionName,
-		Payload:    payload,
+		Payload:    kernel.Opt(payloadStr),
 		Version:    version,
 	})
 	if err != nil {
@@ -65,8 +62,7 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 		pterm.Info.Println("- Verify that the app name and action name are correct")
 		pterm.Info.Println("- Ensure the app version exists")
 		pterm.Info.Println("- Validate that your payload is properly formatted")
-
-		return fmt.Errorf("invocation failed: %w", err)
+		return nil
 	}
 
 	if resp.Output == "" {

@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/onkernel/cli/pkg/util"
 	kernel "github.com/onkernel/kernel-go-sdk"
 	"github.com/pterm/pterm"
@@ -22,6 +24,8 @@ var deployCmd = &cobra.Command{
 func init() {
 	deployCmd.Flags().String("version", "latest", "Specify a version for the app (default: latest)")
 	deployCmd.Flags().Bool("force", false, "Allow overwrite of an existing version with the same name")
+	deployCmd.Flags().StringArrayP("env", "e", []string{}, "Set environment variables (e.g., KEY=value). May be specified multiple times")
+	deployCmd.Flags().StringArray("env-file", []string{}, "Read environment variables from a file (.env format). May be specified multiple times")
 }
 
 func runDeploy(cmd *cobra.Command, args []string) error {
@@ -62,13 +66,40 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	}
 	defer file.Close()
 
+	// Gather environment variables from --env and --env-file flags
+	envPairs, _ := cmd.Flags().GetStringArray("env")
+	envFiles, _ := cmd.Flags().GetStringArray("env-file")
+
+	envVars := make(map[string]string)
+
+	// Load from env files first so that explicit --env overrides them
+	for _, envFile := range envFiles {
+		fileVars, err := godotenv.Read(envFile)
+		if err != nil {
+			return fmt.Errorf("failed to read env file %s: %w", envFile, err)
+		}
+		for k, v := range fileVars {
+			envVars[k] = v
+		}
+	}
+
+	// Parse KEY=value pairs provided via --env
+	for _, kv := range envPairs {
+		parts := strings.SplitN(kv, "=", 2)
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid env variable format: %s (expected KEY=value)", kv)
+		}
+		envVars[parts[0]] = parts[1]
+	}
+
 	spinner, _ = pterm.DefaultSpinner.Start("Deploying app...")
-	logger.Debug("deploying app", logger.Args("version", version, "force", force, "entrypoint", resolvedEntrypoint))
-	resp, err := client.Apps.Deploy(cmd.Context(), kernel.AppDeployParams{
+	logger.Debug("deploying app", logger.Args("version", version, "force", force, "entrypoint", filepath.Base(resolvedEntrypoint)))
+	resp, err := client.Apps.Deployments.New(cmd.Context(), kernel.AppDeploymentNewParams{
 		File:              file,
 		Version:           kernel.Opt(version),
-		Force:             forceParam(force),
+		Force:             kernel.Opt(force),
 		EntrypointRelPath: filepath.Base(resolvedEntrypoint),
+		EnvVars:           envVars,
 	})
 	if err != nil {
 		return &util.CleanedUpSdkError{Err: err}
@@ -99,11 +130,4 @@ func quoteIfNeeded(s string) string {
 		return fmt.Sprintf("\"%s\"", s)
 	}
 	return s
-}
-
-func forceParam(force bool) kernel.AppDeployParamsForce {
-	if force {
-		return kernel.AppDeployParamsForceTrue
-	}
-	return kernel.AppDeployParamsForceFalse
 }
