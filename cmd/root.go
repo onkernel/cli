@@ -9,14 +9,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
+type Metadata struct {
+	Version   string
+	Commit    string
+	Date      string
+	GoVersion string
+}
+
+var metadata = Metadata{
 	// these are set at build-time via ldflags.
 	// https://goreleaser.com/cookbooks/using-main.version/
-	version   = "dev"
-	commit    = ""
-	date      = ""
-	goversion = runtime.Version()
-)
+	Version:   "dev",
+	Commit:    "none",
+	Date:      "unknown",
+	GoVersion: runtime.Version(),
+}
 
 // rootCmd is the base command for the CLI.
 var rootCmd = &cobra.Command{
@@ -64,15 +71,15 @@ func init() {
 		logLevel, _ := cmd.Flags().GetString("log-level")
 		logger = pterm.DefaultLogger.WithLevel(logLevelToPterm(logLevel))
 		if v, _ := cmd.Flags().GetBool("version"); v {
-			fmt.Printf("kernel %s", version)
-			if commit != "" {
-				fmt.Printf(" (%s)", commit)
+			fmt.Printf("kernel %s", metadata.Version)
+			if metadata.Commit != "" {
+				fmt.Printf(" (%s)", metadata.Commit)
 			}
-			if goversion != "" {
-				fmt.Printf(" %s", goversion)
+			if metadata.GoVersion != "" {
+				fmt.Printf(" %s", metadata.GoVersion)
 			}
-			if date != "" {
-				fmt.Printf(" %s", date)
+			if metadata.Date != "" {
+				fmt.Printf(" %s", metadata.Date)
 			}
 			fmt.Println()
 			os.Exit(0)
@@ -93,7 +100,8 @@ func initConfig() {
 }
 
 // Execute executes the root command.
-func Execute() {
+func Execute(m Metadata) {
+	metadata = m
 	if err := rootCmd.Execute(); err != nil {
 		pterm.Error.Println(err)
 		os.Exit(1)

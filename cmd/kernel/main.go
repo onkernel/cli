@@ -1,7 +1,23 @@
 package main
 
-import "github.com/onkernel/cli/cmd"
+import (
+	"runtime"
+
+	"github.com/onkernel/cli/cmd"
+)
+
+var (
+	version   = "dev"
+	commit    = "none"
+	date      = "unknown"
+	goversion = runtime.Version()
+)
 
 func main() {
-	cmd.Execute()
+	cmd.Execute(cmd.Metadata{
+		Version:   version,
+		Commit:    commit,
+		Date:      date,
+		GoVersion: goversion,
+	})
 }

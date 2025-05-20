@@ -15,7 +15,7 @@ builds:
     main: ./cmd/kernel
     mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
-      - -s -w -X main.version={{ .Version }}
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .Date }}
     goarch:
       - amd64
       - arm64
