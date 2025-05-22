@@ -18,8 +18,8 @@ var invokeCmd = &cobra.Command{
 }
 
 func init() {
-	invokeCmd.Flags().String("version", "", "Specify a version of the app to invoke")
-	invokeCmd.Flags().String("payload", "", "JSON payload for the invocation")
+	invokeCmd.Flags().StringP("version", "v", "latest", "Specify a version of the app to invoke (optional, defaults to 'latest')")
+	invokeCmd.Flags().StringP("payload", "p", "", "JSON payload for the invocation (optional)")
 }
 
 func runInvoke(cmd *cobra.Command, args []string) error {
@@ -27,25 +27,37 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 	if apiKey == "" {
 		return fmt.Errorf("KERNEL_API_KEY environment variable is not set")
 	}
-	client := kernel.NewClient() // defaults to look at KERNEL_API_KEY
+	client := kernel.NewClient()
 	appName := args[0]
 	actionName := args[1]
-
+	version, _ := cmd.Flags().GetString("version")
+	if version == "" {
+		return fmt.Errorf("version cannot be an empty string")
+	}
+	params := kernel.AppInvocationNewParams{
+		AppName:    appName,
+		ActionName: actionName,
+		Version:    version,
+	}
 	payloadStr, _ := cmd.Flags().GetString("payload")
-	if payloadStr != "" {
+	payloadProvided := cmd.Flags().Changed("payload")
+	switch {
+	case !payloadProvided:
+		// user did NOT pass --payload at all
+	case payloadStr == "":
+		// user passed --payload ""  (or --payload=) – empty string explicitly requested
+		params.Payload = kernel.Opt("")
+	default:
+		// user passed a non-empty payload
 		var i interface{}
 		if err := json.Unmarshal([]byte(payloadStr), &i); err != nil {
 			return fmt.Errorf("invalid JSON payload: %w", err)
 		}
+		params.Payload = kernel.Opt(payloadStr)
 	}
-	version, _ := cmd.Flags().GetString("version")
-	pterm.Info.Printf("Invoking \"%s\" (action: %s) ...\n", appName, actionName)
-	resp, err := client.Apps.Invocations.New(cmd.Context(), kernel.AppInvocationNewParams{
-		AppName:    appName,
-		ActionName: actionName,
-		Payload:    kernel.Opt(payloadStr),
-		Version:    version,
-	})
+
+	pterm.Info.Printf("Invoking \"%s\" (action: %s, version: %s) ...\n", appName, actionName, version)
+	resp, err := client.Apps.Invocations.New(cmd.Context(), params)
 	if err != nil {
 		pterm.Error.Printf("Failed to invoke application: %v\n", err)
 
