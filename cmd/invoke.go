@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/pterm/pterm"
@@ -23,10 +22,6 @@ func init() {
 }
 
 func runInvoke(cmd *cobra.Command, args []string) error {
-	apiKey := os.Getenv("KERNEL_API_KEY")
-	if apiKey == "" {
-		return fmt.Errorf("KERNEL_API_KEY environment variable is not set")
-	}
 	client := kernel.NewClient()
 	appName := args[0]
 	actionName := args[1]

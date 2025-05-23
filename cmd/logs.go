@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/onkernel/kernel-go-sdk"
@@ -24,10 +23,6 @@ func init() {
 }
 
 func runLogs(cmd *cobra.Command, args []string) error {
-	apiKey := os.Getenv("KERNEL_API_KEY")
-	if apiKey == "" {
-		return fmt.Errorf("KERNEL_API_KEY environment variable is not set")
-	}
 	client := kernel.NewClient()
 
 	appName := args[0]

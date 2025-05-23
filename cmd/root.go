@@ -67,7 +67,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	// Version flag handling: we use our own persistent pre-run to handle it globally.
-	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		logLevel, _ := cmd.Flags().GetString("log-level")
 		logger = pterm.DefaultLogger.WithLevel(logLevelToPterm(logLevel))
 		if v, _ := cmd.Flags().GetBool("version"); v {
@@ -87,11 +87,28 @@ func init() {
 		if noColor, _ := cmd.Flags().GetBool("no-color"); noColor {
 			pterm.DisableStyling()
 		}
+
+		// Check if this command requires API key
+		// Skip API key check for root command (help) and any command that doesn't need it
+		if cmd == rootCmd {
+			return nil
+		}
+
+		// Commands that don't require API key can be added here
+		// For now, all subcommands require API key
+		apiKey := os.Getenv("KERNEL_API_KEY")
+		if apiKey == "" {
+			return fmt.Errorf("KERNEL_API_KEY environment variable is not set")
+		}
+
+		return nil
 	}
 
 	// Register subcommands
 	rootCmd.AddCommand(deployCmd)
 	rootCmd.AddCommand(invokeCmd)
+	rootCmd.AddCommand(browsersCmd)
+	rootCmd.AddCommand(appsCmd)
 }
 
 func initConfig() {

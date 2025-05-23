@@ -30,10 +30,6 @@ func init() {
 
 func runDeploy(cmd *cobra.Command, args []string) error {
 	startTime := time.Now()
-	apiKey := os.Getenv("KERNEL_API_KEY")
-	if apiKey == "" {
-		return fmt.Errorf("KERNEL_API_KEY environment variable is not set")
-	}
 	client := kernel.NewClient() // defaults to look at KERNEL_API_KEY
 	entrypoint := args[0]
 	version, _ := cmd.Flags().GetString("version")

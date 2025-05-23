@@ -50,7 +50,7 @@ Prerequisites:
 
 - Make sure you are logged in to the prod AWS account with `aws sso login --sso-session=kernel` + `export AWS_PROFILE=kernel-prod`. This is necessary to publish releases to S3.
 
-On main, run:
+With a clean tree on the branch you want to release (can be main or a pr branch you're about to merge, doesn't matter), run:
 
 ```bash
 make release-dry-run
@@ -62,6 +62,7 @@ You should see one error about there not being a git tag, and that's fine.
 To actually release, run:
 
 ```bash
+# use `git tag -l | grep cli` to find the latest version and what you want to bump it to
 export VERSION=0.1.1
 git tag -a cli/v$VERSION -m "Bugfixes"
 git push origin cli/v$VERSION
