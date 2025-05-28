@@ -5,7 +5,7 @@ go 1.24.3
 require (
 	github.com/boyter/gocodewalker v1.4.0
 	github.com/joho/godotenv v1.5.1
-	github.com/onkernel/kernel-go-sdk v0.3.0
+	github.com/onkernel/kernel-go-sdk v0.3.1-0.20250528021115-14ad9ca7cae8
 	github.com/pterm/pterm v0.12.80
 	github.com/spf13/cobra v1.9.1
 )

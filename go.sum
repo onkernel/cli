@@ -49,6 +49,8 @@ github.com/mattn/go-runewidth v0.0.16 h1:E5ScNMtiwvlvB5paMFdw9p4kSQzbXFikJ5SQO6T
 github.com/mattn/go-runewidth v0.0.16/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh153qUoGf23w=
 github.com/onkernel/kernel-go-sdk v0.3.0 h1:h6m/RtudKnXQ5oBvEeXJzygQ9cHjl28NnqXb5lVraGs=
 github.com/onkernel/kernel-go-sdk v0.3.0/go.mod h1:q7wsAf+yjpY+w8jbAMciWCtCM0ZUxiw/5o2MSPTZS9E=
+github.com/onkernel/kernel-go-sdk v0.3.1-0.20250528021115-14ad9ca7cae8 h1:e2R11cvYLv43JU6+tQlQYu1BDmglkr57r7K6qR5uQRg=
+github.com/onkernel/kernel-go-sdk v0.3.1-0.20250528021115-14ad9ca7cae8/go.mod h1:q7wsAf+yjpY+w8jbAMciWCtCM0ZUxiw/5o2MSPTZS9E=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pterm/pterm v0.12.27/go.mod h1:PhQ89w4i95rhgE+xedAoqous6K9X+r6aSOI2eFF7DZI=
