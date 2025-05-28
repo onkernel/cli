@@ -3,8 +3,10 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/onkernel/kernel-go-sdk"
+	"github.com/onkernel/kernel-go-sdk/option"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
@@ -52,7 +54,7 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 	}
 
 	pterm.Info.Printf("Invoking \"%s\" (action: %s, version: %s) ...\n", appName, actionName, version)
-	resp, err := client.Apps.Invocations.New(cmd.Context(), params)
+	resp, err := client.Apps.Invocations.New(cmd.Context(), params, option.WithMaxRetries(0), option.WithRequestTimeout(10*time.Minute))
 	if err != nil {
 		pterm.Error.Printf("Failed to invoke application: %v\n", err)
 
