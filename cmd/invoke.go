@@ -83,45 +83,38 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// If invocation is queued, poll until we have output or terminal status
-	if resp.Status == kernel.AppInvocationNewResponseStatusQueued {
-		pterm.Info.Println("Invocation queued, polling for result...")
-		for {
-			time.Sleep(2 * time.Second)
-			pollResp, err := client.Apps.Invocations.Get(cmd.Context(), resp.ID, option.WithMaxRetries(0), option.WithRequestTimeout(2*time.Minute))
-			if err != nil {
-				pterm.Error.Printf("Polling failed: %v\n", err)
-				return nil
-			}
+	// if not queued, print the result
+	if resp.Status != kernel.AppInvocationNewResponseStatusQueued {
+		printResult(resp.Status == kernel.AppInvocationNewResponseStatusSucceeded, resp.Output)
+		return nil
+	}
 
-			switch pollResp.Status {
-			case kernel.AppInvocationGetResponseStatusSucceeded:
-				resp.Output = pollResp.Output
-				resp.Status = kernel.AppInvocationNewResponseStatusSucceeded
-			case kernel.AppInvocationGetResponseStatusFailed:
-				resp.Status = kernel.AppInvocationNewResponseStatusFailed
-				resp.StatusReason = pollResp.StatusReason
-			default:
-				// haven't reached terminal state, continue polling
-				continue
-			}
-			// Break after handling succeeded/failed
-			break
+	// invocation is queued--poll until we have output or terminal status
+	pterm.Info.Println("Invocation queued, polling for result...")
+	for {
+		time.Sleep(2 * time.Second)
+		invocation, err := client.Apps.Invocations.Get(cmd.Context(), resp.ID, option.WithMaxRetries(0), option.WithRequestTimeout(2*time.Minute))
+		if err != nil {
+			pterm.Error.Printf("Polling failed: %v\n", err)
+			return nil
+		}
+		if invocation.Status == kernel.AppInvocationGetResponseStatusSucceeded || invocation.Status == kernel.AppInvocationGetResponseStatusFailed {
+			printResult(invocation.Status == kernel.AppInvocationGetResponseStatusSucceeded, invocation.Output)
+			return nil
 		}
 	}
+}
 
-	if resp.Output == "" {
-		pterm.Warning.Println("No output returned")
-		return nil
-	}
-
+func printResult(success bool, output string) {
 	var prettyJSON map[string]interface{}
-	if err := json.Unmarshal([]byte(resp.Output), &prettyJSON); err != nil {
-		pterm.Success.Printf("Result: %s\n", resp.Output)
-		return nil
+	if err := json.Unmarshal([]byte(output), &prettyJSON); err == nil {
+		bs, _ := json.MarshalIndent(prettyJSON, "", "  ")
+		output = string(bs)
 	}
-
-	pretty, _ := json.MarshalIndent(prettyJSON, "", "  ")
-	pterm.Success.Printf("Result:\n%s\n", string(pretty))
-	return nil
+	// use pterm.Success if succeeded, pterm.Error if failed
+	if success {
+		pterm.Success.Printf("Result:\n%s\n", output)
+	} else {
+		pterm.Error.Printf("Result:\n%s\n", output)
+	}
 }

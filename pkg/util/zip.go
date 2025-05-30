@@ -63,23 +63,54 @@ func ZipDirectory(srcDir, destZip string) error {
 			}
 		}
 
-		// Create the file inside the zip archive
-		zipFileWriter, err := zipWriter.Create(relPath)
+		// Determine if the current path is a symbolic link so we can handle it properly
+		fileInfo, err := os.Lstat(f.Location)
 		if err != nil {
 			return err
 		}
+		isSymlink := fileInfo.Mode()&os.ModeSymlink != 0
 
-		file, err := os.Open(f.Location)
-		if err != nil {
-			return err
-		}
-		// Avoid deferring to reduce open FDs on huge trees
-		_, err = io.Copy(zipFileWriter, file)
-		if closeErr := file.Close(); closeErr != nil {
-			return closeErr
-		}
-		if err != nil {
-			return err
+		// Create the file inside the zip archive
+		if isSymlink {
+			// Read the link target to store inside the archive
+			linkTarget, err := os.Readlink(f.Location)
+			if err != nil {
+				return err
+			}
+
+			// Prepare a custom header marking this entry as a symlink.
+			hdr := &zip.FileHeader{
+				Name:   relPath,
+				Method: zip.Store, // No compression; matches behaviour of most zip tools for symlinks
+			}
+			// Mark as symlink with 0777 permissions (lrwxrwxrwx)
+			hdr.SetMode(os.ModeSymlink | 0777)
+
+			zipFileWriter, err := zipWriter.CreateHeader(hdr)
+			if err != nil {
+				return err
+			}
+			if _, err := zipFileWriter.Write([]byte(linkTarget)); err != nil {
+				return err
+			}
+		} else {
+			zipFileWriter, err := zipWriter.Create(relPath)
+			if err != nil {
+				return err
+			}
+
+			file, err := os.Open(f.Location)
+			if err != nil {
+				return err
+			}
+			// Avoid deferring to reduce open FDs on huge trees
+			_, err = io.Copy(zipFileWriter, file)
+			if closeErr := file.Close(); closeErr != nil {
+				return closeErr
+			}
+			if err != nil {
+				return err
+			}
 		}
 	}
 

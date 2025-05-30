@@ -54,6 +54,7 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	spinner.Success("Compressed files")
+	defer os.Remove(tmpFile)
 
 	// make io.Reader from tmpFile
 	file, err := os.Open(tmpFile)
