@@ -10,6 +10,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/onkernel/cli/pkg/util"
 	kernel "github.com/onkernel/kernel-go-sdk"
+	"github.com/onkernel/kernel-go-sdk/option"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
@@ -97,7 +98,7 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		Force:             kernel.Opt(force),
 		EntrypointRelPath: filepath.Base(resolvedEntrypoint),
 		EnvVars:           envVars,
-	})
+	}, option.WithMaxRetries(0))
 	if err != nil {
 		return &util.CleanedUpSdkError{Err: err}
 	}
