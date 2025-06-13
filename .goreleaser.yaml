@@ -37,7 +37,7 @@ blobs:
     bucket: onkernel-public
     directory: releases/download/cli/{{ .Version }}
 
-brews:
+homebrew_casks:
   - name: kernel
     repository:
       owner: onkernel
@@ -46,9 +46,8 @@ brews:
     directory: Formula
     description: "CLI for Kernel deployment and invocation"
     homepage: "https://docs.onkernel.com"
-    url_template: "https://onkernel-public.s3.us-east-1.amazonaws.com/releases/download/cli/{{ .Version }}/{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}.tar.gz"
-    test: |
-      system "#{bin}/kernel", "--version"
+    url:
+      template: "https://onkernel-public.s3.us-east-1.amazonaws.com/releases/download/cli/{{ .Version }}/{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}.tar.gz"
 
 npms:
   - name: "@onkernel/cli"
