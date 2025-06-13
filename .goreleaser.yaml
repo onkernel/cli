@@ -43,7 +43,7 @@ homebrew_casks:
       owner: onkernel
       name: homebrew-tap
       branch: main
-    directory: Formula
+    directory: Casks
     description: "CLI for Kernel deployment and invocation"
     homepage: "https://docs.onkernel.com"
     url:
