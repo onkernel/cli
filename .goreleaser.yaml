@@ -50,21 +50,22 @@ brews:
     test: |
       system "#{bin}/kernel", "--version"
 
-# npms:
-#   - name: "@onkernel/cli"
-#     repository: "https://onkernel-public.s3.us-east-1.amazonaws.com/"
-#     bugs: https://github.com/onkernel/kernel/issues
-#     description: CLI for Kernel
-#     homepage: https://docs.onkernel.com
-#     license: MIT
-#     author: "Rafael Garcia <raf@onkernel.com>"
-#     access: public
-#     keywords:
-#       - kernel
-#       - cli
-#       - browsers
-#       - automation
-#       - ai
+npms:
+  - name: "@onkernel/cli"
+    repository: "https://github.com/onkernel"
+    bugs: https://github.com/onkernel/kernel/issues
+    description: Kernel CLI
+    homepage: https://docs.onkernel.com
+    license: MIT
+    author: "Rafael Garcia <raf@onkernel.com>"
+    access: public
+    url_template: "https://onkernel-public.s3.us-east-1.amazonaws.com/releases/download/cli/{{ .Version }}/{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}.tar.gz"
+    keywords:
+      - kernel
+      - cli
+      - browsers
+      - automation
+      - ai
 
 changelog:
   sort: asc

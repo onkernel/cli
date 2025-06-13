@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/onkernel/kernel-go-sdk/option"
 	"github.com/pterm/pterm"
@@ -25,7 +26,7 @@ func init() {
 }
 
 func runInvoke(cmd *cobra.Command, args []string) error {
-	client := kernel.NewClient()
+	client := util.NewClient()
 	appName := args[0]
 	actionName := args[1]
 	version, _ := cmd.Flags().GetString("version")

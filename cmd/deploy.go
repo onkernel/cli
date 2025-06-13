@@ -31,7 +31,7 @@ func init() {
 
 func runDeploy(cmd *cobra.Command, args []string) error {
 	startTime := time.Now()
-	client := kernel.NewClient() // defaults to look at KERNEL_API_KEY
+	client := util.NewClient() // defaults to look at KERNEL_API_KEY
 	entrypoint := args[0]
 	version, _ := cmd.Flags().GetString("version")
 	force, _ := cmd.Flags().GetBool("force")

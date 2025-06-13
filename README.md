@@ -42,7 +42,7 @@ Useful make targets:
 
 Prerequisites:
 
-- Make sure you have `goreleaser` _pro_ installed via `brew install goreleaser/tap/goreleaser-pro`. You will need a license key (in 1pw), and then `export GORELEASER_KEY=<the key>`.
+- Make sure you have `goreleaser` _pro_ installed via `brew install --cask goreleaser/tap/goreleaser-pro`. You will need a license key (in 1pw), and then `export GORELEASER_KEY=<the key>`.
 
 - Grab the NPM token for our org (in 1pw) and run `npm config set '//registry.npmjs.org/:_authToken'=<the token>`
 
@@ -67,32 +67,4 @@ export VERSION=0.1.1
 git tag -a cli/v$VERSION -m "Bugfixes"
 git push origin cli/v$VERSION
 make release
-```
-
-The NPM publish needs some extra steps (hopefully one day goreleaser will support this, but right now it assumes download links are public github releases, which we don't have at the moment):
-
-````bash
-go run scripts/npmpublish/npmpublish.go ./.npmdisttmpl ./dist
-cd .npmdist && npm publish --access public
-```)
-
-### Environment variables
-
-The CLI requires a Kernel API key to interact with the platform:
-
-```bash
-export KERNEL_API_KEY=your_api_key
-````
-
-## Directory structure
-
-```
-packages/cli
-├── cmd/          # cobra commands (root, deploy, invoke, …)
-│   └── kernel/
-│       └── main.go
-├── pkg/          # reusable helpers (zip util, etc.)
-├── .goreleaser.yaml
-├── Makefile
-└── README.md
 ```

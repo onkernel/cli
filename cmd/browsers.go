@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -50,7 +51,7 @@ func init() {
 }
 
 func runBrowsersList(cmd *cobra.Command, args []string) error {
-	client := kernel.NewClient()
+	client := util.NewClient()
 
 	pterm.Info.Println("Fetching browsers...")
 
@@ -89,7 +90,7 @@ func runBrowsersList(cmd *cobra.Command, args []string) error {
 }
 
 func runBrowsersDelete(cmd *cobra.Command, args []string) error {
-	client := kernel.NewClient()
+	client := util.NewClient()
 
 	persistentID, _ := cmd.Flags().GetString("by-persistent-id")
 	sessionID, _ := cmd.Flags().GetString("by-id")
@@ -136,7 +137,7 @@ func runBrowsersDelete(cmd *cobra.Command, args []string) error {
 }
 
 func runBrowsersView(cmd *cobra.Command, args []string) error {
-	client := kernel.NewClient()
+	client := util.NewClient()
 
 	persistentID, _ := cmd.Flags().GetString("by-persistent-id")
 	sessionID, _ := cmd.Flags().GetString("by-id")
