@@ -3,7 +3,6 @@ package cmd
 import (
 	"strings"
 
-	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -30,7 +29,7 @@ func init() {
 }
 
 func runAppsList(cmd *cobra.Command, args []string) error {
-	client := util.NewClient()
+	client := getKernelClient(cmd)
 
 	appName, _ := cmd.Flags().GetString("name")
 	version, _ := cmd.Flags().GetString("version")

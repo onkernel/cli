@@ -1,10 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"runtime"
 
+	"github.com/onkernel/cli/pkg/util"
+	"github.com/onkernel/kernel-go-sdk"
+	"github.com/onkernel/kernel-go-sdk/option"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
@@ -58,6 +62,12 @@ func logLevelToPterm(level string) pterm.LogLevel {
 	}
 }
 
+const KernelClientKey = "kernel_client"
+
+func getKernelClient(cmd *cobra.Command) kernel.Client {
+	return cmd.Context().Value(KernelClientKey).(kernel.Client)
+}
+
 func init() {
 	rootCmd.PersistentFlags().BoolP("version", "v", false, "Print the CLI version")
 	rootCmd.PersistentFlags().BoolP("no-color", "", false, "Disable color output")
@@ -67,6 +77,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	// Version flag handling: we use our own persistent pre-run to handle it globally.
+	// We also inject a Kernel client object into the command context for commands to sue
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		logLevel, _ := cmd.Flags().GetString("log-level")
 		logger = pterm.DefaultLogger.WithLevel(logLevelToPterm(logLevel))
@@ -101,6 +112,8 @@ func init() {
 			return fmt.Errorf("KERNEL_API_KEY environment variable is not set")
 		}
 
+		ctx := context.WithValue(cmd.Context(), KernelClientKey, util.NewClient(option.WithHeader("X-Kernel-Cli-Version", metadata.Version)))
+		cmd.SetContext(ctx)
 		return nil
 	}
 
@@ -119,7 +132,7 @@ func initConfig() {
 // Execute executes the root command.
 func Execute(m Metadata) {
 	metadata = m
-	if err := rootCmd.Execute(); err != nil {
+	if err := rootCmd.ExecuteContext(context.Background()); err != nil {
 		pterm.Error.Println(err)
 		os.Exit(1)
 	}
