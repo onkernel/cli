@@ -137,3 +137,13 @@ func Execute(m Metadata) {
 		os.Exit(1)
 	}
 }
+
+// onCancel runs a function when the provided context is cancelled
+func onCancel(ctx context.Context, fn func()) {
+	go func() {
+		<-ctx.Done()
+		if ctx.Err() == context.Canceled {
+			fn()
+		}
+	}()
+}

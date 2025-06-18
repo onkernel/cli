@@ -1,9 +1,15 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/signal"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/onkernel/kernel-go-sdk"
@@ -52,6 +58,9 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 		}
 		params.Payload = kernel.Opt(payloadStr)
 	}
+	// we don't really care to cancel the context, we just want to handle signals
+	ctx, _ := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+	cmd.SetContext(ctx)
 
 	pterm.Info.Printf("Invoking \"%s\" (action: %s, version: %s)…\n", appName, actionName, version)
 
@@ -60,6 +69,29 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return handleSdkError(err)
 	}
+	// coordinate the cleanup with the polling loop to ensure this is given enough time to run
+	// before this function returns
+	cleanupDone := make(chan struct{})
+	cleanupStarted := atomic.Bool{}
+	defer func() {
+		if cleanupStarted.Load() {
+			<-cleanupDone
+		}
+	}()
+
+	// this is a little indirect but we try to fail out of the invocation by deleting the
+	// underlying browser sessions
+	once := sync.Once{}
+	onCancel(cmd.Context(), func() {
+		once.Do(func() {
+			cleanupStarted.Store(true)
+			defer close(cleanupDone)
+			pterm.Warning.Println("Invocation cancelled...cleaning up...")
+			if err := client.Invocations.DeleteBrowsers(context.Background(), resp.ID, option.WithRequestTimeout(30*time.Second)); err != nil {
+				pterm.Error.Printf("Failed to cancel invocation: %v\n", err)
+			}
+		})
+	})
 
 	// Start following events
 	stream := client.Invocations.FollowStreaming(cmd.Context(), resp.ID, option.WithMaxRetries(0))

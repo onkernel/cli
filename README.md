@@ -38,6 +38,27 @@ Useful make targets:
 - `make changelog` – generate/update the `CHANGELOG.md` file using **chglog**
 - `make release` – create a release using **goreleaser** (builds archives, homebrew formula, etc. See below)
 
+### Developing Against API Changes
+
+A typical workflow we encounter is updating the API and integrating those changes into our CLI. The high level workflow is (update API) -> (update SDK) -> (update CLI). Detailed instructions below
+
+1. Get added to https://www.stainless.com/ organization
+1. For the given SDK version switch to branch changes - see https://app.stainless.com/docs/guides/branches
+1. Update `openapi.stainless.yml` with new endpoint paths, objects, etc
+   1. Note: https://github.com/stainless-sdks/kernel-config/blob/main/openapi.stainless.yml is the source of truth. You can pull older versions as necessary
+1. Update `openapi.yml` with your changes
+1. Iterate in the diagnostics view until all errors are fixed
+1. Hit `Save & build branch`
+1. This will then create a branch in https://github.com/stainless-sdks/kernel-go
+1. Create a release of your branch in GitHub (click ops)
+1. Add the following to your `go.mod`:
+
+   ```
+   replace github.com/onkernel/kernel-go-sdk => github.com/stainless-sdks/kernel-go $YOUR_VERSION
+   ```
+
+1. Run `GOPRIVATE=github.com/stainless-sdks/kernel-go go mod tidy` to pull the updated SDK
+
 ### Releasing a new version
 
 Prerequisites:
