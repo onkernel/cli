@@ -29,7 +29,7 @@ func init() {
 	deployCmd.Flags().StringArray("env-file", []string{}, "Read environment variables from a file (.env format). May be specified multiple times")
 }
 
-func runDeploy(cmd *cobra.Command, args []string) error {
+func runDeploy(cmd *cobra.Command, args []string) (err error) {
 	startTime := time.Now()
 	client := getKernelClient(cmd)
 	entrypoint := args[0]
@@ -54,7 +54,7 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		spinner.Fail("Failed to compress files")
 		return err
 	}
-	spinner.Success("Compressed files")
+	spinner.Info("Compressed files")
 	defer os.Remove(tmpFile)
 
 	// make io.Reader from tmpFile
@@ -90,9 +90,10 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		envVars[parts[0]] = parts[1]
 	}
 
-	spinner, _ = pterm.DefaultSpinner.Start("Deploying app...")
 	logger.Debug("deploying app", logger.Args("version", version, "force", force, "entrypoint", filepath.Base(resolvedEntrypoint)))
-	resp, err := client.Apps.Deployments.New(cmd.Context(), kernel.AppDeploymentNewParams{
+	pterm.Info.Println("Deploying...")
+
+	resp, err := client.Deployments.New(cmd.Context(), kernel.DeploymentNewParams{
 		File:              file,
 		Version:           kernel.Opt(version),
 		Force:             kernel.Opt(force),
@@ -102,24 +103,48 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return &util.CleanedUpSdkError{Err: err}
 	}
-	spinner.Success("Deployment successful")
-	logger.Debug("deployment successful", logger.Args("resp", resp))
-	for _, app := range resp.Apps {
-		actions := make([]string, 0, len(app.Actions))
-		for _, a := range app.Actions {
-			actions = append(actions, a.Name)
-		}
-		pterm.Success.Printf("App \"%s\" deployed with action(s): %s\n", app.Name, actions)
-		if len(actions) > 0 {
-			pterm.Info.Printf("Invoke with: kernel invoke %s %s --payload '{...}'\n", quoteIfNeeded(app.Name), quoteIfNeeded(actions[0]))
-		} else {
-			pterm.Warning.Printf("App \"%s\" has no actions available to invoke.\n", app.Name)
+
+	// Follow deployment events via SSE
+	stream := client.Deployments.FollowStreaming(cmd.Context(), resp.ID, option.WithMaxRetries(0))
+	for stream.Next() {
+		data := stream.Current()
+		switch data.Event {
+		case "log":
+			logEv := data.AsLog()
+			msg := strings.TrimSuffix(logEv.Message, "\n")
+			pterm.Info.Println(pterm.Gray(msg))
+		case "deployment_state":
+			deploymentState := data.AsDeploymentState()
+			status := deploymentState.Deployment.Status
+			if status == string(kernel.DeploymentGetResponseStatusFailed) ||
+				status == string(kernel.DeploymentGetResponseStatusStopped) {
+				pterm.Error.Println("✖ Deployment failed")
+				err = fmt.Errorf("Deployment %s: %s", status, deploymentState.Deployment.StatusReason)
+				return err
+			}
+			if status == string(kernel.DeploymentGetResponseStatusRunning) {
+				duration := time.Since(startTime)
+				pterm.Success.Printfln("✔ Deployment complete in %s", duration.Round(time.Millisecond))
+				return nil
+			}
+		case "app_version_summary":
+			appVersionSummary := data.AsDeploymentFollowResponseAppVersionSummaryEvent()
+			pterm.Info.Printf("App \"%s\" deployed (version: %s)\n", appVersionSummary.AppName, appVersionSummary.Version)
+			if len(appVersionSummary.Actions) > 0 {
+				action0Name := appVersionSummary.Actions[0].Name
+				pterm.Info.Printf("Invoke with: kernel invoke %s %s --payload '{...}'\n", quoteIfNeeded(appVersionSummary.AppName), quoteIfNeeded(action0Name))
+			}
+		case "error":
+			errorEv := data.AsErrorEvent()
+			err = fmt.Errorf("%s: %s", errorEv.Error.Code, errorEv.Error.Message)
+			return err
 		}
 	}
 
-	_ = os.Remove(tmpFile)
-	duration := time.Since(startTime)
-	pterm.Success.Printf("Total deployment time: %s\n", duration.Round(time.Millisecond))
+	if serr := stream.Err(); serr != nil {
+		pterm.Error.Println("✖ Stream error")
+		return fmt.Errorf("stream error: %w", serr)
+	}
 	return nil
 }
 

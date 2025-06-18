@@ -47,8 +47,12 @@ github.com/lithammer/fuzzysearch v1.1.8/go.mod h1:IdqeyBClc3FFqSzYq/MXESsS4S0FsZ
 github.com/mattn/go-runewidth v0.0.13/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh153qUoGf23w=
 github.com/mattn/go-runewidth v0.0.16 h1:E5ScNMtiwvlvB5paMFdw9p4kSQzbXFikJ5SQO6TULQc=
 github.com/mattn/go-runewidth v0.0.16/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh153qUoGf23w=
-github.com/onkernel/kernel-go-sdk v0.5.0 h1:3N5e+6h3SlDYVnArNQU9pxPaA/cF4wClSn2AZnloyOA=
-github.com/onkernel/kernel-go-sdk v0.5.0/go.mod h1:q7wsAf+yjpY+w8jbAMciWCtCM0ZUxiw/5o2MSPTZS9E=
+github.com/onkernel/kernel-go-sdk v0.5.1-0.20250614231447-4f59a010b415 h1:SqinINWpopBJuA+YhISQuq1Bggy8RPQWU/d51pSUXkc=
+github.com/onkernel/kernel-go-sdk v0.5.1-0.20250614231447-4f59a010b415/go.mod h1:q7wsAf+yjpY+w8jbAMciWCtCM0ZUxiw/5o2MSPTZS9E=
+github.com/onkernel/kernel-go-sdk v0.5.1-0.20250617150952-4de315e8e0db h1:0WZ10p/eyOsDVEZhbL3zIMg/gdeiCsnXdz9f47EjQ7k=
+github.com/onkernel/kernel-go-sdk v0.5.1-0.20250617150952-4de315e8e0db/go.mod h1:q7wsAf+yjpY+w8jbAMciWCtCM0ZUxiw/5o2MSPTZS9E=
+github.com/onkernel/kernel-go-sdk v0.6.0 h1:yEWbnL9ZFhPW5SAixoMeP5e28e40347lGDtMwkAqa7M=
+github.com/onkernel/kernel-go-sdk v0.6.0/go.mod h1:q7wsAf+yjpY+w8jbAMciWCtCM0ZUxiw/5o2MSPTZS9E=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pterm/pterm v0.12.27/go.mod h1:PhQ89w4i95rhgE+xedAoqous6K9X+r6aSOI2eFF7DZI=
@@ -77,8 +81,8 @@ github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
 github.com/tidwall/gjson v1.14.2/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
-github.com/tidwall/gjson v1.14.4 h1:uo0p8EbA09J7RQaflQ1aBRffTR7xedD2bcIVSYxLnkM=
-github.com/tidwall/gjson v1.14.4/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
+github.com/tidwall/gjson v1.18.0 h1:FIDeeyB800efLX89e5a8Y0BNH+LOngJyGrIWxG2FKQY=
+github.com/tidwall/gjson v1.18.0/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
 github.com/tidwall/match v1.1.1 h1:+Ho715JplO36QYgwN9PGYNhgZvoUSc9X2c80KVTi+GA=
 github.com/tidwall/match v1.1.1/go.mod h1:eRSPERbgtNPcGhD8UCthc6PmLEQXEWd3PRB5JTxsfmM=
 github.com/tidwall/pretty v1.2.0/go.mod h1:ITEVvHYasfjBbM0u2Pg8T2nJnzm8xPwvNhhsoaGGjNU=

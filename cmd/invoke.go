@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/onkernel/kernel-go-sdk"
@@ -25,84 +26,95 @@ func init() {
 }
 
 func runInvoke(cmd *cobra.Command, args []string) error {
+	startTime := time.Now()
 	client := getKernelClient(cmd)
 	appName := args[0]
 	actionName := args[1]
 	version, _ := cmd.Flags().GetString("version")
-	asyncFlag, _ := cmd.Flags().GetBool("async")
 	if version == "" {
 		return fmt.Errorf("version cannot be an empty string")
 	}
-	params := kernel.AppInvocationNewParams{
+	params := kernel.InvocationNewParams{
 		AppName:    appName,
 		ActionName: actionName,
 		Version:    version,
+		Async:      kernel.Opt(true),
 	}
+
 	payloadStr, _ := cmd.Flags().GetString("payload")
-	payloadProvided := cmd.Flags().Changed("payload")
-	switch {
-	case !payloadProvided:
-		// user did NOT pass --payload at all
-	case payloadStr == "":
-		// user passed --payload ""  (or --payload=) – empty string explicitly requested
-		params.Payload = kernel.Opt("")
-	default:
-		// user passed a non-empty payload
-		var i interface{}
-		if err := json.Unmarshal([]byte(payloadStr), &i); err != nil {
-			return fmt.Errorf("invalid JSON payload: %w", err)
+	if cmd.Flags().Changed("payload") {
+		// validate JSON unless empty string explicitly set
+		if payloadStr != "" {
+			var v interface{}
+			if err := json.Unmarshal([]byte(payloadStr), &v); err != nil {
+				return fmt.Errorf("invalid JSON payload: %w", err)
+			}
 		}
 		params.Payload = kernel.Opt(payloadStr)
 	}
-	if asyncFlag {
-		params.Async = kernel.Opt(true)
-	}
 
-	pterm.Info.Printf("Invoking \"%s\" (action: %s, version: %s) ...\n", appName, actionName, version)
-	requestOpts := []option.RequestOption{option.WithMaxRetries(0)}
-	if !asyncFlag {
-		requestOpts = append(requestOpts, option.WithRequestTimeout(10*time.Minute))
-	}
-	resp, err := client.Apps.Invocations.New(cmd.Context(), params, requestOpts...)
+	pterm.Info.Printf("Invoking \"%s\" (action: %s, version: %s)…\n", appName, actionName, version)
+
+	// Create the invocation
+	resp, err := client.Invocations.New(cmd.Context(), params, option.WithMaxRetries(0))
 	if err != nil {
-		pterm.Error.Printf("Failed to invoke application: %v\n", err)
-
-		// Try to extract more detailed error information
-		if apiErr, ok := err.(*kernel.Error); ok {
-			pterm.Error.Printf("API Error Details:\n")
-			pterm.Error.Printf("  Status: %d\n", apiErr.StatusCode)
-			pterm.Error.Printf("  Response: %s\n", apiErr.DumpResponse(true))
-		}
-
-		// Print troubleshooting tips
-		pterm.Info.Println("Troubleshooting tips:")
-		pterm.Info.Println("- Check that your API key is valid")
-		pterm.Info.Println("- Verify that the app name and action name are correct")
-		pterm.Info.Println("- Ensure the app version exists")
-		pterm.Info.Println("- Validate that your payload is properly formatted")
-		return nil
+		return handleSdkError(err)
 	}
 
-	// if not queued, print the result
-	if resp.Status != kernel.AppInvocationNewResponseStatusQueued {
-		printResult(resp.Status == kernel.AppInvocationNewResponseStatusSucceeded, resp.Output)
-		return nil
+	// Start following events
+	stream := client.Invocations.FollowStreaming(cmd.Context(), resp.ID, option.WithMaxRetries(0))
+	for stream.Next() {
+		ev := stream.Current()
+
+		switch ev.Event {
+		case "log":
+			logEv := ev.AsLog()
+			msg := strings.TrimSuffix(logEv.Message, "\n")
+			pterm.Info.Println(pterm.Gray(msg))
+
+		case "invocation_state":
+			stateEv := ev.AsInvocationState()
+			status := stateEv.Invocation.Status
+			if status == string(kernel.InvocationGetResponseStatusSucceeded) || status == string(kernel.InvocationGetResponseStatusFailed) {
+				// Finished – print output and exit accordingly
+				succeeded := status == string(kernel.InvocationGetResponseStatusSucceeded)
+				printResult(succeeded, stateEv.Invocation.Output)
+
+				duration := time.Since(startTime)
+				if succeeded {
+					pterm.Success.Printfln("✔ Completed in %s", duration.Round(time.Millisecond))
+					return nil
+				}
+				return fmt.Errorf("invocation failed")
+			}
+
+		case "error":
+			errEv := ev.AsError()
+			return fmt.Errorf("%s: %s", errEv.Error.Code, errEv.Error.Message)
+		}
 	}
 
-	// invocation is queued--poll until we have output or terminal status
-	pterm.Info.Println("Invocation queued, polling for result...")
-	for {
-		time.Sleep(2 * time.Second)
-		invocation, err := client.Apps.Invocations.Get(cmd.Context(), resp.ID, option.WithMaxRetries(0), option.WithRequestTimeout(2*time.Minute))
-		if err != nil {
-			pterm.Error.Printf("Polling failed: %v\n", err)
-			return nil
-		}
-		if invocation.Status == kernel.AppInvocationGetResponseStatusSucceeded || invocation.Status == kernel.AppInvocationGetResponseStatusFailed {
-			printResult(invocation.Status == kernel.AppInvocationGetResponseStatusSucceeded, invocation.Output)
-			return nil
-		}
+	if serr := stream.Err(); serr != nil {
+		return fmt.Errorf("stream error: %w", serr)
 	}
+	return nil
+}
+
+// handleSdkError prints helpful diagnostics similar to runDeploy
+func handleSdkError(err error) error {
+	pterm.Error.Printf("Failed to invoke application: %v\n", err)
+	if apiErr, ok := err.(*kernel.Error); ok {
+		pterm.Error.Printf("API Error Details:\n")
+		pterm.Error.Printf("  Status: %d\n", apiErr.StatusCode)
+		pterm.Error.Printf("  Response: %s\n", apiErr.DumpResponse(true))
+	}
+
+	pterm.Info.Println("Troubleshooting tips:")
+	pterm.Info.Println("- Check that your API key is valid")
+	pterm.Info.Println("- Verify that the app name and action name are correct")
+	pterm.Info.Println("- Ensure the app version exists")
+	pterm.Info.Println("- Validate that your payload is properly formatted")
+	return err
 }
 
 func printResult(success bool, output string) {

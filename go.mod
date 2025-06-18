@@ -5,7 +5,7 @@ go 1.24.3
 require (
 	github.com/boyter/gocodewalker v1.4.0
 	github.com/joho/godotenv v1.5.1
-	github.com/onkernel/kernel-go-sdk v0.5.0
+	github.com/onkernel/kernel-go-sdk v0.6.0
 	github.com/pterm/pterm v0.12.80
 	github.com/spf13/cobra v1.9.1
 )
@@ -22,7 +22,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
-	github.com/tidwall/gjson v1.14.4 // indirect
+	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect

@@ -78,7 +78,7 @@ func runAppsList(cmd *cobra.Command, args []string) error {
 			app.AppName,
 			app.Version,
 			app.ID,
-			app.Region,
+			string(app.Region),
 			envVarsStr,
 		})
 	}
