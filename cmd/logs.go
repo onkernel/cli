@@ -6,6 +6,7 @@ import (
 
 	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
+	"github.com/onkernel/kernel-go-sdk/option"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
@@ -20,6 +21,8 @@ var logsCmd = &cobra.Command{
 func init() {
 	logsCmd.Flags().String("version", "latest", "Specify a version of the app (default: latest)")
 	logsCmd.Flags().BoolP("follow", "f", false, "Follow logs in real-time (stream continuously)")
+	logsCmd.Flags().String("since", "s", "How far back to retrieve logs (e.g., 5m, 1h). Defaults to 5m if not following, 5s if following. Can also specify timestamps in formats: 2006-01-02 (day), 2006-01-02T15:04 (minute), 2006-01-02T15:04:05 (second), 2006-01-02T15:04:05.000 (ms), 2006-01-02T15:04:05.000000000 (ns). Maximum is 7d.")
+	logsCmd.Flags().Bool("with-timestamps", false, "Include timestamps in each log line")
 	rootCmd.AddCommand(logsCmd)
 }
 
@@ -29,8 +32,17 @@ func runLogs(cmd *cobra.Command, args []string) error {
 	appName := args[0]
 	version, _ := cmd.Flags().GetString("version")
 	follow, _ := cmd.Flags().GetBool("follow")
+	since, _ := cmd.Flags().GetString("since")
+	timestamps, _ := cmd.Flags().GetBool("with-timestamps")
 	if version == "" {
 		version = "latest"
+	}
+	if !cmd.Flags().Changed("since") {
+		if follow {
+			since = "5s"
+		} else {
+			since = "5m"
+		}
 	}
 
 	params := kernel.AppListParams{
@@ -56,7 +68,12 @@ func runLogs(cmd *cobra.Command, args []string) error {
 		pterm.Info.Println("Showing recent logs (timeout after 3s with no events)")
 	}
 
-	stream := client.Apps.Deployments.FollowStreaming(cmd.Context(), app.ID)
+	stream := client.Deployments.FollowStreaming(cmd.Context(), app.Deployment, kernel.DeploymentFollowParams{
+		Since: kernel.Opt(since),
+	}, option.WithMaxRetries(0))
+	if stream.Err() != nil {
+		return fmt.Errorf("failed to follow streaming: %w", stream.Err())
+	}
 
 	// Handle follow vs non-follow mode
 	if follow {
@@ -65,7 +82,12 @@ func runLogs(cmd *cobra.Command, args []string) error {
 			data := stream.Current()
 			switch data.Event {
 			case "log":
-				fmt.Println(data.AsLog().Message)
+				logEntry := data.AsLog()
+				if timestamps {
+					fmt.Printf("%s %s\n", logEntry.Timestamp.Format(time.RFC3339Nano), logEntry.Message)
+				} else {
+					fmt.Println(logEntry.Message)
+				}
 			}
 		}
 	} else {
@@ -94,7 +116,12 @@ func runLogs(cmd *cobra.Command, args []string) error {
 					data := stream.Current()
 					switch data.Event {
 					case "log":
-						fmt.Println(data.AsLog().Message)
+						logEntry := data.AsLog()
+						if timestamps {
+							fmt.Printf("%s %s\n", logEntry.Timestamp.Format(time.RFC3339Nano), logEntry.Message)
+						} else {
+							fmt.Println(logEntry.Message)
+						}
 					}
 					timeout.Reset(3 * time.Second)
 				}
@@ -102,6 +129,7 @@ func runLogs(cmd *cobra.Command, args []string) error {
 				// No events for 3 seconds, we're done
 				done = true
 				stream.Close()
+				return nil
 			}
 		}
 	}

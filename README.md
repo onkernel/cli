@@ -50,14 +50,11 @@ A typical workflow we encounter is updating the API and integrating those change
 1. Iterate in the diagnostics view until all errors are fixed
 1. Hit `Save & build branch`
 1. This will then create a branch in https://github.com/stainless-sdks/kernel-go
-1. Create a release of your branch in GitHub (click ops)
-1. Add the following to your `go.mod`:
+1. Using either your branch name or a specific commit hash you want to point to, run this script to modify the CLI's `go.mod`:
 
-   ```
-   replace github.com/onkernel/kernel-go-sdk => github.com/stainless-sdks/kernel-go $YOUR_VERSION
-   ```
-
-1. Run `GOPRIVATE=github.com/stainless-sdks/kernel-go go mod tidy` to pull the updated SDK
+```
+./scripts/go-mod-replace-kernel.sh <commit | branch name>
+```
 
 ### Releasing a new version
 

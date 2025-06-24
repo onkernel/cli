@@ -105,7 +105,7 @@ func runDeploy(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	// Follow deployment events via SSE
-	stream := client.Deployments.FollowStreaming(cmd.Context(), resp.ID, option.WithMaxRetries(0))
+	stream := client.Deployments.FollowStreaming(cmd.Context(), resp.ID, kernel.DeploymentFollowParams{}, option.WithMaxRetries(0))
 	for stream.Next() {
 		data := stream.Current()
 		switch data.Event {
