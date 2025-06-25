@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/charmbracelet/fang"
 	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/onkernel/kernel-go-sdk/option"
@@ -132,7 +133,7 @@ func initConfig() {
 // Execute executes the root command.
 func Execute(m Metadata) {
 	metadata = m
-	if err := rootCmd.ExecuteContext(context.Background()); err != nil {
+	if err := fang.Execute(context.Background(), rootCmd); err != nil {
 		pterm.Error.Println(err)
 		os.Exit(1)
 	}
