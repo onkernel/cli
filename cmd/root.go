@@ -82,20 +82,6 @@ func init() {
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		logLevel, _ := cmd.Flags().GetString("log-level")
 		logger = pterm.DefaultLogger.WithLevel(logLevelToPterm(logLevel))
-		if v, _ := cmd.Flags().GetBool("version"); v {
-			fmt.Printf("kernel %s", metadata.Version)
-			if metadata.Commit != "" {
-				fmt.Printf(" (%s)", metadata.Commit)
-			}
-			if metadata.GoVersion != "" {
-				fmt.Printf(" %s", metadata.GoVersion)
-			}
-			if metadata.Date != "" {
-				fmt.Printf(" %s", metadata.Date)
-			}
-			fmt.Println()
-			os.Exit(0)
-		}
 		if noColor, _ := cmd.Flags().GetBool("no-color"); noColor {
 			pterm.DisableStyling()
 		}
@@ -133,7 +119,22 @@ func initConfig() {
 // Execute executes the root command.
 func Execute(m Metadata) {
 	metadata = m
-	if err := fang.Execute(context.Background(), rootCmd); err != nil {
+	vt := "kernel"
+	if metadata.Version != "" {
+		vt += " " + metadata.Version
+	}
+	if metadata.Commit != "" {
+		vt += " (" + metadata.Commit + ")"
+	}
+	if metadata.GoVersion != "" {
+		vt += " " + metadata.GoVersion
+	}
+	if metadata.Date != "" {
+		vt += " " + metadata.Date
+	}
+	vt += "\n"
+	rootCmd.SetVersionTemplate(vt)
+	if err := fang.Execute(context.Background(), rootCmd, fang.WithVersion(metadata.Version), fang.WithCommit(metadata.Commit)); err != nil {
 		// fang takes care of printing the error
 		os.Exit(1)
 	}
