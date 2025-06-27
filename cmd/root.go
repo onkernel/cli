@@ -122,7 +122,7 @@ func init() {
 	rootCmd.AddCommand(deployCmd)
 	rootCmd.AddCommand(invokeCmd)
 	rootCmd.AddCommand(browsersCmd)
-	rootCmd.AddCommand(appsCmd)
+	rootCmd.AddCommand(appCmd)
 }
 
 func initConfig() {
@@ -134,7 +134,7 @@ func initConfig() {
 func Execute(m Metadata) {
 	metadata = m
 	if err := fang.Execute(context.Background(), rootCmd); err != nil {
-		pterm.Error.Println(err)
+		// fang takes care of printing the error
 		os.Exit(1)
 	}
 }

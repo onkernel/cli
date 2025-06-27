@@ -117,7 +117,7 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 					pterm.Success.Printfln("✔ Completed in %s", duration.Round(time.Millisecond))
 					return nil
 				}
-				return fmt.Errorf("invocation failed")
+				return nil
 			}
 
 		case "error":
@@ -144,9 +144,11 @@ func handleSdkError(err error) error {
 	pterm.Info.Println("Troubleshooting tips:")
 	pterm.Info.Println("- Check that your API key is valid")
 	pterm.Info.Println("- Verify that the app name and action name are correct")
-	pterm.Info.Println("- Ensure the app version exists")
 	pterm.Info.Println("- Validate that your payload is properly formatted")
-	return err
+	pterm.Info.Println("- Check `kernel app history <app name>` to see if the app is deployed")
+	pterm.Info.Println("- Try redeploying the app")
+	pterm.Info.Println("- Make sure you're on the latest version of the CLI: `brew upgrade onkernel/tap/kernel`")
+	return nil
 }
 
 func printResult(success bool, output string) {

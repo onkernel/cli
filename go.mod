@@ -8,6 +8,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/onkernel/kernel-go-sdk v0.6.2
 	github.com/pterm/pterm v0.12.80
+	github.com/samber/lo v1.51.0
 	github.com/spf13/cobra v1.9.1
 )
 
@@ -45,3 +46,5 @@ require (
 	golang.org/x/term v0.26.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
 )
+
+replace github.com/onkernel/kernel-go-sdk => github.com/stainless-sdks/kernel-go v0.0.0-20250627141652-cf8c37474e58
