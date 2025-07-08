@@ -2,6 +2,7 @@ build:
 	go build -o bin/kernel ./cmd/kernel
 
 test:
+	go vet ./...
 	go test ./...
 
 lint:
