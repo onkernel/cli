@@ -6,13 +6,17 @@ require (
 	github.com/boyter/gocodewalker v1.4.0
 	github.com/charmbracelet/fang v0.2.0
 	github.com/joho/godotenv v1.5.1
-	github.com/onkernel/kernel-go-sdk v0.6.4
+	github.com/onkernel/kernel-go-sdk v0.8.2
+	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/pterm/pterm v0.12.80
 	github.com/samber/lo v1.51.0
 	github.com/spf13/cobra v1.9.1
+	github.com/zalando/go-keyring v0.2.6
+	golang.org/x/oauth2 v0.30.0
 )
 
 require (
+	al.essio.dev/pkg/shellescape v1.5.1 // indirect
 	atomicgo.dev/cursor v0.2.0 // indirect
 	atomicgo.dev/keyboard v0.2.9 // indirect
 	atomicgo.dev/schedule v0.1.0 // indirect
@@ -23,7 +27,10 @@ require (
 	github.com/charmbracelet/x/exp/charmtone v0.0.0-20250603201427-c31516f43444 // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/containerd/console v1.0.3 // indirect
+	github.com/danieljoos/wincred v1.2.2 // indirect
 	github.com/danwakefield/fnmatch v0.0.0-20160403171240-cbb64ac3d964 // indirect
+	github.com/godbus/dbus/v5 v5.1.0 // indirect
+	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/gookit/color v1.5.4 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/lithammer/fuzzysearch v1.1.8 // indirect

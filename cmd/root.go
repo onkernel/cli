@@ -7,7 +7,7 @@ import (
 	"runtime"
 
 	"github.com/charmbracelet/fang"
-	"github.com/onkernel/cli/pkg/util"
+	"github.com/onkernel/cli/pkg/auth"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/onkernel/kernel-go-sdk/option"
 	"github.com/pterm/pterm"
@@ -63,7 +63,9 @@ func logLevelToPterm(level string) pterm.LogLevel {
 	}
 }
 
-const KernelClientKey = "kernel_client"
+type contextKey string
+
+const KernelClientKey contextKey = "kernel_client"
 
 func getKernelClient(cmd *cobra.Command) kernel.Client {
 	return cmd.Context().Value(KernelClientKey).(kernel.Client)
@@ -78,7 +80,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	// Version flag handling: we use our own persistent pre-run to handle it globally.
-	// We also inject a Kernel client object into the command context for commands to sue
+	// We also inject a Kernel client object into the command context for commands to use
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		logLevel, _ := cmd.Flags().GetString("log-level")
 		logger = pterm.DefaultLogger.WithLevel(logLevelToPterm(logLevel))
@@ -86,20 +88,19 @@ func init() {
 			pterm.DisableStyling()
 		}
 
-		// Check if this command requires API key
-		// Skip API key check for root command (help) and any command that doesn't need it
-		if cmd == rootCmd {
+		// Check if this command requires authentication
+		// Skip auth check for root command (help) and commands that don't need it
+		if cmd == rootCmd || cmd.Name() == "login" || cmd.Name() == "logout" || cmd.Name() == "auth" {
 			return nil
 		}
 
-		// Commands that don't require API key can be added here
-		// For now, all subcommands require API key
-		apiKey := os.Getenv("KERNEL_API_KEY")
-		if apiKey == "" {
-			return fmt.Errorf("KERNEL_API_KEY environment variable is not set")
+		// Get authenticated client with OAuth tokens or API key fallback
+		client, err := auth.GetAuthenticatedClient(option.WithHeader("X-Kernel-Cli-Version", metadata.Version))
+		if err != nil {
+			return fmt.Errorf("authentication required: %w", err)
 		}
 
-		ctx := context.WithValue(cmd.Context(), KernelClientKey, util.NewClient(option.WithHeader("X-Kernel-Cli-Version", metadata.Version)))
+		ctx := context.WithValue(cmd.Context(), KernelClientKey, *client)
 		cmd.SetContext(ctx)
 		return nil
 	}

@@ -119,7 +119,7 @@ func runDeploy(cmd *cobra.Command, args []string) (err error) {
 			if status == string(kernel.DeploymentGetResponseStatusFailed) ||
 				status == string(kernel.DeploymentGetResponseStatusStopped) {
 				pterm.Error.Println("✖ Deployment failed")
-				err = fmt.Errorf("Deployment %s: %s", status, deploymentState.Deployment.StatusReason)
+				err = fmt.Errorf("deployment %s: %s", status, deploymentState.Deployment.StatusReason)
 				return err
 			}
 			if status == string(kernel.DeploymentGetResponseStatusRunning) {
