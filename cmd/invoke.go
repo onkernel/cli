@@ -28,7 +28,7 @@ var invokeCmd = &cobra.Command{
 func init() {
 	invokeCmd.Flags().StringP("version", "v", "latest", "Specify a version of the app to invoke (optional, defaults to 'latest')")
 	invokeCmd.Flags().StringP("payload", "p", "", "JSON payload for the invocation (optional)")
-	invokeCmd.Flags().BoolP("async", "a", true, "Invoke asynchronously (default true). Use --async=false if invocations are expected to last less than 60 seconds to wait synchronously")
+	invokeCmd.Flags().BoolP("sync", "s", false, "Invoke synchronously (default false). A synchronous invocation will open a long-lived HTTP POST to the Kernel API to wait for the invocation to complete. This will time out after 60 seconds, so only use this option if you expect your invocation to complete in less than 60 seconds. The default is to invoke asynchronously, in which case the CLI will open an SSE connection to the Kernel API after submitting the invocation and wait for the invocation to complete.")
 }
 
 func runInvoke(cmd *cobra.Command, args []string) error {
@@ -40,11 +40,12 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 	if version == "" {
 		return fmt.Errorf("version cannot be an empty string")
 	}
+	isSync, _ := cmd.Flags().GetBool("sync")
 	params := kernel.InvocationNewParams{
 		AppName:    appName,
 		ActionName: actionName,
 		Version:    version,
-		Async:      kernel.Opt(true),
+		Async:      kernel.Opt(!isSync),
 	}
 
 	payloadStr, _ := cmd.Flags().GetString("payload")
