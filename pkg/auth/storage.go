@@ -20,6 +20,7 @@ type TokenStorage struct {
 	AccessToken  string    `json:"access_token"`
 	RefreshToken string    `json:"refresh_token"`
 	ExpiresAt    time.Time `json:"expires_at"`
+	OrgID        string    `json:"org_id"`
 }
 
 // IsExpired checks if the access token is expired (with 5 minute buffer)

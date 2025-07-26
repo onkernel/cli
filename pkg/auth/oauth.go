@@ -29,7 +29,7 @@ const (
 	TokenURL = "https://auth.onkernel.com/token"
 
 	// OAuth client configuration
-	ClientID    = "hmFrJn9hKDV2N02M"
+	ClientID    = "hmFrJn9hKDV2N02M" // Prod Kernel CLI OAuth Client ID
 	RedirectURI = "http://localhost"
 
 	// OAuth scopes - openid for the MCP server flow
@@ -52,6 +52,12 @@ type TokenResponse struct {
 	OrgID        string `json:"org_id"`
 }
 
+// AuthResult represents the result data passed through the callback channel
+type AuthResult struct {
+	Code  string `json:"code"`
+	OrgID string `json:"org_id,omitempty"`
+}
+
 // NewOAuthConfig creates a new OAuth configuration with PKCE
 func NewOAuthConfig() (*OAuthConfig, error) {
 	// Generate PKCE code verifier and challenge
@@ -60,11 +66,21 @@ func NewOAuthConfig() (*OAuthConfig, error) {
 		return nil, fmt.Errorf("failed to generate code verifier: %w", err)
 	}
 
-	// Generate random state for CSRF protection
-	state, err := generateRandomString(32)
+	// Generate random CSRF token for state protection
+	csrfToken, err := generateRandomString(32)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate state: %w", err)
+		return nil, fmt.Errorf("failed to generate CSRF token: %w", err)
 	}
+
+	// Create state as base64-encoded JSON containing the CSRF token
+	stateData := map[string]string{
+		"csrf": csrfToken,
+	}
+	stateJSON, err := json.Marshal(stateData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal state data: %w", err)
+	}
+	state := base64.StdEncoding.EncodeToString(stateJSON)
 
 	// Try to find an available port from our allowed range
 	// Note: We'll get the actual port later when starting the server to avoid race conditions
@@ -83,7 +99,7 @@ func NewOAuthConfig() (*OAuthConfig, error) {
 	return &OAuthConfig{
 		Config:   config,
 		Verifier: verifier,
-		State:    state,
+		State:    state, // Store the encoded state for OAuth URL
 	}, nil
 }
 
@@ -124,8 +140,37 @@ func (oc *OAuthConfig) StartOAuthFlow(ctx context.Context) (*TokenStorage, error
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
-		// Verify state parameter to prevent CSRF
-		if r.URL.Query().Get("state") != oc.State {
+		// Extract and decode state parameter to get CSRF token and org_id
+		encodedState := r.URL.Query().Get("state")
+		var csrfToken, orgID string
+
+		if encodedState != "" {
+			// Try to decode the state parameter
+			if decodedBytes, err := base64.StdEncoding.DecodeString(encodedState); err == nil {
+				var stateData map[string]string
+				if json.Unmarshal(decodedBytes, &stateData) == nil {
+					csrfToken = stateData["csrf"]
+					orgID = stateData["org_id"]
+				}
+			}
+
+			// Fallback to treating the entire state as CSRF token if decoding fails
+			if csrfToken == "" {
+				csrfToken = encodedState
+			}
+		}
+
+		// Verify CSRF token to prevent CSRF attacks
+		// Extract the expected CSRF token from our stored state
+		var expectedCSRF string
+		if decodedBytes, err := base64.StdEncoding.DecodeString(oc.State); err == nil {
+			var stateData map[string]string
+			if json.Unmarshal(decodedBytes, &stateData) == nil {
+				expectedCSRF = stateData["csrf"]
+			}
+		}
+
+		if csrfToken != expectedCSRF || expectedCSRF == "" {
 			http.Error(w, "Invalid state parameter", http.StatusBadRequest)
 			errChan <- fmt.Errorf("invalid state parameter")
 			return
@@ -143,7 +188,17 @@ func (oc *OAuthConfig) StartOAuthFlow(ctx context.Context) (*TokenStorage, error
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(successHTML))
 
-		codeChan <- code
+		// Pass both code and org_id to the channel using JSON encoding
+		result := AuthResult{
+			Code:  code,
+			OrgID: orgID,
+		}
+		resultJSON, err := json.Marshal(result)
+		if err != nil {
+			errChan <- fmt.Errorf("failed to encode auth result: %w", err)
+			return
+		}
+		codeChan <- string(resultJSON)
 	})
 
 	server := &http.Server{Handler: mux}
@@ -156,11 +211,18 @@ func (oc *OAuthConfig) StartOAuthFlow(ctx context.Context) (*TokenStorage, error
 	}()
 
 	// Wait for callback or timeout
-	var authCode string
+	var authCode, orgID string
 	select {
-	case authCode = <-codeChan:
+	case resultJSON := <-codeChan:
 		// Success - shutdown server
 		server.Shutdown(context.Background())
+		// Parse JSON result containing both code and org_id
+		var result AuthResult
+		if err := json.Unmarshal([]byte(resultJSON), &result); err != nil {
+			return nil, fmt.Errorf("failed to decode auth result: %w", err)
+		}
+		authCode = result.Code
+		orgID = result.OrgID
 	case err := <-errChan:
 		server.Shutdown(context.Background())
 		return nil, err
@@ -173,15 +235,19 @@ func (oc *OAuthConfig) StartOAuthFlow(ctx context.Context) (*TokenStorage, error
 	}
 
 	// Exchange authorization code for tokens
-	return oc.exchangeCodeForTokens(ctx, authCode)
+	return oc.exchangeCodeForTokens(ctx, authCode, orgID)
 }
 
 // exchangeCodeForTokens exchanges the authorization code for access and refresh tokens
-func (oc *OAuthConfig) exchangeCodeForTokens(ctx context.Context, code string) (*TokenStorage, error) {
-	// Use PKCE verifier in token exchange
-	token, err := oc.Config.Exchange(ctx, code,
-		oauth2.SetAuthURLParam("code_verifier", oc.Verifier),
-	)
+func (oc *OAuthConfig) exchangeCodeForTokens(ctx context.Context, code, orgID string) (*TokenStorage, error) {
+	// Use PKCE verifier in token exchange, and include org_id if available
+	var opts []oauth2.AuthCodeOption
+	opts = append(opts, oauth2.SetAuthURLParam("code_verifier", oc.Verifier))
+	if orgID != "" {
+		opts = append(opts, oauth2.SetAuthURLParam("org_id", orgID))
+	}
+
+	token, err := oc.Config.Exchange(ctx, code, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to exchange code for token: %w", err)
 	}
@@ -190,6 +256,7 @@ func (oc *OAuthConfig) exchangeCodeForTokens(ctx context.Context, code string) (
 		AccessToken:  token.AccessToken,
 		RefreshToken: token.RefreshToken,
 		ExpiresAt:    token.Expiry,
+		OrgID:        orgID,
 	}, nil
 }
 
@@ -204,10 +271,6 @@ func RefreshTokens(ctx context.Context, tokens *TokenStorage) (*TokenStorage, er
 	values.Set("refresh_token", tokens.RefreshToken)
 	values.Set("client_id", ClientID)
 	values.Set("scope", DefaultScope)
-	// Include expired access token for server-side claim extraction
-	if tokens.AccessToken != "" {
-		values.Set("expired_token", tokens.AccessToken)
-	}
 
 	// Make the token request manually to ensure client_id is included
 	req, err := http.NewRequestWithContext(ctx, "POST", TokenURL, strings.NewReader(values.Encode()))

@@ -104,7 +104,7 @@ func runAuth(cmd *cobra.Command, args []string) error {
 	// Extract info from JWT token
 	if claims, err := parseJWT(tokens.AccessToken); err == nil && claims != nil {
 		if claims.Sub != "" {
-			logger.Debug("User details", logger.Args("email", claims.Email, "user_id", claims.Sub, "org_name", claims.OrgName, "org_id", claims.OrgID))
+			logger.Debug("User details", logger.Args("email", claims.Email, "user_id", claims.Sub, "org_id", tokens.OrgID))
 		}
 	}
 
