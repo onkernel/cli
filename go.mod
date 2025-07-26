@@ -5,6 +5,7 @@ go 1.24.3
 require (
 	github.com/boyter/gocodewalker v1.4.0
 	github.com/charmbracelet/fang v0.2.0
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/joho/godotenv v1.5.1
 	github.com/onkernel/kernel-go-sdk v0.8.2
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
@@ -30,7 +31,6 @@ require (
 	github.com/danieljoos/wincred v1.2.2 // indirect
 	github.com/danwakefield/fnmatch v0.0.0-20160403171240-cbb64ac3d964 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
-	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/gookit/color v1.5.4 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/lithammer/fuzzysearch v1.1.8 // indirect
