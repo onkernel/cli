@@ -80,6 +80,18 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
+	if resp.Status != kernel.InvocationNewResponseStatusQueued {
+		succeeded := resp.Status == kernel.InvocationNewResponseStatusSucceeded
+		printResult(succeeded, resp.Output)
+
+		duration := time.Since(startTime)
+		if succeeded {
+			pterm.Success.Printfln("✔ Completed in %s", duration.Round(time.Millisecond))
+			return nil
+		}
+		return nil
+	}
+
 	// this is a little indirect but we try to fail out of the invocation by deleting the
 	// underlying browser sessions
 	once := sync.Once{}
