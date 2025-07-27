@@ -1,88 +1,192 @@
 # Kernel CLI
 
-A command-line tool for deploying and invoking Kernel applications.
+The Kernel CLI helps you deploy and run web automation apps on the Kernel platform. Build browser automation, web scraping, and AI agents that run in the cloud.
 
 ## Installation
 
+Install the Kernel CLI using your favorite package manager:
+
 ```bash
+# Using brew (recommended)
 brew install onkernel/tap/kernel
+
+# Using pnpm
+pnpm install -g @onkernel/cli
+
+# Using npm
+npm install -g @onkernel/cli
 ```
 
-## Development Prerequisites
-
-Install the following tools:
-
-- Go 1.22+ ( https://go.dev/doc/install )
-- [Goreleaser](https://goreleaser.com/install/)
-- [chglog](https://github.com/goreleaser/chglog)
-
-Compile the CLI:
+Verify the installation:
 
 ```bash
-make build   # compiles the binary to ./bin/kernel
+which kernel
+kernel --version
 ```
 
-Run the CLI:
+## Quick Start
+
+1. **Authenticate with Kernel:**
+
+   ```bash
+   kernel login
+   ```
+
+2. **Deploy your first app:**
+
+   ```bash
+   kernel deploy index.ts
+   ```
+
+3. **Invoke your app:**
+   ```bash
+   kernel invoke my-app action-name --payload '{"key": "value"}'
+   ```
+
+## Authentication
+
+### OAuth 2.0 (Recommended)
+
+The easiest way to authenticate is using OAuth:
 
 ```bash
-./bin/kernel --help
+kernel login
 ```
 
-## Development workflow
+This opens your browser to complete the authentication flow. Your credentials are securely stored and automatically refreshed.
 
-Useful make targets:
+### API Key
 
-- `make build` – compile the project to `./bin/kernel`
-- `make test` – execute unit tests
-- `make lint` – run the linter (requires `golangci-lint`)
-- `make changelog` – generate/update the `CHANGELOG.md` file using **chglog**
-- `make release` – create a release using **goreleaser** (builds archives, homebrew formula, etc. See below)
-
-### Developing Against API Changes
-
-A typical workflow we encounter is updating the API and integrating those changes into our CLI. The high level workflow is (update API) -> (update SDK) -> (update CLI). Detailed instructions below
-
-1. Get added to https://www.stainless.com/ organization
-1. For the given SDK version switch to branch changes - see https://app.stainless.com/docs/guides/branches
-1. Update `openapi.stainless.yml` with new endpoint paths, objects, etc
-   1. Note: https://github.com/stainless-sdks/kernel-config/blob/main/openapi.stainless.yml is the source of truth. You can pull older versions as necessary
-1. Update `openapi.yml` with your changes
-1. Iterate in the diagnostics view until all errors are fixed
-1. Hit `Save & build branch`
-1. This will then create a branch in https://github.com/stainless-sdks/kernel-go
-1. Using either your branch name or a specific commit hash you want to point to, run this script to modify the CLI's `go.mod`:
-
-```
-./scripts/go-mod-replace-kernel.sh <commit | branch name>
-```
-
-### Releasing a new version
-
-Prerequisites:
-
-- Make sure you have `goreleaser` _pro_ installed via `brew install --cask goreleaser/tap/goreleaser-pro`. You will need a license key (in 1pw), and then `export GORELEASER_KEY=<the key>`.
-
-- Grab the NPM token for our org (in 1pw) and run `npm config set '//registry.npmjs.org/:_authToken'=<the token>`
-
-- export a `GITHUB_TOKEN` with repo and write:packages permissions: https://github.com/settings/tokens/new?scopes=repo,write:packages.
-
-- Make sure you are logged in to the prod AWS account with `aws sso login --sso-session=kernel` + `export AWS_PROFILE=kernel-prod`. This is necessary to publish releases to S3.
-
-With a clean tree on the branch you want to release (can be main or a pr branch you're about to merge, doesn't matter), run:
+You can also authenticate using an API key:
 
 ```bash
-make release-dry-run
+export KERNEL_API_KEY=<YOUR_API_KEY>
 ```
 
-This will check that everything is working, but not actually release anything.
-You should see one error about there not being a git tag, and that's fine.
+Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 
-To actually release, run:
+## Commands Reference
+
+### Global Flags
+
+- `--version`, `-v` - Print the CLI version
+- `--no-color` - Disable color output
+- `--log-level <level>` - Set log level (trace, debug, info, warn, error, fatal, print)
+
+### Authentication
+
+- `kernel login [--force]` - Login via OAuth 2.0
+- `kernel logout` - Clear stored credentials
+- `kernel auth` - Check authentication status
+
+### App Management
+
+- `kernel deploy <file>` - Deploy an app to Kernel
+  - `--version <version>` - Specify app version (default: latest)
+  - `--force` - Allow overwriting existing version
+  - `--env <KEY=VALUE>`, `-e` - Set environment variables (can be used multiple times)
+  - `--env-file <file>` - Load environment variables from file (can be used multiple times)
+
+- `kernel invoke <app> <action>` - Run an app action
+  - `--version <version>`, `-v` - Specify app version (default: latest)
+  - `--payload <json>`, `-p` - JSON payload for the action
+  - `--sync`, `-s` - Invoke synchronously (timeout after 60s)
+
+- `kernel app list` - List deployed apps
+  - `--name <app_name>` - Filter by app name
+  - `--version <version>` - Filter by version
+
+- `kernel app history <app_name>` - Show deployment history for an app
+
+### Logs
+
+- `kernel logs <app_name>` - View app logs
+  - `--version <version>` - Specify app version (default: latest)
+  - `--follow`, `-f` - Follow logs in real-time
+  - `--since <time>`, `-s` - How far back to retrieve logs (e.g., 5m, 1h)
+  - `--with-timestamps` - Include timestamps in log output
+
+### Browser Management
+
+- `kernel browsers list` - List running browsers
+- `kernel browsers delete` - Delete a browser
+  - `--by-persistent-id <id>` - Delete by persistent ID
+  - `--by-id <id>` - Delete by session ID
+  - `--yes`, `-y` - Skip confirmation prompt
+- `kernel browsers view` - Get live view URL for a browser
+  - `--by-persistent-id <id>` - View by persistent ID
+  - `--by-id <id>` - View by session ID
+
+## Examples
+
+### Deploy with environment variables
 
 ```bash
-# use `git tag -l | grep cli` to find the latest version and what you want to bump it to
-export VERSION=0.1.1
-git tag -a cli/v$VERSION -m "Bugfixes"
-git push origin cli/v$VERSION
-make release
+# Set individual variables
+kernel deploy index.ts --env API_KEY=abc123 --env DEBUG=true
+
+# Load from .env file
+kernel deploy index.ts --env-file .env
+
+# Combine both methods
+kernel deploy index.ts --env-file .env --env OVERRIDE_VAR=value
 ```
+
+### Invoke with payload
+
+```bash
+# Simple invoke
+kernel invoke my-scraper scrape-page
+
+# With JSON payload
+kernel invoke my-scraper scrape-page --payload '{"url": "https://example.com"}'
+
+# Synchronous invoke (wait for completion)
+kernel invoke my-scraper quick-task --sync
+```
+
+### Follow logs in real-time
+
+```bash
+# Follow logs
+kernel logs my-app --follow
+
+# Show recent logs with timestamps
+kernel logs my-app --since 1h --with-timestamps
+```
+
+### Browser management
+
+```bash
+# List all browsers
+kernel browsers list
+
+# Delete a persistent browser
+kernel browsers delete --by-persistent-id my-browser-session --yes
+
+# Get live view URL
+kernel browsers view --by-id browser123
+```
+
+## Getting Help
+
+- `kernel --help` - Show all available commands
+- `kernel <command> --help` - Get help for a specific command
+
+## Documentation
+
+For complete documentation, visit:
+
+- [📖 Documentation](https://docs.onkernel.com)
+- [🚀 Quickstart Guide](https://docs.onkernel.com/quickstart)
+- [📋 CLI Reference](https://docs.onkernel.com/reference/cli)
+
+## Support
+
+- [Discord Community](https://discord.gg/kernel)
+- [GitHub Issues](https://github.com/onkernel/kernel/issues)
+- [Documentation](https://docs.onkernel.com)
+
+---
+
+For development and contribution information, see [DEVELOPMENT.md](./DEVELOPMENT.md).
