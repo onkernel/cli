@@ -109,6 +109,10 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 ### Browser Management
 
 - `kernel browsers list` - List running browsers
+- `kernel browsers create` - Create a new browser session
+  - `--persistence-id <id>` - Unique identifier for browser session persistence
+  - `--stealth` - Launch browser in stealth mode to avoid detection
+  - `--headless` - Launch browser without GUI access
 - `kernel browsers delete` - Delete a browser
   - `--by-persistent-id <id>` - Delete by persistent ID
   - `--by-id <id>` - Delete by session ID
@@ -160,6 +164,15 @@ kernel logs my-app --since 1h --with-timestamps
 ```bash
 # List all browsers
 kernel browsers list
+
+# Create a new browser session
+kernel browsers create
+
+# Create a persistent browser session
+kernel browsers create --persistence-id my-browser-session
+
+# Create a headless browser in stealth mode
+kernel browsers create --headless --stealth
 
 # Delete a persistent browser
 kernel browsers delete --by-persistent-id my-browser-session --yes
