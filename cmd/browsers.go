@@ -20,6 +20,12 @@ var browsersListCmd = &cobra.Command{
 	RunE:  runBrowsersList,
 }
 
+var browsersCreateCmd = &cobra.Command{
+	Use:   "create",
+	Short: "Create a new browser session",
+	RunE:  runBrowsersCreate,
+}
+
 var browsersDeleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Delete a browser",
@@ -34,8 +40,14 @@ var browsersViewCmd = &cobra.Command{
 
 func init() {
 	browsersCmd.AddCommand(browsersListCmd)
+	browsersCmd.AddCommand(browsersCreateCmd)
 	browsersCmd.AddCommand(browsersDeleteCmd)
 	browsersCmd.AddCommand(browsersViewCmd)
+
+	// Add flags for create command
+	browsersCreateCmd.Flags().String("persistence-id", "", "Unique identifier for browser session persistence")
+	browsersCreateCmd.Flags().Bool("stealth", false, "Launch browser in stealth mode to avoid detection")
+	browsersCreateCmd.Flags().Bool("headless", false, "Launch browser without GUI access")
 
 	// Add flags for delete command
 	browsersDeleteCmd.Flags().String("by-persistent-id", "", "Delete browser by persistent ID")
@@ -85,6 +97,62 @@ func runBrowsersList(cmd *cobra.Command, args []string) error {
 	}
 
 	pterm.DefaultTable.WithHasHeader().WithData(tableData).Render()
+	return nil
+}
+
+func runBrowsersCreate(cmd *cobra.Command, args []string) error {
+	client := getKernelClient(cmd)
+
+	// Get flag values
+	persistenceID, _ := cmd.Flags().GetString("persistence-id")
+	stealth, _ := cmd.Flags().GetBool("stealth")
+	headless, _ := cmd.Flags().GetBool("headless")
+
+	pterm.Info.Println("Creating browser session...")
+
+	// Build browser creation parameters
+	params := kernel.BrowserNewParams{}
+
+	if persistenceID != "" {
+		params.Persistence = kernel.BrowserPersistenceParam{
+			ID: persistenceID,
+		}
+	}
+
+	// Always set stealth parameter if the flag was explicitly provided
+	if cmd.Flags().Changed("stealth") {
+		params.Stealth = kernel.Opt(stealth)
+	}
+
+	// Always set headless parameter if the flag was explicitly provided
+	if cmd.Flags().Changed("headless") {
+		params.Headless = kernel.Opt(headless)
+	}
+
+	// Create the browser
+	browser, err := client.Browsers.New(cmd.Context(), params)
+	if err != nil {
+		pterm.Error.Printf("Failed to create browser: %v\n", err)
+		return nil
+	}
+
+	// Display browser information
+	tableData := pterm.TableData{
+		{"Property", "Value"},
+		{"Session ID", browser.SessionID},
+		{"CDP WebSocket URL", browser.CdpWsURL},
+	}
+
+	if browser.BrowserLiveViewURL != "" {
+		tableData = append(tableData, []string{"Live View URL", browser.BrowserLiveViewURL})
+	}
+
+	if browser.Persistence.ID != "" {
+		tableData = append(tableData, []string{"Persistent ID", browser.Persistence.ID})
+	}
+
+	pterm.DefaultTable.WithHasHeader().WithData(tableData).Render()
+
 	return nil
 }
 
