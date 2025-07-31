@@ -20,7 +20,7 @@ var logsCmd = &cobra.Command{
 func init() {
 	logsCmd.Flags().String("version", "latest", "Specify a version of the app (default: latest)")
 	logsCmd.Flags().BoolP("follow", "f", false, "Follow logs in real-time (stream continuously)")
-	logsCmd.Flags().String("since", "s", "How far back to retrieve logs (e.g., 5m, 1h). Defaults to 5m if not following, 5s if following. Can also specify timestamps in formats: 2006-01-02 (day), 2006-01-02T15:04 (minute), 2006-01-02T15:04:05 (second), 2006-01-02T15:04:05.000 (ms), 2006-01-02T15:04:05.000000000 (ns). Maximum is 7d.")
+	logsCmd.Flags().String("since", "s", "How far back to retrieve logs. Supports duration formats: ns, us, ms, s, m, h (e.g., 5m, 2h, 1h30m). Note: 'd' for days is NOT supported - use hours instead. Can also specify timestamps: 2006-01-02 (day), 2006-01-02T15:04 (minute), 2006-01-02T15:04:05 (second), 2006-01-02T15:04:05.000 (ms). Maximum lookback is 167h (just under 7 days). Defaults to 5m if not following, 5s if following.")
 	logsCmd.Flags().Bool("with-timestamps", false, "Include timestamps in each log line")
 	rootCmd.AddCommand(logsCmd)
 }
