@@ -48,6 +48,7 @@ func init() {
 	browsersCreateCmd.Flags().String("persistence-id", "", "Unique identifier for browser session persistence")
 	browsersCreateCmd.Flags().Bool("stealth", false, "Launch browser in stealth mode to avoid detection")
 	browsersCreateCmd.Flags().Bool("headless", false, "Launch browser without GUI access")
+	browsersCreateCmd.Flags().Int("timeout", 60, "Timeout in seconds for the browser session")
 
 	// Add flags for delete command
 	browsersDeleteCmd.Flags().String("by-persistent-id", "", "Delete browser by persistent ID")
@@ -79,7 +80,7 @@ func runBrowsersList(cmd *cobra.Command, args []string) error {
 
 	// Prepare table data
 	tableData := pterm.TableData{
-		{"Browser ID", "Persistent ID", "CDP WS URL", "Live View URL"},
+		{"Browser ID", "Created At", "Persistent ID", "CDP WS URL", "Live View URL"},
 	}
 
 	for _, browser := range *browsers {
@@ -90,6 +91,7 @@ func runBrowsersList(cmd *cobra.Command, args []string) error {
 
 		tableData = append(tableData, []string{
 			browser.SessionID,
+			browser.CreatedAt.Format("2006-01-02 15:04:05"),
 			persistentID,
 			truncateURL(browser.CdpWsURL, 50),
 			truncateURL(browser.BrowserLiveViewURL, 50),
@@ -107,6 +109,7 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 	persistenceID, _ := cmd.Flags().GetString("persistence-id")
 	stealth, _ := cmd.Flags().GetBool("stealth")
 	headless, _ := cmd.Flags().GetBool("headless")
+	timeout, _ := cmd.Flags().GetInt("timeout")
 
 	pterm.Info.Println("Creating browser session...")
 
@@ -117,6 +120,10 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 		params.Persistence = kernel.BrowserPersistenceParam{
 			ID: persistenceID,
 		}
+	}
+
+	if timeout > 0 {
+		params.TimeoutSeconds = kernel.Opt(int64(timeout))
 	}
 
 	// Always set stealth parameter if the flag was explicitly provided
