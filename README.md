@@ -1,6 +1,30 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/onkernel/kernel-images/main/static/images/Kernel-Wordmark_Accent.svg" alt="Kernel Logo" width="55%">
+</p>
+
+<p align="center">
+  <img alt="GitHub License" src="https://img.shields.io/github/license/onkernel/kernel">
+  <a href="https://discord.gg/FBrveQRcud"><img src="https://img.shields.io/discord/1342243238748225556?logo=discord&logoColor=white&color=7289DA" alt="Discord"></a>
+  <a href="https://x.com/juecd__"><img src="https://img.shields.io/twitter/follow/juecd__" alt="Follow @juecd__"></a>
+  <a href="https://x.com/rfgarcia"><img src="https://img.shields.io/twitter/follow/rfgarcia" alt="Follow @rfgarcia"></a>
+</p>
+
 # Kernel CLI
 
-The Kernel CLI helps you deploy and run web automation apps on the Kernel platform. Build browser automation, web scraping, and AI agents that run in the cloud.
+The Kernel CLI is a fast, friendly command‑line interface for Kernel — the platform that provides sandboxed, ready‑to‑use Chrome browsers for browser automations and web agents.
+
+Sign up at [onkernel.com](https://www.onkernel.com/) and read the [docs](https://docs.onkernel.com/introduction).
+
+## What's Kernel?
+
+Kernel provides sandboxed, ready-to-use Chrome browsers for browser automations and web agents. This CLI helps you deploy apps, run actions, manage browsers, and access live views.
+
+### What you can do with the CLI
+
+- Deploy and version apps to Kernel
+- Invoke app actions (sync or async) and stream logs
+- Create, list, view, and delete managed browser sessions
+- Get a live view URL for visual monitoring and remote control
 
 ## Installation
 
@@ -110,16 +134,12 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 
 - `kernel browsers list` - List running browsers
 - `kernel browsers create` - Create a new browser session
-  - `--persistence-id <id>` - Unique identifier for browser session persistence
-  - `--stealth` - Launch browser in stealth mode to avoid detection
-  - `--headless` - Launch browser without GUI access
-- `kernel browsers delete` - Delete a browser
-  - `--by-persistent-id <id>` - Delete by persistent ID
-  - `--by-id <id>` - Delete by session ID
-  - `--yes`, `-y` - Skip confirmation prompt
-- `kernel browsers view` - Get live view URL for a browser
-  - `--by-persistent-id <id>` - View by persistent ID
-  - `--by-id <id>` - View by session ID
+  - `-p, --persistence-id <id>` - Unique identifier for browser session persistence
+  - `-s, --stealth` - Launch browser in stealth mode to avoid detection
+  - `-H, --headless` - Launch browser without GUI access
+- `kernel browsers delete <id or persistent id>` - Delete a browser
+  - `-y, --yes` - Skip confirmation prompt
+- `kernel browsers view <id or persistent id>` - Get live view URL for a browser
 
 ## Examples
 
