@@ -66,8 +66,6 @@ Prerequisites:
 
 - export a `GITHUB_TOKEN` with repo and write:packages permissions: https://github.com/settings/tokens/new?scopes=repo,write:packages.
 
-- Make sure you are logged in to the prod AWS account with `aws sso login --sso-session=kernel` + `export AWS_PROFILE=kernel-prod`. This is necessary to publish releases to S3.
-
 With a clean tree on the branch you want to release (can be main or a pr branch you're about to merge, doesn't matter), run:
 
 ```bash
@@ -82,7 +80,7 @@ To actually release, run:
 ```bash
 # use `git tag -l | grep cli` to find the latest version and what you want to bump it to
 export VERSION=0.1.1
-git tag -a cli/v$VERSION -m "Bugfixes"
-git push origin cli/v$VERSION
+git tag -a v$VERSION -m "Bugfixes"
+git push origin v$VERSION
 make release
 ```
