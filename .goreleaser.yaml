@@ -26,12 +26,6 @@ archives:
     formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
-blobs:
-  - provider: s3
-    region: us-east-1
-    bucket: onkernel-public
-    directory: releases/download/cli/{{ .Version }}
-
 brews:
   - name: kernel
     repository:
