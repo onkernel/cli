@@ -1,9 +1,6 @@
 version: 2
 project_name: kernel
 
-monorepo:
-  tag_prefix: cli/
-
 before:
   hooks:
     - go mod tidy
@@ -28,8 +25,6 @@ archives:
   - id: archive
     formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    # files:
-    #   - LICENSE
 
 blobs:
   - provider: s3
