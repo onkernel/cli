@@ -71,6 +71,20 @@ func getKernelClient(cmd *cobra.Command) kernel.Client {
 	return cmd.Context().Value(KernelClientKey).(kernel.Client)
 }
 
+// isAuthExempt returns true if the command or any of its parents should skip auth.
+func isAuthExempt(cmd *cobra.Command) bool {
+	for c := cmd; c != nil; c = c.Parent() {
+		if c == rootCmd {
+			return true
+		}
+		switch c.Name() {
+		case "login", "logout", "auth", "help", "completion":
+			return true
+		}
+	}
+	return false
+}
+
 func init() {
 	rootCmd.PersistentFlags().BoolP("version", "v", false, "Print the CLI version")
 	rootCmd.PersistentFlags().BoolP("no-color", "", false, "Disable color output")
@@ -88,9 +102,8 @@ func init() {
 			pterm.DisableStyling()
 		}
 
-		// Check if this command requires authentication
-		// Skip auth check for root command (help) and commands that don't need it
-		if cmd == rootCmd || cmd.Name() == "login" || cmd.Name() == "logout" || cmd.Name() == "auth" {
+		// Skip auth check for commands that don't need it (including children, e.g., "completion zsh")
+		if isAuthExempt(cmd) {
 			return nil
 		}
 
