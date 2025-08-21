@@ -93,6 +93,58 @@ func init() {
 	rootCmd.SilenceErrors = true
 	cobra.OnInitialize(initConfig)
 
+	// Print local (command-specific) flags before global flags in help output
+	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		// Short/Long description
+		if cmd.Short != "" {
+			fmt.Fprintln(cmd.OutOrStdout(), "  "+cmd.Short)
+			fmt.Fprintln(cmd.OutOrStdout())
+		}
+		if cmd.Long != "" && cmd.Long != cmd.Short {
+			fmt.Fprintln(cmd.OutOrStdout(), cmd.Long)
+			fmt.Fprintln(cmd.OutOrStdout())
+		}
+
+		// Usage
+		fmt.Fprintln(cmd.OutOrStdout(), "  USAGE")
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout(), "  ")
+		fmt.Fprintln(cmd.OutOrStdout(), "  "+cmd.UseLine()+"  ")
+		fmt.Fprintln(cmd.OutOrStdout())
+
+		// Flags (local first, then global)
+		local := cmd.LocalFlags()
+		inherited := cmd.InheritedFlags()
+		local.SortFlags = false
+		inherited.SortFlags = false
+		hasLocal := local.HasAvailableFlags()
+		hasInherited := inherited.HasAvailableFlags()
+		if hasLocal || hasInherited {
+			fmt.Fprintln(cmd.OutOrStdout(), "  FLAGS")
+			fmt.Fprintln(cmd.OutOrStdout())
+			if hasLocal {
+				fmt.Fprint(cmd.OutOrStdout(), local.FlagUsages())
+			}
+			if hasInherited {
+				fmt.Fprint(cmd.OutOrStdout(), inherited.FlagUsages())
+			}
+		}
+
+		// Subcommands
+		cmds := cmd.Commands()
+		if len(cmds) > 0 {
+			fmt.Fprintln(cmd.OutOrStdout())
+			fmt.Fprintln(cmd.OutOrStdout(), "  COMMANDS")
+			fmt.Fprintln(cmd.OutOrStdout())
+			for _, c := range cmds {
+				if !c.IsAvailableCommand() || c.Name() == "help" {
+					continue
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "    %-20s %s\n", c.UseLine(), c.Short)
+			}
+		}
+	})
+
 	// Version flag handling: we use our own persistent pre-run to handle it globally.
 	// We also inject a Kernel client object into the command context for commands to use
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {

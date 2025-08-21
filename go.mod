@@ -53,3 +53,5 @@ require (
 	golang.org/x/term v0.26.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
 )
+
+replace github.com/onkernel/kernel-go-sdk => github.com/stainless-sdks/kernel-go v0.0.0-20250821151755-5fb93e0b3d5c
