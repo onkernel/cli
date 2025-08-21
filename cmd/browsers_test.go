@@ -542,8 +542,12 @@ func makeStream[T any](vals []T) *ssestream.Stream[T] {
 
 func TestBrowsersLogsStream_PrintsEvents(t *testing.T) {
 	setupStdoutCapture(t)
-	b := BrowsersCmd{logs: &FakeLogService{}}
-	_ = b.LogsStream(context.Background(), BrowsersLogsStreamInput{ID: "id", Source: string(kernel.BrowserLogStreamParamsSourcePath), Follow: BoolFlag{Set: true, Value: true}, Path: "/var/log.txt"})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, logs: &FakeLogService{}}
+	_ = b.LogsStream(context.Background(), BrowsersLogsStreamInput{Identifier: "id", Source: string(kernel.BrowserLogStreamParamsSourcePath), Follow: BoolFlag{Set: true, Value: true}, Path: "/var/log.txt"})
 	out := outBuf.String()
 	if !strings.Contains(out, "m1") || !strings.Contains(out, "m2") {
 		t.Fatalf("expected log messages, got: %s", out)
@@ -559,8 +563,12 @@ func TestBrowsersReplaysList_PrintsRows(t *testing.T) {
 	fake := &FakeReplaysService{ListFunc: func(ctx context.Context, id string, opts ...option.RequestOption) (*[]kernel.BrowserReplayListResponse, error) {
 		return &replays, nil
 	}}
-	b := BrowsersCmd{replays: fake}
-	_ = b.ReplaysList(context.Background(), BrowsersReplaysListInput{ID: "id"})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, replays: fake}
+	_ = b.ReplaysList(context.Background(), BrowsersReplaysListInput{Identifier: "id"})
 	out := outBuf.String()
 	if !strings.Contains(out, "r1") || !strings.Contains(out, "http://v") {
 		t.Fatalf("expected replay rows, got: %s", out)
@@ -572,8 +580,12 @@ func TestBrowsersReplaysStart_PrintsInfo(t *testing.T) {
 	fake := &FakeReplaysService{StartFunc: func(ctx context.Context, id string, body kernel.BrowserReplayStartParams, opts ...option.RequestOption) (*kernel.BrowserReplayStartResponse, error) {
 		return &kernel.BrowserReplayStartResponse{ReplayID: "rid", ReplayViewURL: "http://view", StartedAt: time.Unix(0, 0)}, nil
 	}}
-	b := BrowsersCmd{replays: fake}
-	_ = b.ReplaysStart(context.Background(), BrowsersReplaysStartInput{ID: "id", Framerate: 30, MaxDurationSeconds: 60})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, replays: fake}
+	_ = b.ReplaysStart(context.Background(), BrowsersReplaysStartInput{Identifier: "id", Framerate: 30, MaxDurationSeconds: 60})
 	out := outBuf.String()
 	if !strings.Contains(out, "rid") || !strings.Contains(out, "http://view") {
 		t.Fatalf("expected start output, got: %s", out)
@@ -583,8 +595,12 @@ func TestBrowsersReplaysStart_PrintsInfo(t *testing.T) {
 func TestBrowsersReplaysStop_PrintsSuccess(t *testing.T) {
 	setupStdoutCapture(t)
 	fake := &FakeReplaysService{}
-	b := BrowsersCmd{replays: fake}
-	_ = b.ReplaysStop(context.Background(), BrowsersReplaysStopInput{ID: "id", ReplayID: "rid"})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, replays: fake}
+	_ = b.ReplaysStop(context.Background(), BrowsersReplaysStopInput{Identifier: "id", ReplayID: "rid"})
 	out := outBuf.String()
 	if !strings.Contains(out, "Stopped replay rid") {
 		t.Fatalf("expected stop message, got: %s", out)
@@ -598,8 +614,12 @@ func TestBrowsersReplaysDownload_SavesFile(t *testing.T) {
 	fake := &FakeReplaysService{DownloadFunc: func(ctx context.Context, replayID string, query kernel.BrowserReplayDownloadParams, opts ...option.RequestOption) (*http.Response, error) {
 		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"video/mp4"}}, Body: io.NopCloser(strings.NewReader("mp4data"))}, nil
 	}}
-	b := BrowsersCmd{replays: fake}
-	_ = b.ReplaysDownload(context.Background(), BrowsersReplaysDownloadInput{ID: "id", ReplayID: "rid", Output: outPath})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, replays: fake}
+	_ = b.ReplaysDownload(context.Background(), BrowsersReplaysDownloadInput{Identifier: "id", ReplayID: "rid", Output: outPath})
 	data, err := os.ReadFile(outPath)
 	if err != nil {
 		t.Fatalf("expected file saved, err: %v", err)
@@ -614,8 +634,12 @@ func TestBrowsersReplaysDownload_SavesFile(t *testing.T) {
 func TestBrowsersProcessExec_PrintsSummary(t *testing.T) {
 	setupStdoutCapture(t)
 	fake := &FakeProcessService{}
-	b := BrowsersCmd{process: fake}
-	_ = b.ProcessExec(context.Background(), BrowsersProcessExecInput{ID: "id", Command: "echo"})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, process: fake}
+	_ = b.ProcessExec(context.Background(), BrowsersProcessExecInput{Identifier: "id", Command: "echo"})
 	out := outBuf.String()
 	if !strings.Contains(out, "Exit Code") || !strings.Contains(out, "Duration") {
 		t.Fatalf("expected exec summary, got: %s", out)
@@ -625,8 +649,12 @@ func TestBrowsersProcessExec_PrintsSummary(t *testing.T) {
 func TestBrowsersProcessSpawn_PrintsInfo(t *testing.T) {
 	setupStdoutCapture(t)
 	fake := &FakeProcessService{}
-	b := BrowsersCmd{process: fake}
-	_ = b.ProcessSpawn(context.Background(), BrowsersProcessSpawnInput{ID: "id", Command: "sleep"})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, process: fake}
+	_ = b.ProcessSpawn(context.Background(), BrowsersProcessSpawnInput{Identifier: "id", Command: "sleep"})
 	out := outBuf.String()
 	if !strings.Contains(out, "Process ID") || !strings.Contains(out, "PID") {
 		t.Fatalf("expected spawn info, got: %s", out)
@@ -636,8 +664,12 @@ func TestBrowsersProcessSpawn_PrintsInfo(t *testing.T) {
 func TestBrowsersProcessKill_PrintsSuccess(t *testing.T) {
 	setupStdoutCapture(t)
 	fake := &FakeProcessService{}
-	b := BrowsersCmd{process: fake}
-	_ = b.ProcessKill(context.Background(), BrowsersProcessKillInput{ID: "id", ProcessID: "proc", Signal: "TERM"})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, process: fake}
+	_ = b.ProcessKill(context.Background(), BrowsersProcessKillInput{Identifier: "id", ProcessID: "proc", Signal: "TERM"})
 	out := outBuf.String()
 	if !strings.Contains(out, "Sent TERM to process proc") {
 		t.Fatalf("expected kill message, got: %s", out)
@@ -647,8 +679,12 @@ func TestBrowsersProcessKill_PrintsSuccess(t *testing.T) {
 func TestBrowsersProcessStatus_PrintsFields(t *testing.T) {
 	setupStdoutCapture(t)
 	fake := &FakeProcessService{}
-	b := BrowsersCmd{process: fake}
-	_ = b.ProcessStatus(context.Background(), BrowsersProcessStatusInput{ID: "id", ProcessID: "proc"})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, process: fake}
+	_ = b.ProcessStatus(context.Background(), BrowsersProcessStatusInput{Identifier: "id", ProcessID: "proc"})
 	out := outBuf.String()
 	if !strings.Contains(out, "State") || !strings.Contains(out, "CPU %") || !strings.Contains(out, "Mem Bytes") {
 		t.Fatalf("expected status fields, got: %s", out)
@@ -658,8 +694,12 @@ func TestBrowsersProcessStatus_PrintsFields(t *testing.T) {
 func TestBrowsersProcessStdin_PrintsSuccess(t *testing.T) {
 	setupStdoutCapture(t)
 	fake := &FakeProcessService{}
-	b := BrowsersCmd{process: fake}
-	_ = b.ProcessStdin(context.Background(), BrowsersProcessStdinInput{ID: "id", ProcessID: "proc", DataB64: "ZGF0YQ=="})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, process: fake}
+	_ = b.ProcessStdin(context.Background(), BrowsersProcessStdinInput{Identifier: "id", ProcessID: "proc", DataB64: "ZGF0YQ=="})
 	out := outBuf.String()
 	if !strings.Contains(out, "Wrote to stdin") {
 		t.Fatalf("expected stdin message, got: %s", out)
@@ -669,8 +709,12 @@ func TestBrowsersProcessStdin_PrintsSuccess(t *testing.T) {
 func TestBrowsersProcessStdoutStream_PrintsExit(t *testing.T) {
 	setupStdoutCapture(t)
 	fake := &FakeProcessService{}
-	b := BrowsersCmd{process: fake}
-	_ = b.ProcessStdoutStream(context.Background(), BrowsersProcessStdoutStreamInput{ID: "id", ProcessID: "proc"})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, process: fake}
+	_ = b.ProcessStdoutStream(context.Background(), BrowsersProcessStdoutStreamInput{Identifier: "id", ProcessID: "proc"})
 	out := outBuf.String()
 	if !strings.Contains(out, "process exited with code 0") {
 		t.Fatalf("expected exit message, got: %s", out)
@@ -682,8 +726,12 @@ func TestBrowsersProcessStdoutStream_PrintsExit(t *testing.T) {
 func TestBrowsersFSNewDirectory_PrintsSuccess(t *testing.T) {
 	setupStdoutCapture(t)
 	fake := &FakeFSService{}
-	b := BrowsersCmd{fs: fake}
-	_ = b.FSNewDirectory(context.Background(), BrowsersFSNewDirInput{ID: "id", Path: "/tmp/x"})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
+	_ = b.FSNewDirectory(context.Background(), BrowsersFSNewDirInput{Identifier: "id", Path: "/tmp/x"})
 	out := outBuf.String()
 	if !strings.Contains(out, "Created directory /tmp/x") {
 		t.Fatalf("expected created message, got: %s", out)
@@ -693,8 +741,12 @@ func TestBrowsersFSNewDirectory_PrintsSuccess(t *testing.T) {
 func TestBrowsersFSDeleteDirectory_PrintsSuccess(t *testing.T) {
 	setupStdoutCapture(t)
 	fake := &FakeFSService{}
-	b := BrowsersCmd{fs: fake}
-	_ = b.FSDeleteDirectory(context.Background(), BrowsersFSDeleteDirInput{ID: "id", Path: "/tmp/x"})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
+	_ = b.FSDeleteDirectory(context.Background(), BrowsersFSDeleteDirInput{Identifier: "id", Path: "/tmp/x"})
 	out := outBuf.String()
 	if !strings.Contains(out, "Deleted directory /tmp/x") {
 		t.Fatalf("expected deleted message, got: %s", out)
@@ -704,8 +756,12 @@ func TestBrowsersFSDeleteDirectory_PrintsSuccess(t *testing.T) {
 func TestBrowsersFSDeleteFile_PrintsSuccess(t *testing.T) {
 	setupStdoutCapture(t)
 	fake := &FakeFSService{}
-	b := BrowsersCmd{fs: fake}
-	_ = b.FSDeleteFile(context.Background(), BrowsersFSDeleteFileInput{ID: "id", Path: "/tmp/file"})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
+	_ = b.FSDeleteFile(context.Background(), BrowsersFSDeleteFileInput{Identifier: "id", Path: "/tmp/file"})
 	out := outBuf.String()
 	if !strings.Contains(out, "Deleted file /tmp/file") {
 		t.Fatalf("expected deleted message, got: %s", out)
@@ -716,8 +772,12 @@ func TestBrowsersFSDownloadDirZip_SavesFile(t *testing.T) {
 	dir := t.TempDir()
 	outPath := filepath.Join(dir, "out.zip")
 	fake := &FakeFSService{}
-	b := BrowsersCmd{fs: fake}
-	_ = b.FSDownloadDirZip(context.Background(), BrowsersFSDownloadDirZipInput{ID: "id", Path: "/tmp", Output: outPath})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
+	_ = b.FSDownloadDirZip(context.Background(), BrowsersFSDownloadDirZipInput{Identifier: "id", Path: "/tmp", Output: outPath})
 	data, err := os.ReadFile(outPath)
 	if err != nil || len(data) == 0 {
 		t.Fatalf("expected zip saved, err=%v size=%d", err, len(data))
@@ -729,8 +789,12 @@ func TestBrowsersFSFileInfo_PrintsFields(t *testing.T) {
 	fake := &FakeFSService{FileInfoFunc: func(ctx context.Context, id string, query kernel.BrowserFFileInfoParams, opts ...option.RequestOption) (*kernel.BrowserFFileInfoResponse, error) {
 		return &kernel.BrowserFFileInfoResponse{Path: "/tmp/a", Name: "a", Mode: "-rw-r--r--", IsDir: false, SizeBytes: 1, ModTime: time.Unix(0, 0)}, nil
 	}}
-	b := BrowsersCmd{fs: fake}
-	_ = b.FSFileInfo(context.Background(), BrowsersFSFileInfoInput{ID: "id", Path: "/tmp/a"})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
+	_ = b.FSFileInfo(context.Background(), BrowsersFSFileInfoInput{Identifier: "id", Path: "/tmp/a"})
 	out := outBuf.String()
 	if !strings.Contains(out, "Path") || !strings.Contains(out, "/tmp/a") {
 		t.Fatalf("expected fields, got: %s", out)
@@ -740,8 +804,12 @@ func TestBrowsersFSFileInfo_PrintsFields(t *testing.T) {
 func TestBrowsersFSListFiles_PrintsRows(t *testing.T) {
 	setupStdoutCapture(t)
 	fake := &FakeFSService{}
-	b := BrowsersCmd{fs: fake}
-	_ = b.FSListFiles(context.Background(), BrowsersFSListFilesInput{ID: "id", Path: "/"})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
+	_ = b.FSListFiles(context.Background(), BrowsersFSListFilesInput{Identifier: "id", Path: "/"})
 	out := outBuf.String()
 	if !strings.Contains(out, "f1") || !strings.Contains(out, "/f1") {
 		t.Fatalf("expected list row, got: %s", out)
@@ -751,8 +819,12 @@ func TestBrowsersFSListFiles_PrintsRows(t *testing.T) {
 func TestBrowsersFSMove_PrintsSuccess(t *testing.T) {
 	setupStdoutCapture(t)
 	fake := &FakeFSService{}
-	b := BrowsersCmd{fs: fake}
-	_ = b.FSMove(context.Background(), BrowsersFSMoveInput{ID: "id", SrcPath: "/a", DestPath: "/b"})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
+	_ = b.FSMove(context.Background(), BrowsersFSMoveInput{Identifier: "id", SrcPath: "/a", DestPath: "/b"})
 	out := outBuf.String()
 	if !strings.Contains(out, "Moved /a -> /b") {
 		t.Fatalf("expected move message, got: %s", out)
@@ -763,8 +835,12 @@ func TestBrowsersFSReadFile_SavesFile(t *testing.T) {
 	dir := t.TempDir()
 	outPath := filepath.Join(dir, "file.txt")
 	fake := &FakeFSService{}
-	b := BrowsersCmd{fs: fake}
-	_ = b.FSReadFile(context.Background(), BrowsersFSReadFileInput{ID: "id", Path: "/tmp/x", Output: outPath})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
+	_ = b.FSReadFile(context.Background(), BrowsersFSReadFileInput{Identifier: "id", Path: "/tmp/x", Output: outPath})
 	data, err := os.ReadFile(outPath)
 	if err != nil || string(data) != "content" {
 		t.Fatalf("expected file saved, err=%v content=%s", err, string(data))
@@ -774,8 +850,12 @@ func TestBrowsersFSReadFile_SavesFile(t *testing.T) {
 func TestBrowsersFSSetPermissions_PrintsSuccess(t *testing.T) {
 	setupStdoutCapture(t)
 	fake := &FakeFSService{}
-	b := BrowsersCmd{fs: fake}
-	_ = b.FSSetPermissions(context.Background(), BrowsersFSSetPermsInput{ID: "id", Path: "/tmp/a", Mode: "644"})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
+	_ = b.FSSetPermissions(context.Background(), BrowsersFSSetPermsInput{Identifier: "id", Path: "/tmp/a", Mode: "644"})
 	out := outBuf.String()
 	if !strings.Contains(out, "Updated permissions for /tmp/a") {
 		t.Fatalf("expected perms message, got: %s", out)
@@ -789,8 +869,12 @@ func TestBrowsersFSUpload_MappingAndDestDir_Success(t *testing.T) {
 		captured = body
 		return nil
 	}}
-	b := BrowsersCmd{fs: fake}
-	in := BrowsersFSUploadInput{ID: "id", Mappings: []struct {
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
+	in := BrowsersFSUploadInput{Identifier: "id", Mappings: []struct {
 		Local string
 		Dest  string
 	}{{Local: __writeTempFile(t, "a"), Dest: "/remote/a"}}, DestDir: "/remote/dir", Paths: []string{__writeTempFile(t, "b")}}
@@ -810,8 +894,12 @@ func TestBrowsersFSUploadZip_Success(t *testing.T) {
 	fake := &FakeFSService{UploadZipFunc: func(ctx context.Context, id string, body kernel.BrowserFUploadZipParams, opts ...option.RequestOption) error {
 		return nil
 	}}
-	b := BrowsersCmd{fs: fake}
-	_ = b.FSUploadZip(context.Background(), BrowsersFSUploadZipInput{ID: "id", ZipPath: z, DestDir: "/dst"})
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
+	_ = b.FSUploadZip(context.Background(), BrowsersFSUploadZipInput{Identifier: "id", ZipPath: z, DestDir: "/dst"})
 	out := outBuf.String()
 	if !strings.Contains(out, "Uploaded zip") {
 		t.Fatalf("expected upload zip message, got: %s", out)
@@ -823,10 +911,14 @@ func TestBrowsersFSWriteFile_FromBase64_And_FromInput(t *testing.T) {
 	fake := &FakeFSService{WriteFileFunc: func(ctx context.Context, id string, contents io.Reader, body kernel.BrowserFWriteFileParams, opts ...option.RequestOption) error {
 		return nil
 	}}
-	b := BrowsersCmd{fs: fake}
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
 	// input mode
 	p := __writeTempFile(t, "hello")
-	_ = b.FSWriteFile(context.Background(), BrowsersFSWriteFileInput{ID: "id", DestPath: "/y", SourcePath: p, Mode: "644"})
+	_ = b.FSWriteFile(context.Background(), BrowsersFSWriteFileInput{Identifier: "id", DestPath: "/y", SourcePath: p, Mode: "644"})
 	out := outBuf.String()
 	if !strings.Contains(out, "Wrote file to /y") {
 		t.Fatalf("expected write messages, got: %s", out)

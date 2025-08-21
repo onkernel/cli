@@ -139,9 +139,7 @@ func (b BrowsersCmd) List(ctx context.Context) error {
 
 func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 	pterm.Info.Println("Creating browser session...")
-
 	params := kernel.BrowserNewParams{}
-
 	if in.PersistenceID != "" {
 		params.Persistence = kernel.BrowserPersistenceParam{ID: in.PersistenceID}
 	}
@@ -307,7 +305,7 @@ func (b BrowsersCmd) View(ctx context.Context, in BrowsersViewInput) error {
 
 // Logs
 type BrowsersLogsStreamInput struct {
-	ID                string
+	Identifier        string
 	Source            string
 	Follow            BoolFlag
 	Path              string
@@ -317,6 +315,19 @@ type BrowsersLogsStreamInput struct {
 func (b BrowsersCmd) LogsStream(ctx context.Context, in BrowsersLogsStreamInput) error {
 	if b.logs == nil {
 		pterm.Error.Println("logs service not available")
+		return nil
+	}
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to list browsers: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
 		return nil
 	}
 	params := kernel.BrowserLogStreamParams{Source: kernel.BrowserLogStreamParamsSource(in.Source)}
@@ -329,7 +340,7 @@ func (b BrowsersCmd) LogsStream(ctx context.Context, in BrowsersLogsStreamInput)
 	if in.SupervisorProcess != "" {
 		params.SupervisorProcess = kernel.Opt(in.SupervisorProcess)
 	}
-	stream := b.logs.StreamStreaming(ctx, in.ID, params)
+	stream := b.logs.StreamStreaming(ctx, br.SessionID, params)
 	if stream == nil {
 		pterm.Error.Println("failed to open log stream")
 		return nil
@@ -347,24 +358,24 @@ func (b BrowsersCmd) LogsStream(ctx context.Context, in BrowsersLogsStreamInput)
 
 // Replays
 type BrowsersReplaysListInput struct {
-	ID string
+	Identifier string
 }
 
 type BrowsersReplaysStartInput struct {
-	ID                 string
+	Identifier         string
 	Framerate          int
 	MaxDurationSeconds int
 }
 
 type BrowsersReplaysStopInput struct {
-	ID       string
-	ReplayID string
+	Identifier string
+	ReplayID   string
 }
 
 type BrowsersReplaysDownloadInput struct {
-	ID       string
-	ReplayID string
-	Output   string
+	Identifier string
+	ReplayID   string
+	Output     string
 }
 
 func (b BrowsersCmd) ReplaysList(ctx context.Context, in BrowsersReplaysListInput) error {
@@ -372,7 +383,20 @@ func (b BrowsersCmd) ReplaysList(ctx context.Context, in BrowsersReplaysListInpu
 		pterm.Error.Println("replays service not available")
 		return nil
 	}
-	items, err := b.replays.List(ctx, in.ID)
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to list replays: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	items, err := b.replays.List(ctx, br.SessionID)
 	if err != nil {
 		pterm.Error.Printf("Failed to list replays: %v\n", err)
 		return nil
@@ -394,6 +418,19 @@ func (b BrowsersCmd) ReplaysStart(ctx context.Context, in BrowsersReplaysStartIn
 		pterm.Error.Println("replays service not available")
 		return nil
 	}
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to start replay: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
 	body := kernel.BrowserReplayStartParams{}
 	if in.Framerate > 0 {
 		body.Framerate = kernel.Opt(int64(in.Framerate))
@@ -401,7 +438,7 @@ func (b BrowsersCmd) ReplaysStart(ctx context.Context, in BrowsersReplaysStartIn
 	if in.MaxDurationSeconds > 0 {
 		body.MaxDurationInSeconds = kernel.Opt(int64(in.MaxDurationSeconds))
 	}
-	res, err := b.replays.Start(ctx, in.ID, body)
+	res, err := b.replays.Start(ctx, br.SessionID, body)
 	if err != nil {
 		pterm.Error.Printf("Failed to start replay: %v\n", err)
 		return nil
@@ -416,12 +453,25 @@ func (b BrowsersCmd) ReplaysStop(ctx context.Context, in BrowsersReplaysStopInpu
 		pterm.Error.Println("replays service not available")
 		return nil
 	}
-	err := b.replays.Stop(ctx, in.ReplayID, kernel.BrowserReplayStopParams{ID: in.ID})
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		pterm.Error.Printf("Failed to stop replay: %v\n", err)
 		return nil
 	}
-	pterm.Success.Printf("Stopped replay %s for browser %s\n", in.ReplayID, in.ID)
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	err = b.replays.Stop(ctx, in.ReplayID, kernel.BrowserReplayStopParams{ID: br.SessionID})
+	if err != nil {
+		pterm.Error.Printf("Failed to stop replay: %v\n", err)
+		return nil
+	}
+	pterm.Success.Printf("Stopped replay %s for browser %s\n", in.ReplayID, br.SessionID)
 	return nil
 }
 
@@ -430,7 +480,20 @@ func (b BrowsersCmd) ReplaysDownload(ctx context.Context, in BrowsersReplaysDown
 		pterm.Error.Println("replays service not available")
 		return nil
 	}
-	res, err := b.replays.Download(ctx, in.ReplayID, kernel.BrowserReplayDownloadParams{ID: in.ID})
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to download replay: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	res, err := b.replays.Download(ctx, in.ReplayID, kernel.BrowserReplayDownloadParams{ID: br.SessionID})
 	if err != nil {
 		pterm.Error.Printf("Failed to download replay: %v\n", err)
 		return nil
@@ -457,42 +520,55 @@ func (b BrowsersCmd) ReplaysDownload(ctx context.Context, in BrowsersReplaysDown
 
 // Process
 type BrowsersProcessExecInput struct {
-	ID      string
-	Command string
-	Args    []string
-	Cwd     string
-	Timeout int
-	AsUser  string
-	AsRoot  BoolFlag
+	Identifier string
+	Command    string
+	Args       []string
+	Cwd        string
+	Timeout    int
+	AsUser     string
+	AsRoot     BoolFlag
 }
 
 type BrowsersProcessSpawnInput = BrowsersProcessExecInput
 
 type BrowsersProcessKillInput struct {
-	ID        string
-	ProcessID string
-	Signal    string
+	Identifier string
+	ProcessID  string
+	Signal     string
 }
 
 type BrowsersProcessStatusInput struct {
-	ID        string
-	ProcessID string
+	Identifier string
+	ProcessID  string
 }
 
 type BrowsersProcessStdinInput struct {
-	ID        string
-	ProcessID string
-	DataB64   string
+	Identifier string
+	ProcessID  string
+	DataB64    string
 }
 
 type BrowsersProcessStdoutStreamInput struct {
-	ID        string
-	ProcessID string
+	Identifier string
+	ProcessID  string
 }
 
 func (b BrowsersCmd) ProcessExec(ctx context.Context, in BrowsersProcessExecInput) error {
 	if b.process == nil {
 		pterm.Error.Println("process service not available")
+		return nil
+	}
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to exec: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
 		return nil
 	}
 	params := kernel.BrowserProcessExecParams{Command: in.Command}
@@ -511,7 +587,7 @@ func (b BrowsersCmd) ProcessExec(ctx context.Context, in BrowsersProcessExecInpu
 	if in.AsRoot.Set {
 		params.AsRoot = kernel.Opt(in.AsRoot.Value)
 	}
-	res, err := b.process.Exec(ctx, in.ID, params)
+	res, err := b.process.Exec(ctx, br.SessionID, params)
 	if err != nil {
 		pterm.Error.Printf("Failed to exec: %v\n", err)
 		return nil
@@ -524,6 +600,19 @@ func (b BrowsersCmd) ProcessExec(ctx context.Context, in BrowsersProcessExecInpu
 func (b BrowsersCmd) ProcessSpawn(ctx context.Context, in BrowsersProcessSpawnInput) error {
 	if b.process == nil {
 		pterm.Error.Println("process service not available")
+		return nil
+	}
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to spawn: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
 		return nil
 	}
 	params := kernel.BrowserProcessSpawnParams{Command: in.Command}
@@ -542,7 +631,7 @@ func (b BrowsersCmd) ProcessSpawn(ctx context.Context, in BrowsersProcessSpawnIn
 	if in.AsRoot.Set {
 		params.AsRoot = kernel.Opt(in.AsRoot.Value)
 	}
-	res, err := b.process.Spawn(ctx, in.ID, params)
+	res, err := b.process.Spawn(ctx, br.SessionID, params)
 	if err != nil {
 		pterm.Error.Printf("Failed to spawn: %v\n", err)
 		return nil
@@ -557,13 +646,26 @@ func (b BrowsersCmd) ProcessKill(ctx context.Context, in BrowsersProcessKillInpu
 		pterm.Error.Println("process service not available")
 		return nil
 	}
-	params := kernel.BrowserProcessKillParams{ID: in.ID, Signal: kernel.BrowserProcessKillParamsSignal(in.Signal)}
-	_, err := b.process.Kill(ctx, in.ProcessID, params)
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		pterm.Error.Printf("Failed to kill process: %v\n", err)
 		return nil
 	}
-	pterm.Success.Printf("Sent %s to process %s on %s\n", in.Signal, in.ProcessID, in.ID)
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	params := kernel.BrowserProcessKillParams{ID: br.SessionID, Signal: kernel.BrowserProcessKillParamsSignal(in.Signal)}
+	_, err = b.process.Kill(ctx, in.ProcessID, params)
+	if err != nil {
+		pterm.Error.Printf("Failed to kill process: %v\n", err)
+		return nil
+	}
+	pterm.Success.Printf("Sent %s to process %s on %s\n", in.Signal, in.ProcessID, br.SessionID)
 	return nil
 }
 
@@ -572,7 +674,20 @@ func (b BrowsersCmd) ProcessStatus(ctx context.Context, in BrowsersProcessStatus
 		pterm.Error.Println("process service not available")
 		return nil
 	}
-	res, err := b.process.Status(ctx, in.ProcessID, kernel.BrowserProcessStatusParams{ID: in.ID})
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to get status: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	res, err := b.process.Status(ctx, in.ProcessID, kernel.BrowserProcessStatusParams{ID: br.SessionID})
 	if err != nil {
 		pterm.Error.Printf("Failed to get status: %v\n", err)
 		return nil
@@ -587,7 +702,20 @@ func (b BrowsersCmd) ProcessStdin(ctx context.Context, in BrowsersProcessStdinIn
 		pterm.Error.Println("process service not available")
 		return nil
 	}
-	_, err := b.process.Stdin(ctx, in.ProcessID, kernel.BrowserProcessStdinParams{ID: in.ID, DataB64: in.DataB64})
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to write stdin: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	_, err = b.process.Stdin(ctx, in.ProcessID, kernel.BrowserProcessStdinParams{ID: br.SessionID, DataB64: in.DataB64})
 	if err != nil {
 		pterm.Error.Printf("Failed to write stdin: %v\n", err)
 		return nil
@@ -601,7 +729,20 @@ func (b BrowsersCmd) ProcessStdoutStream(ctx context.Context, in BrowsersProcess
 		pterm.Error.Println("process service not available")
 		return nil
 	}
-	stream := b.process.StdoutStreamStreaming(ctx, in.ProcessID, kernel.BrowserProcessStdoutStreamParams{ID: in.ID})
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("stdout stream error: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	stream := b.process.StdoutStreamStreaming(ctx, in.ProcessID, kernel.BrowserProcessStdoutStreamParams{ID: br.SessionID})
 	if stream == nil {
 		pterm.Error.Println("failed to open stdout stream")
 		return nil
@@ -628,61 +769,61 @@ func (b BrowsersCmd) ProcessStdoutStream(ctx context.Context, in BrowsersProcess
 
 // FS (minimal scaffolding)
 type BrowsersFSNewDirInput struct {
-	ID   string
-	Path string
-	Mode string
+	Identifier string
+	Path       string
+	Mode       string
 }
 
 type BrowsersFSDeleteDirInput struct {
-	ID   string
-	Path string
+	Identifier string
+	Path       string
 }
 
 type BrowsersFSDeleteFileInput struct {
-	ID   string
-	Path string
+	Identifier string
+	Path       string
 }
 
 type BrowsersFSDownloadDirZipInput struct {
-	ID     string
-	Path   string
-	Output string
+	Identifier string
+	Path       string
+	Output     string
 }
 
 type BrowsersFSFileInfoInput struct {
-	ID   string
-	Path string
+	Identifier string
+	Path       string
 }
 
 type BrowsersFSListFilesInput struct {
-	ID   string
-	Path string
+	Identifier string
+	Path       string
 }
 
 type BrowsersFSMoveInput struct {
-	ID       string
-	SrcPath  string
-	DestPath string
+	Identifier string
+	SrcPath    string
+	DestPath   string
 }
 
 type BrowsersFSReadFileInput struct {
-	ID     string
-	Path   string
-	Output string
+	Identifier string
+	Path       string
+	Output     string
 }
 
 type BrowsersFSSetPermsInput struct {
-	ID    string
-	Path  string
-	Mode  string
-	Owner string
-	Group string
+	Identifier string
+	Path       string
+	Mode       string
+	Owner      string
+	Group      string
 }
 
 // Upload inputs
 type BrowsersFSUploadInput struct {
-	ID       string
-	Mappings []struct {
+	Identifier string
+	Mappings   []struct {
 		Local string
 		Dest  string
 	}
@@ -691,13 +832,13 @@ type BrowsersFSUploadInput struct {
 }
 
 type BrowsersFSUploadZipInput struct {
-	ID      string
-	ZipPath string
-	DestDir string
+	Identifier string
+	ZipPath    string
+	DestDir    string
 }
 
 type BrowsersFSWriteFileInput struct {
-	ID         string
+	Identifier string
 	DestPath   string
 	Mode       string
 	SourcePath string
@@ -708,11 +849,24 @@ func (b BrowsersCmd) FSNewDirectory(ctx context.Context, in BrowsersFSNewDirInpu
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to create directory: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
 	params := kernel.BrowserFNewDirectoryParams{Path: in.Path}
 	if in.Mode != "" {
 		params.Mode = kernel.Opt(in.Mode)
 	}
-	if err := b.fs.NewDirectory(ctx, in.ID, params); err != nil {
+	if err := b.fs.NewDirectory(ctx, br.SessionID, params); err != nil {
 		pterm.Error.Printf("Failed to create directory: %v\n", err)
 		return nil
 	}
@@ -725,7 +879,20 @@ func (b BrowsersCmd) FSDeleteDirectory(ctx context.Context, in BrowsersFSDeleteD
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	if err := b.fs.DeleteDirectory(ctx, in.ID, kernel.BrowserFDeleteDirectoryParams{Path: in.Path}); err != nil {
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to delete directory: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	if err := b.fs.DeleteDirectory(ctx, br.SessionID, kernel.BrowserFDeleteDirectoryParams{Path: in.Path}); err != nil {
 		pterm.Error.Printf("Failed to delete directory: %v\n", err)
 		return nil
 	}
@@ -738,7 +905,20 @@ func (b BrowsersCmd) FSDeleteFile(ctx context.Context, in BrowsersFSDeleteFileIn
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	if err := b.fs.DeleteFile(ctx, in.ID, kernel.BrowserFDeleteFileParams{Path: in.Path}); err != nil {
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to delete file: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	if err := b.fs.DeleteFile(ctx, br.SessionID, kernel.BrowserFDeleteFileParams{Path: in.Path}); err != nil {
 		pterm.Error.Printf("Failed to delete file: %v\n", err)
 		return nil
 	}
@@ -751,7 +931,20 @@ func (b BrowsersCmd) FSDownloadDirZip(ctx context.Context, in BrowsersFSDownload
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	res, err := b.fs.DownloadDirZip(ctx, in.ID, kernel.BrowserFDownloadDirZipParams{Path: in.Path})
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to download dir zip: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	res, err := b.fs.DownloadDirZip(ctx, br.SessionID, kernel.BrowserFDownloadDirZipParams{Path: in.Path})
 	if err != nil {
 		pterm.Error.Printf("Failed to download dir zip: %v\n", err)
 		return nil
@@ -781,7 +974,20 @@ func (b BrowsersCmd) FSFileInfo(ctx context.Context, in BrowsersFSFileInfoInput)
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	res, err := b.fs.FileInfo(ctx, in.ID, kernel.BrowserFFileInfoParams{Path: in.Path})
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to get file info: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	res, err := b.fs.FileInfo(ctx, br.SessionID, kernel.BrowserFFileInfoParams{Path: in.Path})
 	if err != nil {
 		pterm.Error.Printf("Failed to get file info: %v\n", err)
 		return nil
@@ -796,7 +1002,20 @@ func (b BrowsersCmd) FSListFiles(ctx context.Context, in BrowsersFSListFilesInpu
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	res, err := b.fs.ListFiles(ctx, in.ID, kernel.BrowserFListFilesParams{Path: in.Path})
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to list files: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	res, err := b.fs.ListFiles(ctx, br.SessionID, kernel.BrowserFListFilesParams{Path: in.Path})
 	if err != nil {
 		pterm.Error.Printf("Failed to list files: %v\n", err)
 		return nil
@@ -818,7 +1037,20 @@ func (b BrowsersCmd) FSMove(ctx context.Context, in BrowsersFSMoveInput) error {
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	if err := b.fs.Move(ctx, in.ID, kernel.BrowserFMoveParams{SrcPath: in.SrcPath, DestPath: in.DestPath}); err != nil {
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to move: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	if err := b.fs.Move(ctx, br.SessionID, kernel.BrowserFMoveParams{SrcPath: in.SrcPath, DestPath: in.DestPath}); err != nil {
 		pterm.Error.Printf("Failed to move: %v\n", err)
 		return nil
 	}
@@ -831,7 +1063,20 @@ func (b BrowsersCmd) FSReadFile(ctx context.Context, in BrowsersFSReadFileInput)
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	res, err := b.fs.ReadFile(ctx, in.ID, kernel.BrowserFReadFileParams{Path: in.Path})
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to read file: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	res, err := b.fs.ReadFile(ctx, br.SessionID, kernel.BrowserFReadFileParams{Path: in.Path})
 	if err != nil {
 		pterm.Error.Printf("Failed to read file: %v\n", err)
 		return nil
@@ -860,6 +1105,19 @@ func (b BrowsersCmd) FSSetPermissions(ctx context.Context, in BrowsersFSSetPerms
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to set permissions: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
 	params := kernel.BrowserFSetFilePermissionsParams{Path: in.Path, Mode: in.Mode}
 	if in.Owner != "" {
 		params.Owner = kernel.Opt(in.Owner)
@@ -867,7 +1125,7 @@ func (b BrowsersCmd) FSSetPermissions(ctx context.Context, in BrowsersFSSetPerms
 	if in.Group != "" {
 		params.Group = kernel.Opt(in.Group)
 	}
-	if err := b.fs.SetFilePermissions(ctx, in.ID, params); err != nil {
+	if err := b.fs.SetFilePermissions(ctx, br.SessionID, params); err != nil {
 		pterm.Error.Printf("Failed to set permissions: %v\n", err)
 		return nil
 	}
@@ -878,6 +1136,19 @@ func (b BrowsersCmd) FSSetPermissions(ctx context.Context, in BrowsersFSSetPerms
 func (b BrowsersCmd) FSUpload(ctx context.Context, in BrowsersFSUploadInput) error {
 	if b.fs == nil {
 		pterm.Error.Println("fs service not available")
+		return nil
+	}
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to upload: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
 		return nil
 	}
 	var files []kernel.BrowserFUploadParamsFile
@@ -918,7 +1189,7 @@ func (b BrowsersCmd) FSUpload(ctx context.Context, in BrowsersFSUploadInput) err
 			_ = c.Close()
 		}
 	}()
-	if err := b.fs.Upload(ctx, in.ID, kernel.BrowserFUploadParams{Files: files}); err != nil {
+	if err := b.fs.Upload(ctx, br.SessionID, kernel.BrowserFUploadParams{Files: files}); err != nil {
 		pterm.Error.Printf("Failed to upload: %v\n", err)
 		return nil
 	}
@@ -935,13 +1206,26 @@ func (b BrowsersCmd) FSUploadZip(ctx context.Context, in BrowsersFSUploadZipInpu
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to upload zip: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
 	f, err := os.Open(in.ZipPath)
 	if err != nil {
 		pterm.Error.Printf("Failed to open zip: %v\n", err)
 		return nil
 	}
 	defer f.Close()
-	if err := b.fs.UploadZip(ctx, in.ID, kernel.BrowserFUploadZipParams{DestPath: in.DestDir, ZipFile: f}); err != nil {
+	if err := b.fs.UploadZip(ctx, br.SessionID, kernel.BrowserFUploadZipParams{DestPath: in.DestDir, ZipFile: f}); err != nil {
 		pterm.Error.Printf("Failed to upload zip: %v\n", err)
 		return nil
 	}
@@ -952,6 +1236,19 @@ func (b BrowsersCmd) FSUploadZip(ctx context.Context, in BrowsersFSUploadZipInpu
 func (b BrowsersCmd) FSWriteFile(ctx context.Context, in BrowsersFSWriteFileInput) error {
 	if b.fs == nil {
 		pterm.Error.Println("fs service not available")
+		return nil
+	}
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		pterm.Error.Printf("Failed to write file: %v\n", err)
+		return nil
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
 		return nil
 	}
 	var reader io.Reader
@@ -971,7 +1268,7 @@ func (b BrowsersCmd) FSWriteFile(ctx context.Context, in BrowsersFSWriteFileInpu
 	if in.Mode != "" {
 		params.Mode = kernel.Opt(in.Mode)
 	}
-	if err := b.fs.WriteFile(ctx, in.ID, reader, params); err != nil {
+	if err := b.fs.WriteFile(ctx, br.SessionID, reader, params); err != nil {
 		pterm.Error.Printf("Failed to write file: %v\n", err)
 		return nil
 	}
@@ -1005,7 +1302,7 @@ var browsersDeleteCmd = &cobra.Command{
 }
 
 var browsersViewCmd = &cobra.Command{
-	Use:   "view <id-or-persistent-id>",
+	Use:   "view <id|persistent-id>",
 	Short: "Get the live view URL for a browser",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runBrowsersView,
@@ -1019,7 +1316,7 @@ func init() {
 
 	// logs
 	logsRoot := &cobra.Command{Use: "logs", Short: "Browser logs operations"}
-	logsStream := &cobra.Command{Use: "stream <id>", Short: "Stream browser logs", Args: cobra.ExactArgs(1), RunE: runBrowsersLogsStream}
+	logsStream := &cobra.Command{Use: "stream <id|persistent-id>", Short: "Stream browser logs", Args: cobra.ExactArgs(1), RunE: runBrowsersLogsStream}
 	logsStream.Flags().String("source", "", "Log source: path or supervisor")
 	logsStream.Flags().Bool("follow", true, "Follow the log stream")
 	logsStream.Flags().String("path", "", "File path when source=path")
@@ -1030,19 +1327,19 @@ func init() {
 
 	// replays
 	replaysRoot := &cobra.Command{Use: "replays", Short: "Manage browser replays"}
-	replaysList := &cobra.Command{Use: "list <id>", Short: "List replays for a browser", Args: cobra.ExactArgs(1), RunE: runBrowsersReplaysList}
-	replaysStart := &cobra.Command{Use: "start <id>", Short: "Start a replay recording", Args: cobra.ExactArgs(1), RunE: runBrowsersReplaysStart}
+	replaysList := &cobra.Command{Use: "list <id|persistent-id>", Short: "List replays for a browser", Args: cobra.ExactArgs(1), RunE: runBrowsersReplaysList}
+	replaysStart := &cobra.Command{Use: "start <id|persistent-id>", Short: "Start a replay recording", Args: cobra.ExactArgs(1), RunE: runBrowsersReplaysStart}
 	replaysStart.Flags().Int("framerate", 0, "Recording framerate (fps)")
 	replaysStart.Flags().Int("max-duration", 0, "Maximum duration in seconds")
-	replaysStop := &cobra.Command{Use: "stop <id> <replay-id>", Short: "Stop a replay recording", Args: cobra.ExactArgs(2), RunE: runBrowsersReplaysStop}
-	replaysDownload := &cobra.Command{Use: "download <id> <replay-id>", Short: "Download a replay video", Args: cobra.ExactArgs(2), RunE: runBrowsersReplaysDownload}
+	replaysStop := &cobra.Command{Use: "stop <id|persistent-id> <replay-id>", Short: "Stop a replay recording", Args: cobra.ExactArgs(2), RunE: runBrowsersReplaysStop}
+	replaysDownload := &cobra.Command{Use: "download <id|persistent-id> <replay-id>", Short: "Download a replay video", Args: cobra.ExactArgs(2), RunE: runBrowsersReplaysDownload}
 	replaysDownload.Flags().StringP("output", "o", "", "Output file path for the replay video")
 	replaysRoot.AddCommand(replaysList, replaysStart, replaysStop, replaysDownload)
 	browsersCmd.AddCommand(replaysRoot)
 
 	// process
 	procRoot := &cobra.Command{Use: "process", Short: "Manage processes inside the browser VM"}
-	procExec := &cobra.Command{Use: "exec <id>", Short: "Execute a command synchronously", Args: cobra.ExactArgs(1), RunE: runBrowsersProcessExec}
+	procExec := &cobra.Command{Use: "exec <id|persistent-id>", Short: "Execute a command synchronously", Args: cobra.ExactArgs(1), RunE: runBrowsersProcessExec}
 	procExec.Flags().String("command", "", "Command to execute")
 	_ = procExec.MarkFlagRequired("command")
 	procExec.Flags().StringSlice("args", []string{}, "Command arguments")
@@ -1050,7 +1347,7 @@ func init() {
 	procExec.Flags().Int("timeout", 0, "Timeout in seconds")
 	procExec.Flags().String("as-user", "", "Run as user")
 	procExec.Flags().Bool("as-root", false, "Run as root")
-	procSpawn := &cobra.Command{Use: "spawn <id>", Short: "Execute a command asynchronously", Args: cobra.ExactArgs(1), RunE: runBrowsersProcessSpawn}
+	procSpawn := &cobra.Command{Use: "spawn <id|persistent-id>", Short: "Execute a command asynchronously", Args: cobra.ExactArgs(1), RunE: runBrowsersProcessSpawn}
 	procSpawn.Flags().String("command", "", "Command to execute")
 	_ = procSpawn.MarkFlagRequired("command")
 	procSpawn.Flags().StringSlice("args", []string{}, "Command arguments")
@@ -1058,48 +1355,48 @@ func init() {
 	procSpawn.Flags().Int("timeout", 0, "Timeout in seconds")
 	procSpawn.Flags().String("as-user", "", "Run as user")
 	procSpawn.Flags().Bool("as-root", false, "Run as root")
-	procKill := &cobra.Command{Use: "kill <id> <process-id>", Short: "Send a signal to a process", Args: cobra.ExactArgs(2), RunE: runBrowsersProcessKill}
+	procKill := &cobra.Command{Use: "kill <id|persistent-id> <process-id>", Short: "Send a signal to a process", Args: cobra.ExactArgs(2), RunE: runBrowsersProcessKill}
 	procKill.Flags().String("signal", "TERM", "Signal to send (TERM, KILL, INT, HUP)")
-	procStatus := &cobra.Command{Use: "status <id> <process-id>", Short: "Get process status", Args: cobra.ExactArgs(2), RunE: runBrowsersProcessStatus}
-	procStdin := &cobra.Command{Use: "stdin <id> <process-id>", Short: "Write to process stdin (base64)", Args: cobra.ExactArgs(2), RunE: runBrowsersProcessStdin}
+	procStatus := &cobra.Command{Use: "status <id|persistent-id> <process-id>", Short: "Get process status", Args: cobra.ExactArgs(2), RunE: runBrowsersProcessStatus}
+	procStdin := &cobra.Command{Use: "stdin <id|persistent-id> <process-id>", Short: "Write to process stdin (base64)", Args: cobra.ExactArgs(2), RunE: runBrowsersProcessStdin}
 	procStdin.Flags().String("data-b64", "", "Base64-encoded data to write to stdin")
 	_ = procStdin.MarkFlagRequired("data-b64")
-	procStdoutStream := &cobra.Command{Use: "stdout-stream <id> <process-id>", Short: "Stream process stdout/stderr", Args: cobra.ExactArgs(2), RunE: runBrowsersProcessStdoutStream}
+	procStdoutStream := &cobra.Command{Use: "stdout-stream <id|persistent-id> <process-id>", Short: "Stream process stdout/stderr", Args: cobra.ExactArgs(2), RunE: runBrowsersProcessStdoutStream}
 	procRoot.AddCommand(procExec, procSpawn, procKill, procStatus, procStdin, procStdoutStream)
 	browsersCmd.AddCommand(procRoot)
 
 	// fs
 	fsRoot := &cobra.Command{Use: "fs", Short: "Browser filesystem operations"}
-	fsNewDir := &cobra.Command{Use: "new-directory <id>", Short: "Create a new directory", Args: cobra.ExactArgs(1), RunE: runBrowsersFSNewDirectory}
+	fsNewDir := &cobra.Command{Use: "new-directory <id|persistent-id>", Short: "Create a new directory", Args: cobra.ExactArgs(1), RunE: runBrowsersFSNewDirectory}
 	fsNewDir.Flags().String("path", "", "Absolute directory path to create")
 	_ = fsNewDir.MarkFlagRequired("path")
 	fsNewDir.Flags().String("mode", "", "Directory mode (octal string)")
-	fsDelDir := &cobra.Command{Use: "delete-directory <id>", Short: "Delete a directory", Args: cobra.ExactArgs(1), RunE: runBrowsersFSDeleteDirectory}
+	fsDelDir := &cobra.Command{Use: "delete-directory <id|persistent-id>", Short: "Delete a directory", Args: cobra.ExactArgs(1), RunE: runBrowsersFSDeleteDirectory}
 	fsDelDir.Flags().String("path", "", "Absolute directory path to delete")
 	_ = fsDelDir.MarkFlagRequired("path")
-	fsDelFile := &cobra.Command{Use: "delete-file <id>", Short: "Delete a file", Args: cobra.ExactArgs(1), RunE: runBrowsersFSDeleteFile}
+	fsDelFile := &cobra.Command{Use: "delete-file <id|persistent-id>", Short: "Delete a file", Args: cobra.ExactArgs(1), RunE: runBrowsersFSDeleteFile}
 	fsDelFile.Flags().String("path", "", "Absolute file path to delete")
 	_ = fsDelFile.MarkFlagRequired("path")
-	fsDownloadZip := &cobra.Command{Use: "download-dir-zip <id>", Short: "Download a directory as zip", Args: cobra.ExactArgs(1), RunE: runBrowsersFSDownloadDirZip}
+	fsDownloadZip := &cobra.Command{Use: "download-dir-zip <id|persistent-id>", Short: "Download a directory as zip", Args: cobra.ExactArgs(1), RunE: runBrowsersFSDownloadDirZip}
 	fsDownloadZip.Flags().String("path", "", "Absolute directory path to download")
 	_ = fsDownloadZip.MarkFlagRequired("path")
 	fsDownloadZip.Flags().StringP("output", "o", "", "Output zip file path")
-	fsFileInfo := &cobra.Command{Use: "file-info <id>", Short: "Get file or directory info", Args: cobra.ExactArgs(1), RunE: runBrowsersFSFileInfo}
+	fsFileInfo := &cobra.Command{Use: "file-info <id|persistent-id>", Short: "Get file or directory info", Args: cobra.ExactArgs(1), RunE: runBrowsersFSFileInfo}
 	fsFileInfo.Flags().String("path", "", "Absolute file or directory path")
 	_ = fsFileInfo.MarkFlagRequired("path")
-	fsListFiles := &cobra.Command{Use: "list-files <id>", Short: "List files in a directory", Args: cobra.ExactArgs(1), RunE: runBrowsersFSListFiles}
+	fsListFiles := &cobra.Command{Use: "list-files <id|persistent-id>", Short: "List files in a directory", Args: cobra.ExactArgs(1), RunE: runBrowsersFSListFiles}
 	fsListFiles.Flags().String("path", "", "Absolute directory path")
 	_ = fsListFiles.MarkFlagRequired("path")
-	fsMove := &cobra.Command{Use: "move <id>", Short: "Move or rename a file or directory", Args: cobra.ExactArgs(1), RunE: runBrowsersFSMove}
+	fsMove := &cobra.Command{Use: "move <id|persistent-id>", Short: "Move or rename a file or directory", Args: cobra.ExactArgs(1), RunE: runBrowsersFSMove}
 	fsMove.Flags().String("src", "", "Absolute source path")
 	fsMove.Flags().String("dest", "", "Absolute destination path")
 	_ = fsMove.MarkFlagRequired("src")
 	_ = fsMove.MarkFlagRequired("dest")
-	fsReadFile := &cobra.Command{Use: "read-file <id>", Short: "Read a file", Args: cobra.ExactArgs(1), RunE: runBrowsersFSReadFile}
+	fsReadFile := &cobra.Command{Use: "read-file <id|persistent-id>", Short: "Read a file", Args: cobra.ExactArgs(1), RunE: runBrowsersFSReadFile}
 	fsReadFile.Flags().String("path", "", "Absolute file path")
 	_ = fsReadFile.MarkFlagRequired("path")
 	fsReadFile.Flags().StringP("output", "o", "", "Output file path (optional)")
-	fsSetPerms := &cobra.Command{Use: "set-permissions <id>", Short: "Set file permissions or ownership", Args: cobra.ExactArgs(1), RunE: runBrowsersFSSetPermissions}
+	fsSetPerms := &cobra.Command{Use: "set-permissions <id|persistent-id>", Short: "Set file permissions or ownership", Args: cobra.ExactArgs(1), RunE: runBrowsersFSSetPermissions}
 	fsSetPerms.Flags().String("path", "", "Absolute path")
 	fsSetPerms.Flags().String("mode", "", "File mode bits (octal string)")
 	_ = fsSetPerms.MarkFlagRequired("path")
@@ -1108,20 +1405,20 @@ func init() {
 	fsSetPerms.Flags().String("group", "", "New group name or GID")
 
 	// fs upload
-	fsUpload := &cobra.Command{Use: "upload <id>", Short: "Upload one or more files", Args: cobra.ExactArgs(1), RunE: runBrowsersFSUpload}
+	fsUpload := &cobra.Command{Use: "upload <id|persistent-id>", Short: "Upload one or more files", Args: cobra.ExactArgs(1), RunE: runBrowsersFSUpload}
 	fsUpload.Flags().StringSlice("file", []string{}, "Mapping local:remote (repeatable)")
 	fsUpload.Flags().String("dest-dir", "", "Destination directory for uploads")
 	fsUpload.Flags().StringSlice("paths", []string{}, "Local file paths to upload")
 
 	// fs upload-zip
-	fsUploadZip := &cobra.Command{Use: "upload-zip <id>", Short: "Upload a zip and extract it", Args: cobra.ExactArgs(1), RunE: runBrowsersFSUploadZip}
+	fsUploadZip := &cobra.Command{Use: "upload-zip <id|persistent-id>", Short: "Upload a zip and extract it", Args: cobra.ExactArgs(1), RunE: runBrowsersFSUploadZip}
 	fsUploadZip.Flags().String("zip", "", "Local zip file path")
 	_ = fsUploadZip.MarkFlagRequired("zip")
 	fsUploadZip.Flags().String("dest-dir", "", "Destination directory to extract to")
 	_ = fsUploadZip.MarkFlagRequired("dest-dir")
 
 	// fs write-file
-	fsWriteFile := &cobra.Command{Use: "write-file <id>", Short: "Write a file from local data", Args: cobra.ExactArgs(1), RunE: runBrowsersFSWriteFile}
+	fsWriteFile := &cobra.Command{Use: "write-file <id|persistent-id>", Short: "Write a file from local data", Args: cobra.ExactArgs(1), RunE: runBrowsersFSWriteFile}
 	fsWriteFile.Flags().String("path", "", "Destination absolute file path")
 	_ = fsWriteFile.MarkFlagRequired("path")
 	fsWriteFile.Flags().String("mode", "", "File mode (octal string)")
@@ -1201,9 +1498,9 @@ func runBrowsersLogsStream(cmd *cobra.Command, args []string) error {
 	source, _ := cmd.Flags().GetString("source")
 	path, _ := cmd.Flags().GetString("path")
 	supervisor, _ := cmd.Flags().GetString("supervisor-process")
-	b := BrowsersCmd{logs: &svc.Logs}
+	b := BrowsersCmd{browsers: &svc, logs: &svc.Logs}
 	return b.LogsStream(cmd.Context(), BrowsersLogsStreamInput{
-		ID:                args[0],
+		Identifier:        args[0],
 		Source:            source,
 		Follow:            BoolFlag{Set: cmd.Flags().Changed("follow"), Value: followVal},
 		Path:              path,
@@ -1214,8 +1511,8 @@ func runBrowsersLogsStream(cmd *cobra.Command, args []string) error {
 func runBrowsersReplaysList(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	svc := client.Browsers
-	b := BrowsersCmd{replays: &svc.Replays}
-	return b.ReplaysList(cmd.Context(), BrowsersReplaysListInput{ID: args[0]})
+	b := BrowsersCmd{browsers: &svc, replays: &svc.Replays}
+	return b.ReplaysList(cmd.Context(), BrowsersReplaysListInput{Identifier: args[0]})
 }
 
 func runBrowsersReplaysStart(cmd *cobra.Command, args []string) error {
@@ -1223,23 +1520,23 @@ func runBrowsersReplaysStart(cmd *cobra.Command, args []string) error {
 	svc := client.Browsers
 	fr, _ := cmd.Flags().GetInt("framerate")
 	md, _ := cmd.Flags().GetInt("max-duration")
-	b := BrowsersCmd{replays: &svc.Replays}
-	return b.ReplaysStart(cmd.Context(), BrowsersReplaysStartInput{ID: args[0], Framerate: fr, MaxDurationSeconds: md})
+	b := BrowsersCmd{browsers: &svc, replays: &svc.Replays}
+	return b.ReplaysStart(cmd.Context(), BrowsersReplaysStartInput{Identifier: args[0], Framerate: fr, MaxDurationSeconds: md})
 }
 
 func runBrowsersReplaysStop(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	svc := client.Browsers
-	b := BrowsersCmd{replays: &svc.Replays}
-	return b.ReplaysStop(cmd.Context(), BrowsersReplaysStopInput{ID: args[0], ReplayID: args[1]})
+	b := BrowsersCmd{browsers: &svc, replays: &svc.Replays}
+	return b.ReplaysStop(cmd.Context(), BrowsersReplaysStopInput{Identifier: args[0], ReplayID: args[1]})
 }
 
 func runBrowsersReplaysDownload(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	svc := client.Browsers
 	out, _ := cmd.Flags().GetString("output")
-	b := BrowsersCmd{replays: &svc.Replays}
-	return b.ReplaysDownload(cmd.Context(), BrowsersReplaysDownloadInput{ID: args[0], ReplayID: args[1], Output: out})
+	b := BrowsersCmd{browsers: &svc, replays: &svc.Replays}
+	return b.ReplaysDownload(cmd.Context(), BrowsersReplaysDownloadInput{Identifier: args[0], ReplayID: args[1], Output: out})
 }
 
 func runBrowsersProcessExec(cmd *cobra.Command, args []string) error {
@@ -1251,8 +1548,8 @@ func runBrowsersProcessExec(cmd *cobra.Command, args []string) error {
 	timeout, _ := cmd.Flags().GetInt("timeout")
 	asUser, _ := cmd.Flags().GetString("as-user")
 	asRoot, _ := cmd.Flags().GetBool("as-root")
-	b := BrowsersCmd{process: &svc.Process}
-	return b.ProcessExec(cmd.Context(), BrowsersProcessExecInput{ID: args[0], Command: command, Args: argv, Cwd: cwd, Timeout: timeout, AsUser: asUser, AsRoot: BoolFlag{Set: cmd.Flags().Changed("as-root"), Value: asRoot}})
+	b := BrowsersCmd{browsers: &svc, process: &svc.Process}
+	return b.ProcessExec(cmd.Context(), BrowsersProcessExecInput{Identifier: args[0], Command: command, Args: argv, Cwd: cwd, Timeout: timeout, AsUser: asUser, AsRoot: BoolFlag{Set: cmd.Flags().Changed("as-root"), Value: asRoot}})
 }
 
 func runBrowsersProcessSpawn(cmd *cobra.Command, args []string) error {
@@ -1264,38 +1561,38 @@ func runBrowsersProcessSpawn(cmd *cobra.Command, args []string) error {
 	timeout, _ := cmd.Flags().GetInt("timeout")
 	asUser, _ := cmd.Flags().GetString("as-user")
 	asRoot, _ := cmd.Flags().GetBool("as-root")
-	b := BrowsersCmd{process: &svc.Process}
-	return b.ProcessSpawn(cmd.Context(), BrowsersProcessSpawnInput{ID: args[0], Command: command, Args: argv, Cwd: cwd, Timeout: timeout, AsUser: asUser, AsRoot: BoolFlag{Set: cmd.Flags().Changed("as-root"), Value: asRoot}})
+	b := BrowsersCmd{browsers: &svc, process: &svc.Process}
+	return b.ProcessSpawn(cmd.Context(), BrowsersProcessSpawnInput{Identifier: args[0], Command: command, Args: argv, Cwd: cwd, Timeout: timeout, AsUser: asUser, AsRoot: BoolFlag{Set: cmd.Flags().Changed("as-root"), Value: asRoot}})
 }
 
 func runBrowsersProcessKill(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	svc := client.Browsers
 	signal, _ := cmd.Flags().GetString("signal")
-	b := BrowsersCmd{process: &svc.Process}
-	return b.ProcessKill(cmd.Context(), BrowsersProcessKillInput{ID: args[0], ProcessID: args[1], Signal: signal})
+	b := BrowsersCmd{browsers: &svc, process: &svc.Process}
+	return b.ProcessKill(cmd.Context(), BrowsersProcessKillInput{Identifier: args[0], ProcessID: args[1], Signal: signal})
 }
 
 func runBrowsersProcessStatus(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	svc := client.Browsers
-	b := BrowsersCmd{process: &svc.Process}
-	return b.ProcessStatus(cmd.Context(), BrowsersProcessStatusInput{ID: args[0], ProcessID: args[1]})
+	b := BrowsersCmd{browsers: &svc, process: &svc.Process}
+	return b.ProcessStatus(cmd.Context(), BrowsersProcessStatusInput{Identifier: args[0], ProcessID: args[1]})
 }
 
 func runBrowsersProcessStdin(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	svc := client.Browsers
 	data, _ := cmd.Flags().GetString("data-b64")
-	b := BrowsersCmd{process: &svc.Process}
-	return b.ProcessStdin(cmd.Context(), BrowsersProcessStdinInput{ID: args[0], ProcessID: args[1], DataB64: data})
+	b := BrowsersCmd{browsers: &svc, process: &svc.Process}
+	return b.ProcessStdin(cmd.Context(), BrowsersProcessStdinInput{Identifier: args[0], ProcessID: args[1], DataB64: data})
 }
 
 func runBrowsersProcessStdoutStream(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	svc := client.Browsers
-	b := BrowsersCmd{process: &svc.Process}
-	return b.ProcessStdoutStream(cmd.Context(), BrowsersProcessStdoutStreamInput{ID: args[0], ProcessID: args[1]})
+	b := BrowsersCmd{browsers: &svc, process: &svc.Process}
+	return b.ProcessStdoutStream(cmd.Context(), BrowsersProcessStdoutStreamInput{Identifier: args[0], ProcessID: args[1]})
 }
 
 func runBrowsersFSNewDirectory(cmd *cobra.Command, args []string) error {
@@ -1303,24 +1600,24 @@ func runBrowsersFSNewDirectory(cmd *cobra.Command, args []string) error {
 	svc := client.Browsers
 	path, _ := cmd.Flags().GetString("path")
 	mode, _ := cmd.Flags().GetString("mode")
-	b := BrowsersCmd{fs: &svc.Fs}
-	return b.FSNewDirectory(cmd.Context(), BrowsersFSNewDirInput{ID: args[0], Path: path, Mode: mode})
+	b := BrowsersCmd{browsers: &svc, fs: &svc.Fs}
+	return b.FSNewDirectory(cmd.Context(), BrowsersFSNewDirInput{Identifier: args[0], Path: path, Mode: mode})
 }
 
 func runBrowsersFSDeleteDirectory(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	svc := client.Browsers
 	path, _ := cmd.Flags().GetString("path")
-	b := BrowsersCmd{fs: &svc.Fs}
-	return b.FSDeleteDirectory(cmd.Context(), BrowsersFSDeleteDirInput{ID: args[0], Path: path})
+	b := BrowsersCmd{browsers: &svc, fs: &svc.Fs}
+	return b.FSDeleteDirectory(cmd.Context(), BrowsersFSDeleteDirInput{Identifier: args[0], Path: path})
 }
 
 func runBrowsersFSDeleteFile(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	svc := client.Browsers
 	path, _ := cmd.Flags().GetString("path")
-	b := BrowsersCmd{fs: &svc.Fs}
-	return b.FSDeleteFile(cmd.Context(), BrowsersFSDeleteFileInput{ID: args[0], Path: path})
+	b := BrowsersCmd{browsers: &svc, fs: &svc.Fs}
+	return b.FSDeleteFile(cmd.Context(), BrowsersFSDeleteFileInput{Identifier: args[0], Path: path})
 }
 
 func runBrowsersFSDownloadDirZip(cmd *cobra.Command, args []string) error {
@@ -1328,24 +1625,24 @@ func runBrowsersFSDownloadDirZip(cmd *cobra.Command, args []string) error {
 	svc := client.Browsers
 	path, _ := cmd.Flags().GetString("path")
 	out, _ := cmd.Flags().GetString("output")
-	b := BrowsersCmd{fs: &svc.Fs}
-	return b.FSDownloadDirZip(cmd.Context(), BrowsersFSDownloadDirZipInput{ID: args[0], Path: path, Output: out})
+	b := BrowsersCmd{browsers: &svc, fs: &svc.Fs}
+	return b.FSDownloadDirZip(cmd.Context(), BrowsersFSDownloadDirZipInput{Identifier: args[0], Path: path, Output: out})
 }
 
 func runBrowsersFSFileInfo(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	svc := client.Browsers
 	path, _ := cmd.Flags().GetString("path")
-	b := BrowsersCmd{fs: &svc.Fs}
-	return b.FSFileInfo(cmd.Context(), BrowsersFSFileInfoInput{ID: args[0], Path: path})
+	b := BrowsersCmd{browsers: &svc, fs: &svc.Fs}
+	return b.FSFileInfo(cmd.Context(), BrowsersFSFileInfoInput{Identifier: args[0], Path: path})
 }
 
 func runBrowsersFSListFiles(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	svc := client.Browsers
 	path, _ := cmd.Flags().GetString("path")
-	b := BrowsersCmd{fs: &svc.Fs}
-	return b.FSListFiles(cmd.Context(), BrowsersFSListFilesInput{ID: args[0], Path: path})
+	b := BrowsersCmd{browsers: &svc, fs: &svc.Fs}
+	return b.FSListFiles(cmd.Context(), BrowsersFSListFilesInput{Identifier: args[0], Path: path})
 }
 
 func runBrowsersFSMove(cmd *cobra.Command, args []string) error {
@@ -1353,8 +1650,8 @@ func runBrowsersFSMove(cmd *cobra.Command, args []string) error {
 	svc := client.Browsers
 	src, _ := cmd.Flags().GetString("src")
 	dest, _ := cmd.Flags().GetString("dest")
-	b := BrowsersCmd{fs: &svc.Fs}
-	return b.FSMove(cmd.Context(), BrowsersFSMoveInput{ID: args[0], SrcPath: src, DestPath: dest})
+	b := BrowsersCmd{browsers: &svc, fs: &svc.Fs}
+	return b.FSMove(cmd.Context(), BrowsersFSMoveInput{Identifier: args[0], SrcPath: src, DestPath: dest})
 }
 
 func runBrowsersFSReadFile(cmd *cobra.Command, args []string) error {
@@ -1362,8 +1659,8 @@ func runBrowsersFSReadFile(cmd *cobra.Command, args []string) error {
 	svc := client.Browsers
 	path, _ := cmd.Flags().GetString("path")
 	out, _ := cmd.Flags().GetString("output")
-	b := BrowsersCmd{fs: &svc.Fs}
-	return b.FSReadFile(cmd.Context(), BrowsersFSReadFileInput{ID: args[0], Path: path, Output: out})
+	b := BrowsersCmd{browsers: &svc, fs: &svc.Fs}
+	return b.FSReadFile(cmd.Context(), BrowsersFSReadFileInput{Identifier: args[0], Path: path, Output: out})
 }
 
 func runBrowsersFSSetPermissions(cmd *cobra.Command, args []string) error {
@@ -1373,8 +1670,8 @@ func runBrowsersFSSetPermissions(cmd *cobra.Command, args []string) error {
 	mode, _ := cmd.Flags().GetString("mode")
 	owner, _ := cmd.Flags().GetString("owner")
 	group, _ := cmd.Flags().GetString("group")
-	b := BrowsersCmd{fs: &svc.Fs}
-	return b.FSSetPermissions(cmd.Context(), BrowsersFSSetPermsInput{ID: args[0], Path: path, Mode: mode, Owner: owner, Group: group})
+	b := BrowsersCmd{browsers: &svc, fs: &svc.Fs}
+	return b.FSSetPermissions(cmd.Context(), BrowsersFSSetPermsInput{Identifier: args[0], Path: path, Mode: mode, Owner: owner, Group: group})
 }
 
 func runBrowsersFSUpload(cmd *cobra.Command, args []string) error {
@@ -1399,8 +1696,8 @@ func runBrowsersFSUpload(cmd *cobra.Command, args []string) error {
 			Dest  string
 		}{Local: parts[0], Dest: parts[1]})
 	}
-	b := BrowsersCmd{fs: &svc.Fs}
-	return b.FSUpload(cmd.Context(), BrowsersFSUploadInput{ID: args[0], Mappings: mappings, DestDir: destDir, Paths: paths})
+	b := BrowsersCmd{browsers: &svc, fs: &svc.Fs}
+	return b.FSUpload(cmd.Context(), BrowsersFSUploadInput{Identifier: args[0], Mappings: mappings, DestDir: destDir, Paths: paths})
 }
 
 func runBrowsersFSUploadZip(cmd *cobra.Command, args []string) error {
@@ -1408,8 +1705,8 @@ func runBrowsersFSUploadZip(cmd *cobra.Command, args []string) error {
 	svc := client.Browsers
 	zipPath, _ := cmd.Flags().GetString("zip")
 	destDir, _ := cmd.Flags().GetString("dest-dir")
-	b := BrowsersCmd{fs: &svc.Fs}
-	return b.FSUploadZip(cmd.Context(), BrowsersFSUploadZipInput{ID: args[0], ZipPath: zipPath, DestDir: destDir})
+	b := BrowsersCmd{browsers: &svc, fs: &svc.Fs}
+	return b.FSUploadZip(cmd.Context(), BrowsersFSUploadZipInput{Identifier: args[0], ZipPath: zipPath, DestDir: destDir})
 }
 
 func runBrowsersFSWriteFile(cmd *cobra.Command, args []string) error {
@@ -1418,8 +1715,8 @@ func runBrowsersFSWriteFile(cmd *cobra.Command, args []string) error {
 	path, _ := cmd.Flags().GetString("path")
 	mode, _ := cmd.Flags().GetString("mode")
 	input, _ := cmd.Flags().GetString("source")
-	b := BrowsersCmd{fs: &svc.Fs}
-	return b.FSWriteFile(cmd.Context(), BrowsersFSWriteFileInput{ID: args[0], DestPath: path, Mode: mode, SourcePath: input})
+	b := BrowsersCmd{browsers: &svc, fs: &svc.Fs}
+	return b.FSWriteFile(cmd.Context(), BrowsersFSWriteFileInput{Identifier: args[0], DestPath: path, Mode: mode, SourcePath: input})
 }
 
 func truncateURL(url string, maxLen int) string {
@@ -1427,4 +1724,22 @@ func truncateURL(url string, maxLen int) string {
 		return url
 	}
 	return url[:maxLen-3] + "..."
+}
+
+// resolveBrowserByIdentifier finds a browser by session ID or persistent ID.
+func (b BrowsersCmd) resolveBrowserByIdentifier(ctx context.Context, identifier string) (*kernel.BrowserListResponse, error) {
+	browsers, err := b.browsers.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if browsers == nil || len(*browsers) == 0 {
+		return nil, nil
+	}
+	for _, br := range *browsers {
+		if br.SessionID == identifier || br.Persistence.ID == identifier {
+			bCopy := br
+			return &bCopy, nil
+		}
+	}
+	return nil, nil
 }
