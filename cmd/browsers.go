@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/onkernel/kernel-go-sdk/option"
 	"github.com/onkernel/kernel-go-sdk/packages/ssestream"
@@ -104,8 +105,7 @@ func (b BrowsersCmd) List(ctx context.Context) error {
 
 	browsers, err := b.browsers.List(ctx)
 	if err != nil {
-		pterm.Error.Printf("Failed to list browsers: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 
 	if browsers == nil || len(*browsers) == 0 {
@@ -133,7 +133,7 @@ func (b BrowsersCmd) List(ctx context.Context) error {
 		})
 	}
 
-	pterm.DefaultTable.WithHasHeader().WithData(tableData).Render()
+	printTableNoPad(tableData, true)
 	return nil
 }
 
@@ -155,8 +155,7 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 
 	browser, err := b.browsers.New(ctx, params)
 	if err != nil {
-		pterm.Error.Printf("Failed to create browser: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 
 	tableData := pterm.TableData{
@@ -171,7 +170,7 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 		tableData = append(tableData, []string{"Persistent ID", browser.Persistence.ID})
 	}
 
-	pterm.DefaultTable.WithHasHeader().WithData(tableData).Render()
+	printTableNoPad(tableData, true)
 	return nil
 }
 
@@ -190,8 +189,7 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 	if !in.SkipConfirm {
 		browsers, err := b.browsers.List(ctx)
 		if err != nil {
-			pterm.Error.Printf("Failed to list browsers: %v\n", err)
-			return nil
+			return util.CleanedUpSdkError{Err: err}
 		}
 		if browsers == nil || len(*browsers) == 0 {
 			pterm.Error.Println("No browsers found")
@@ -228,8 +226,7 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 			pterm.Info.Printf("Deleting browser with persistent ID: %s\n", in.Identifier)
 			err = b.browsers.Delete(ctx, kernel.BrowserDeleteParams{PersistentID: in.Identifier})
 			if err != nil && !isNotFound(err) {
-				pterm.Error.Printf("Failed to delete browser: %v\n", err)
-				return nil
+				return util.CleanedUpSdkError{Err: err}
 			}
 			pterm.Success.Printf("Successfully deleted browser with persistent ID: %s\n", in.Identifier)
 			return nil
@@ -238,8 +235,7 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 		pterm.Info.Printf("Deleting browser with ID: %s\n", in.Identifier)
 		err = b.browsers.DeleteByID(ctx, in.Identifier)
 		if err != nil && !isNotFound(err) {
-			pterm.Error.Printf("Failed to delete browser: %v\n", err)
-			return nil
+			return util.CleanedUpSdkError{Err: err}
 		}
 		pterm.Success.Printf("Successfully deleted browser with ID: %s\n", in.Identifier)
 		return nil
@@ -265,8 +261,7 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 
 	if len(nonNotFoundErrors) >= 2 {
 		// Both failed with meaningful errors; report one
-		pterm.Error.Printf("Failed to delete browser: %v\n", nonNotFoundErrors[0])
-		return nil
+		return util.CleanedUpSdkError{Err: nonNotFoundErrors[0]}
 	}
 
 	pterm.Success.Printf("Successfully deleted (or already absent) browser: %s\n", in.Identifier)
@@ -276,8 +271,7 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 func (b BrowsersCmd) View(ctx context.Context, in BrowsersViewInput) error {
 	browsers, err := b.browsers.List(ctx)
 	if err != nil {
-		pterm.Error.Printf("Failed to list browsers: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 
 	if browsers == nil || len(*browsers) == 0 {
@@ -323,8 +317,7 @@ func (b BrowsersCmd) LogsStream(ctx context.Context, in BrowsersLogsStreamInput)
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to list browsers: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -351,7 +344,7 @@ func (b BrowsersCmd) LogsStream(ctx context.Context, in BrowsersLogsStreamInput)
 		pterm.Println(fmt.Sprintf("[%s] %s", ev.Timestamp.Format("2006-01-02 15:04:05"), ev.Message))
 	}
 	if err := stream.Err(); err != nil {
-		pterm.Error.Printf("log stream error: %v\n", err)
+		return util.CleanedUpSdkError{Err: err}
 	}
 	return nil
 }
@@ -389,8 +382,7 @@ func (b BrowsersCmd) ReplaysList(ctx context.Context, in BrowsersReplaysListInpu
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to list replays: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -398,8 +390,7 @@ func (b BrowsersCmd) ReplaysList(ctx context.Context, in BrowsersReplaysListInpu
 	}
 	items, err := b.replays.List(ctx, br.SessionID)
 	if err != nil {
-		pterm.Error.Printf("Failed to list replays: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if items == nil || len(*items) == 0 {
 		pterm.Info.Println("No replays found")
@@ -409,7 +400,7 @@ func (b BrowsersCmd) ReplaysList(ctx context.Context, in BrowsersReplaysListInpu
 	for _, r := range *items {
 		rows = append(rows, []string{r.ReplayID, r.StartedAt.Format("2006-01-02 15:04:05"), r.FinishedAt.Format("2006-01-02 15:04:05"), truncateURL(r.ReplayViewURL, 60)})
 	}
-	pterm.DefaultTable.WithHasHeader().WithData(rows).Render()
+	printTableNoPad(rows, true)
 	return nil
 }
 
@@ -424,8 +415,7 @@ func (b BrowsersCmd) ReplaysStart(ctx context.Context, in BrowsersReplaysStartIn
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to start replay: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -440,11 +430,10 @@ func (b BrowsersCmd) ReplaysStart(ctx context.Context, in BrowsersReplaysStartIn
 	}
 	res, err := b.replays.Start(ctx, br.SessionID, body)
 	if err != nil {
-		pterm.Error.Printf("Failed to start replay: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	rows := pterm.TableData{{"Property", "Value"}, {"Replay ID", res.ReplayID}, {"View URL", res.ReplayViewURL}, {"Started At", res.StartedAt.Format("2006-01-02 15:04:05")}}
-	pterm.DefaultTable.WithHasHeader().WithData(rows).Render()
+	printTableNoPad(rows, true)
 	return nil
 }
 
@@ -459,8 +448,7 @@ func (b BrowsersCmd) ReplaysStop(ctx context.Context, in BrowsersReplaysStopInpu
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to stop replay: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -468,8 +456,7 @@ func (b BrowsersCmd) ReplaysStop(ctx context.Context, in BrowsersReplaysStopInpu
 	}
 	err = b.replays.Stop(ctx, in.ReplayID, kernel.BrowserReplayStopParams{ID: br.SessionID})
 	if err != nil {
-		pterm.Error.Printf("Failed to stop replay: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	pterm.Success.Printf("Stopped replay %s for browser %s\n", in.ReplayID, br.SessionID)
 	return nil
@@ -486,8 +473,7 @@ func (b BrowsersCmd) ReplaysDownload(ctx context.Context, in BrowsersReplaysDown
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to download replay: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -495,8 +481,7 @@ func (b BrowsersCmd) ReplaysDownload(ctx context.Context, in BrowsersReplaysDown
 	}
 	res, err := b.replays.Download(ctx, in.ReplayID, kernel.BrowserReplayDownloadParams{ID: br.SessionID})
 	if err != nil {
-		pterm.Error.Printf("Failed to download replay: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	defer res.Body.Close()
 	if in.Output == "" {
@@ -564,8 +549,7 @@ func (b BrowsersCmd) ProcessExec(ctx context.Context, in BrowsersProcessExecInpu
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to exec: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -589,11 +573,10 @@ func (b BrowsersCmd) ProcessExec(ctx context.Context, in BrowsersProcessExecInpu
 	}
 	res, err := b.process.Exec(ctx, br.SessionID, params)
 	if err != nil {
-		pterm.Error.Printf("Failed to exec: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	rows := pterm.TableData{{"Property", "Value"}, {"Exit Code", fmt.Sprintf("%d", res.ExitCode)}, {"Duration (ms)", fmt.Sprintf("%d", res.DurationMs)}}
-	pterm.DefaultTable.WithHasHeader().WithData(rows).Render()
+	printTableNoPad(rows, true)
 	return nil
 }
 
@@ -608,8 +591,7 @@ func (b BrowsersCmd) ProcessSpawn(ctx context.Context, in BrowsersProcessSpawnIn
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to spawn: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -633,11 +615,10 @@ func (b BrowsersCmd) ProcessSpawn(ctx context.Context, in BrowsersProcessSpawnIn
 	}
 	res, err := b.process.Spawn(ctx, br.SessionID, params)
 	if err != nil {
-		pterm.Error.Printf("Failed to spawn: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	rows := pterm.TableData{{"Property", "Value"}, {"Process ID", res.ProcessID}, {"PID", fmt.Sprintf("%d", res.Pid)}, {"Started At", res.StartedAt.Format("2006-01-02 15:04:05")}}
-	pterm.DefaultTable.WithHasHeader().WithData(rows).Render()
+	printTableNoPad(rows, true)
 	return nil
 }
 
@@ -652,8 +633,7 @@ func (b BrowsersCmd) ProcessKill(ctx context.Context, in BrowsersProcessKillInpu
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to kill process: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -662,8 +642,7 @@ func (b BrowsersCmd) ProcessKill(ctx context.Context, in BrowsersProcessKillInpu
 	params := kernel.BrowserProcessKillParams{ID: br.SessionID, Signal: kernel.BrowserProcessKillParamsSignal(in.Signal)}
 	_, err = b.process.Kill(ctx, in.ProcessID, params)
 	if err != nil {
-		pterm.Error.Printf("Failed to kill process: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	pterm.Success.Printf("Sent %s to process %s on %s\n", in.Signal, in.ProcessID, br.SessionID)
 	return nil
@@ -680,8 +659,7 @@ func (b BrowsersCmd) ProcessStatus(ctx context.Context, in BrowsersProcessStatus
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to get status: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -689,11 +667,10 @@ func (b BrowsersCmd) ProcessStatus(ctx context.Context, in BrowsersProcessStatus
 	}
 	res, err := b.process.Status(ctx, in.ProcessID, kernel.BrowserProcessStatusParams{ID: br.SessionID})
 	if err != nil {
-		pterm.Error.Printf("Failed to get status: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	rows := pterm.TableData{{"Property", "Value"}, {"State", string(res.State)}, {"CPU %", fmt.Sprintf("%.2f", res.CPUPct)}, {"Mem Bytes", fmt.Sprintf("%d", res.MemBytes)}, {"Exit Code", fmt.Sprintf("%d", res.ExitCode)}}
-	pterm.DefaultTable.WithHasHeader().WithData(rows).Render()
+	printTableNoPad(rows, true)
 	return nil
 }
 
@@ -708,8 +685,7 @@ func (b BrowsersCmd) ProcessStdin(ctx context.Context, in BrowsersProcessStdinIn
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to write stdin: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -717,8 +693,7 @@ func (b BrowsersCmd) ProcessStdin(ctx context.Context, in BrowsersProcessStdinIn
 	}
 	_, err = b.process.Stdin(ctx, in.ProcessID, kernel.BrowserProcessStdinParams{ID: br.SessionID, DataB64: in.DataB64})
 	if err != nil {
-		pterm.Error.Printf("Failed to write stdin: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	pterm.Success.Println("Wrote to stdin")
 	return nil
@@ -735,8 +710,7 @@ func (b BrowsersCmd) ProcessStdoutStream(ctx context.Context, in BrowsersProcess
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("stdout stream error: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -762,7 +736,7 @@ func (b BrowsersCmd) ProcessStdoutStream(ctx context.Context, in BrowsersProcess
 		os.Stdout.Write(data)
 	}
 	if err := stream.Err(); err != nil {
-		pterm.Error.Printf("stdout stream error: %v\n", err)
+		return util.CleanedUpSdkError{Err: err}
 	}
 	return nil
 }
@@ -855,8 +829,7 @@ func (b BrowsersCmd) FSNewDirectory(ctx context.Context, in BrowsersFSNewDirInpu
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to create directory: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -867,8 +840,7 @@ func (b BrowsersCmd) FSNewDirectory(ctx context.Context, in BrowsersFSNewDirInpu
 		params.Mode = kernel.Opt(in.Mode)
 	}
 	if err := b.fs.NewDirectory(ctx, br.SessionID, params); err != nil {
-		pterm.Error.Printf("Failed to create directory: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	pterm.Success.Printf("Created directory %s\n", in.Path)
 	return nil
@@ -885,16 +857,14 @@ func (b BrowsersCmd) FSDeleteDirectory(ctx context.Context, in BrowsersFSDeleteD
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to delete directory: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
 		return nil
 	}
 	if err := b.fs.DeleteDirectory(ctx, br.SessionID, kernel.BrowserFDeleteDirectoryParams{Path: in.Path}); err != nil {
-		pterm.Error.Printf("Failed to delete directory: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	pterm.Success.Printf("Deleted directory %s\n", in.Path)
 	return nil
@@ -911,16 +881,14 @@ func (b BrowsersCmd) FSDeleteFile(ctx context.Context, in BrowsersFSDeleteFileIn
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to delete file: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
 		return nil
 	}
 	if err := b.fs.DeleteFile(ctx, br.SessionID, kernel.BrowserFDeleteFileParams{Path: in.Path}); err != nil {
-		pterm.Error.Printf("Failed to delete file: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	pterm.Success.Printf("Deleted file %s\n", in.Path)
 	return nil
@@ -937,8 +905,7 @@ func (b BrowsersCmd) FSDownloadDirZip(ctx context.Context, in BrowsersFSDownload
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to download dir zip: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -946,8 +913,7 @@ func (b BrowsersCmd) FSDownloadDirZip(ctx context.Context, in BrowsersFSDownload
 	}
 	res, err := b.fs.DownloadDirZip(ctx, br.SessionID, kernel.BrowserFDownloadDirZipParams{Path: in.Path})
 	if err != nil {
-		pterm.Error.Printf("Failed to download dir zip: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	defer res.Body.Close()
 	if in.Output == "" {
@@ -980,8 +946,7 @@ func (b BrowsersCmd) FSFileInfo(ctx context.Context, in BrowsersFSFileInfoInput)
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to get file info: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -989,11 +954,10 @@ func (b BrowsersCmd) FSFileInfo(ctx context.Context, in BrowsersFSFileInfoInput)
 	}
 	res, err := b.fs.FileInfo(ctx, br.SessionID, kernel.BrowserFFileInfoParams{Path: in.Path})
 	if err != nil {
-		pterm.Error.Printf("Failed to get file info: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	rows := pterm.TableData{{"Property", "Value"}, {"Path", res.Path}, {"Name", res.Name}, {"Mode", res.Mode}, {"IsDir", fmt.Sprintf("%t", res.IsDir)}, {"SizeBytes", fmt.Sprintf("%d", res.SizeBytes)}, {"ModTime", res.ModTime.Format("2006-01-02 15:04:05")}}
-	pterm.DefaultTable.WithHasHeader().WithData(rows).Render()
+	printTableNoPad(rows, true)
 	return nil
 }
 
@@ -1008,8 +972,7 @@ func (b BrowsersCmd) FSListFiles(ctx context.Context, in BrowsersFSListFilesInpu
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to list files: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -1017,8 +980,7 @@ func (b BrowsersCmd) FSListFiles(ctx context.Context, in BrowsersFSListFilesInpu
 	}
 	res, err := b.fs.ListFiles(ctx, br.SessionID, kernel.BrowserFListFilesParams{Path: in.Path})
 	if err != nil {
-		pterm.Error.Printf("Failed to list files: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if res == nil || len(*res) == 0 {
 		pterm.Info.Println("No files found")
@@ -1028,7 +990,7 @@ func (b BrowsersCmd) FSListFiles(ctx context.Context, in BrowsersFSListFilesInpu
 	for _, f := range *res {
 		rows = append(rows, []string{f.Mode, fmt.Sprintf("%d", f.SizeBytes), f.ModTime.Format("2006-01-02 15:04:05"), f.Name, f.Path})
 	}
-	pterm.DefaultTable.WithHasHeader().WithData(rows).Render()
+	printTableNoPad(rows, true)
 	return nil
 }
 
@@ -1043,16 +1005,14 @@ func (b BrowsersCmd) FSMove(ctx context.Context, in BrowsersFSMoveInput) error {
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to move: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
 		return nil
 	}
 	if err := b.fs.Move(ctx, br.SessionID, kernel.BrowserFMoveParams{SrcPath: in.SrcPath, DestPath: in.DestPath}); err != nil {
-		pterm.Error.Printf("Failed to move: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	pterm.Success.Printf("Moved %s -> %s\n", in.SrcPath, in.DestPath)
 	return nil
@@ -1069,8 +1029,7 @@ func (b BrowsersCmd) FSReadFile(ctx context.Context, in BrowsersFSReadFileInput)
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to read file: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -1078,8 +1037,7 @@ func (b BrowsersCmd) FSReadFile(ctx context.Context, in BrowsersFSReadFileInput)
 	}
 	res, err := b.fs.ReadFile(ctx, br.SessionID, kernel.BrowserFReadFileParams{Path: in.Path})
 	if err != nil {
-		pterm.Error.Printf("Failed to read file: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	defer res.Body.Close()
 	if in.Output == "" {
@@ -1111,8 +1069,7 @@ func (b BrowsersCmd) FSSetPermissions(ctx context.Context, in BrowsersFSSetPerms
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to set permissions: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -1126,8 +1083,7 @@ func (b BrowsersCmd) FSSetPermissions(ctx context.Context, in BrowsersFSSetPerms
 		params.Group = kernel.Opt(in.Group)
 	}
 	if err := b.fs.SetFilePermissions(ctx, br.SessionID, params); err != nil {
-		pterm.Error.Printf("Failed to set permissions: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	pterm.Success.Printf("Updated permissions for %s\n", in.Path)
 	return nil
@@ -1144,8 +1100,7 @@ func (b BrowsersCmd) FSUpload(ctx context.Context, in BrowsersFSUploadInput) err
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to upload: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -1190,8 +1145,7 @@ func (b BrowsersCmd) FSUpload(ctx context.Context, in BrowsersFSUploadInput) err
 		}
 	}()
 	if err := b.fs.Upload(ctx, br.SessionID, kernel.BrowserFUploadParams{Files: files}); err != nil {
-		pterm.Error.Printf("Failed to upload: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if len(files) == 1 {
 		pterm.Success.Println("Uploaded 1 file")
@@ -1212,8 +1166,7 @@ func (b BrowsersCmd) FSUploadZip(ctx context.Context, in BrowsersFSUploadZipInpu
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to upload zip: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -1226,8 +1179,7 @@ func (b BrowsersCmd) FSUploadZip(ctx context.Context, in BrowsersFSUploadZipInpu
 	}
 	defer f.Close()
 	if err := b.fs.UploadZip(ctx, br.SessionID, kernel.BrowserFUploadZipParams{DestPath: in.DestDir, ZipFile: f}); err != nil {
-		pterm.Error.Printf("Failed to upload zip: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	pterm.Success.Printf("Uploaded zip to %s\n", in.DestDir)
 	return nil
@@ -1269,8 +1221,7 @@ func (b BrowsersCmd) FSWriteFile(ctx context.Context, in BrowsersFSWriteFileInpu
 		params.Mode = kernel.Opt(in.Mode)
 	}
 	if err := b.fs.WriteFile(ctx, br.SessionID, reader, params); err != nil {
-		pterm.Error.Printf("Failed to write file: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	pterm.Success.Printf("Wrote file to %s\n", in.DestPath)
 	return nil
@@ -1339,17 +1290,15 @@ func init() {
 
 	// process
 	procRoot := &cobra.Command{Use: "process", Short: "Manage processes inside the browser VM"}
-	procExec := &cobra.Command{Use: "exec <id|persistent-id>", Short: "Execute a command synchronously", Args: cobra.ExactArgs(1), RunE: runBrowsersProcessExec}
-	procExec.Flags().String("command", "", "Command to execute")
-	_ = procExec.MarkFlagRequired("command")
+	procExec := &cobra.Command{Use: "exec <id|persistent-id> [--] [command...]", Short: "Execute a command synchronously", Args: cobra.MinimumNArgs(1), RunE: runBrowsersProcessExec}
+	procExec.Flags().String("command", "", "Command to execute (optional; if omitted, trailing args are executed via /bin/bash -c)")
 	procExec.Flags().StringSlice("args", []string{}, "Command arguments")
 	procExec.Flags().String("cwd", "", "Working directory")
 	procExec.Flags().Int("timeout", 0, "Timeout in seconds")
 	procExec.Flags().String("as-user", "", "Run as user")
 	procExec.Flags().Bool("as-root", false, "Run as root")
-	procSpawn := &cobra.Command{Use: "spawn <id|persistent-id>", Short: "Execute a command asynchronously", Args: cobra.ExactArgs(1), RunE: runBrowsersProcessSpawn}
-	procSpawn.Flags().String("command", "", "Command to execute")
-	_ = procSpawn.MarkFlagRequired("command")
+	procSpawn := &cobra.Command{Use: "spawn <id|persistent-id> [--] [command...]", Short: "Execute a command asynchronously", Args: cobra.MinimumNArgs(1), RunE: runBrowsersProcessSpawn}
+	procSpawn.Flags().String("command", "", "Command to execute (optional; if omitted, trailing args are executed via /bin/bash -c)")
 	procSpawn.Flags().StringSlice("args", []string{}, "Command arguments")
 	procSpawn.Flags().String("cwd", "", "Working directory")
 	procSpawn.Flags().Int("timeout", 0, "Timeout in seconds")
@@ -1548,6 +1497,12 @@ func runBrowsersProcessExec(cmd *cobra.Command, args []string) error {
 	timeout, _ := cmd.Flags().GetInt("timeout")
 	asUser, _ := cmd.Flags().GetString("as-user")
 	asRoot, _ := cmd.Flags().GetBool("as-root")
+	if command == "" && len(args) > 1 {
+		// Treat trailing args after identifier as a shell command
+		shellCmd := strings.Join(args[1:], " ")
+		command = "/bin/bash"
+		argv = []string{"-c", shellCmd}
+	}
 	b := BrowsersCmd{browsers: &svc, process: &svc.Process}
 	return b.ProcessExec(cmd.Context(), BrowsersProcessExecInput{Identifier: args[0], Command: command, Args: argv, Cwd: cwd, Timeout: timeout, AsUser: asUser, AsRoot: BoolFlag{Set: cmd.Flags().Changed("as-root"), Value: asRoot}})
 }
@@ -1561,6 +1516,11 @@ func runBrowsersProcessSpawn(cmd *cobra.Command, args []string) error {
 	timeout, _ := cmd.Flags().GetInt("timeout")
 	asUser, _ := cmd.Flags().GetString("as-user")
 	asRoot, _ := cmd.Flags().GetBool("as-root")
+	if command == "" && len(args) > 1 {
+		shellCmd := strings.Join(args[1:], " ")
+		command = "/bin/bash"
+		argv = []string{"-c", shellCmd}
+	}
 	b := BrowsersCmd{browsers: &svc, process: &svc.Process}
 	return b.ProcessSpawn(cmd.Context(), BrowsersProcessSpawnInput{Identifier: args[0], Command: command, Args: argv, Cwd: cwd, Timeout: timeout, AsUser: asUser, AsRoot: BoolFlag{Set: cmd.Flags().Changed("as-root"), Value: asRoot}})
 }

@@ -102,7 +102,7 @@ func runAppList(cmd *cobra.Command, args []string) error {
 		})
 	}
 
-	pterm.DefaultTable.WithHasHeader().WithData(tableData).Render()
+	printTableNoPad(tableData, true)
 	return nil
 }
 
@@ -146,6 +146,6 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 		})
 	}
 
-	pterm.DefaultTable.WithHasHeader().WithData(tableData).Render()
+	printTableNoPad(tableData, true)
 	return nil
 }
