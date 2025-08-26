@@ -18,6 +18,7 @@ import (
 	"github.com/onkernel/kernel-go-sdk/packages/ssestream"
 	"github.com/onkernel/kernel-go-sdk/shared"
 	"github.com/pterm/pterm"
+	"github.com/stretchr/testify/assert"
 )
 
 // outBuf captures pterm output during tests.
@@ -99,9 +100,7 @@ func TestBrowsersList_PrintsEmptyMessage(t *testing.T) {
 	_ = b.List(context.Background())
 
 	out := outBuf.String()
-	if !strings.Contains(out, "No running or persistent browsers found") {
-		t.Fatalf("expected empty message, got: %s", out)
-	}
+	assert.Contains(t, out, "No running or persistent browsers found")
 }
 
 func TestBrowsersList_PrintsTableWithRows(t *testing.T) {
@@ -134,12 +133,9 @@ func TestBrowsersList_PrintsTableWithRows(t *testing.T) {
 	_ = b.List(context.Background())
 
 	out := outBuf.String()
-	if !strings.Contains(out, "sess-1") || !strings.Contains(out, "sess-2") {
-		t.Fatalf("expected session IDs in output, got: %s", out)
-	}
-	if !strings.Contains(out, "pid-1") {
-		t.Fatalf("expected persistent ID in output, got: %s", out)
-	}
+	assert.Contains(t, out, "sess-1")
+	assert.Contains(t, out, "sess-2")
+	assert.Contains(t, out, "pid-1")
 }
 
 func TestBrowsersList_PrintsErrorOnFailure(t *testing.T) {
@@ -151,12 +147,10 @@ func TestBrowsersList_PrintsErrorOnFailure(t *testing.T) {
 		},
 	}
 	b := BrowsersCmd{browsers: fake}
-	_ = b.List(context.Background())
+	err := b.List(context.Background())
 
-	out := outBuf.String()
-	if !strings.Contains(out, "Failed to list browsers: list failed") {
-		t.Fatalf("expected error message, got: %s", out)
-	}
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "list failed")
 }
 
 func TestBrowsersCreate_PrintsResponse(t *testing.T) {
@@ -184,18 +178,14 @@ func TestBrowsersCreate_PrintsResponse(t *testing.T) {
 	_ = b.Create(context.Background(), in)
 
 	out := outBuf.String()
-	if !strings.Contains(out, "Session ID") || !strings.Contains(out, "sess-new") {
-		t.Fatalf("expected session details, got: %s", out)
-	}
-	if !strings.Contains(out, "CDP WebSocket URL") || !strings.Contains(out, "ws://cdp-new") {
-		t.Fatalf("expected cdp url, got: %s", out)
-	}
-	if !strings.Contains(out, "Live View URL") || !strings.Contains(out, "http://view-new") {
-		t.Fatalf("expected live view url, got: %s", out)
-	}
-	if !strings.Contains(out, "Persistent ID") || !strings.Contains(out, "pid-new") {
-		t.Fatalf("expected persistent id, got: %s", out)
-	}
+	assert.Contains(t, out, "Session ID")
+	assert.Contains(t, out, "sess-new")
+	assert.Contains(t, out, "CDP WebSocket URL")
+	assert.Contains(t, out, "ws://cdp-new")
+	assert.Contains(t, out, "Live View URL")
+	assert.Contains(t, out, "http://view-new")
+	assert.Contains(t, out, "Persistent ID")
+	assert.Contains(t, out, "pid-new")
 }
 
 func TestBrowsersCreate_PrintsErrorOnFailure(t *testing.T) {
@@ -207,12 +197,10 @@ func TestBrowsersCreate_PrintsErrorOnFailure(t *testing.T) {
 		},
 	}
 	b := BrowsersCmd{browsers: fake}
-	_ = b.Create(context.Background(), BrowsersCreateInput{})
+	err := b.Create(context.Background(), BrowsersCreateInput{})
 
-	out := outBuf.String()
-	if !strings.Contains(out, "Failed to create browser: create failed") {
-		t.Fatalf("expected create error message, got: %s", out)
-	}
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "create failed")
 }
 
 func TestBrowsersDelete_SkipConfirm_Success(t *testing.T) {
@@ -230,9 +218,7 @@ func TestBrowsersDelete_SkipConfirm_Success(t *testing.T) {
 	_ = b.Delete(context.Background(), BrowsersDeleteInput{Identifier: "any", SkipConfirm: true})
 
 	out := outBuf.String()
-	if !strings.Contains(out, "Successfully deleted (or already absent) browser: any") {
-		t.Fatalf("expected success message, got: %s", out)
-	}
+	assert.Contains(t, out, "Successfully deleted (or already absent) browser: any")
 }
 
 func TestBrowsersDelete_SkipConfirm_Failure(t *testing.T) {
@@ -247,12 +233,11 @@ func TestBrowsersDelete_SkipConfirm_Failure(t *testing.T) {
 		},
 	}
 	b := BrowsersCmd{browsers: fake}
-	_ = b.Delete(context.Background(), BrowsersDeleteInput{Identifier: "any", SkipConfirm: true})
+	err := b.Delete(context.Background(), BrowsersDeleteInput{Identifier: "any", SkipConfirm: true})
 
-	out := outBuf.String()
-	if !strings.Contains(out, "Failed to delete browser: right failed") && !strings.Contains(out, "Failed to delete browser: left failed") {
-		t.Fatalf("expected failure message, got: %s", out)
-	}
+	assert.Error(t, err)
+	errMsg := err.Error()
+	assert.True(t, strings.Contains(errMsg, "right failed") || strings.Contains(errMsg, "left failed"), "expected error message to contain either 'right failed' or 'left failed', got: %s", errMsg)
 }
 
 func TestBrowsersDelete_WithConfirm_NotFound(t *testing.T) {
@@ -268,9 +253,7 @@ func TestBrowsersDelete_WithConfirm_NotFound(t *testing.T) {
 	_ = b.Delete(context.Background(), BrowsersDeleteInput{Identifier: "missing", SkipConfirm: false})
 
 	out := outBuf.String()
-	if !strings.Contains(out, "Browser 'missing' not found") {
-		t.Fatalf("expected not found message, got: %s", out)
-	}
+	assert.Contains(t, out, "Browser 'missing' not found")
 }
 
 func TestBrowsersView_ByID_PrintsURL(t *testing.T) {
@@ -289,9 +272,7 @@ func TestBrowsersView_ByID_PrintsURL(t *testing.T) {
 	_ = b.View(context.Background(), BrowsersViewInput{Identifier: "abc"})
 
 	out := outBuf.String()
-	if !strings.Contains(out, "http://live-url") {
-		t.Fatalf("expected live view url, got: %s", out)
-	}
+	assert.Contains(t, out, "http://live-url")
 }
 
 func TestBrowsersView_NotFound_ByEither(t *testing.T) {
@@ -307,9 +288,7 @@ func TestBrowsersView_NotFound_ByEither(t *testing.T) {
 	_ = b.View(context.Background(), BrowsersViewInput{Identifier: "missing"})
 
 	out := outBuf.String()
-	if !strings.Contains(out, "Browser 'missing' not found") {
-		t.Fatalf("expected not found message, got: %s", out)
-	}
+	assert.Contains(t, out, "Browser 'missing' not found")
 }
 
 func TestBrowsersView_PrintsErrorOnListFailure(t *testing.T) {
@@ -321,12 +300,10 @@ func TestBrowsersView_PrintsErrorOnListFailure(t *testing.T) {
 		},
 	}
 	b := BrowsersCmd{browsers: fake}
-	_ = b.View(context.Background(), BrowsersViewInput{Identifier: "any"})
+	err := b.View(context.Background(), BrowsersViewInput{Identifier: "any"})
 
-	out := outBuf.String()
-	if !strings.Contains(out, "Failed to list browsers: list error") {
-		t.Fatalf("expected error message, got: %s", out)
-	}
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "list error")
 }
 
 // --- Fakes for sub-services ---
@@ -549,9 +526,8 @@ func TestBrowsersLogsStream_PrintsEvents(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, logs: &FakeLogService{}}
 	_ = b.LogsStream(context.Background(), BrowsersLogsStreamInput{Identifier: "id", Source: string(kernel.BrowserLogStreamParamsSourcePath), Follow: BoolFlag{Set: true, Value: true}, Path: "/var/log.txt"})
 	out := outBuf.String()
-	if !strings.Contains(out, "m1") || !strings.Contains(out, "m2") {
-		t.Fatalf("expected log messages, got: %s", out)
-	}
+	assert.Contains(t, out, "m1")
+	assert.Contains(t, out, "m2")
 }
 
 // --- Tests for Replays ---
@@ -570,9 +546,8 @@ func TestBrowsersReplaysList_PrintsRows(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, replays: fake}
 	_ = b.ReplaysList(context.Background(), BrowsersReplaysListInput{Identifier: "id"})
 	out := outBuf.String()
-	if !strings.Contains(out, "r1") || !strings.Contains(out, "http://v") {
-		t.Fatalf("expected replay rows, got: %s", out)
-	}
+	assert.Contains(t, out, "r1")
+	assert.Contains(t, out, "http://v")
 }
 
 func TestBrowsersReplaysStart_PrintsInfo(t *testing.T) {
@@ -587,9 +562,8 @@ func TestBrowsersReplaysStart_PrintsInfo(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, replays: fake}
 	_ = b.ReplaysStart(context.Background(), BrowsersReplaysStartInput{Identifier: "id", Framerate: 30, MaxDurationSeconds: 60})
 	out := outBuf.String()
-	if !strings.Contains(out, "rid") || !strings.Contains(out, "http://view") {
-		t.Fatalf("expected start output, got: %s", out)
-	}
+	assert.Contains(t, out, "rid")
+	assert.Contains(t, out, "http://view")
 }
 
 func TestBrowsersReplaysStop_PrintsSuccess(t *testing.T) {
@@ -602,9 +576,7 @@ func TestBrowsersReplaysStop_PrintsSuccess(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, replays: fake}
 	_ = b.ReplaysStop(context.Background(), BrowsersReplaysStopInput{Identifier: "id", ReplayID: "rid"})
 	out := outBuf.String()
-	if !strings.Contains(out, "Stopped replay rid") {
-		t.Fatalf("expected stop message, got: %s", out)
-	}
+	assert.Contains(t, out, "Stopped replay rid")
 }
 
 func TestBrowsersReplaysDownload_SavesFile(t *testing.T) {
@@ -621,12 +593,8 @@ func TestBrowsersReplaysDownload_SavesFile(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, replays: fake}
 	_ = b.ReplaysDownload(context.Background(), BrowsersReplaysDownloadInput{Identifier: "id", ReplayID: "rid", Output: outPath})
 	data, err := os.ReadFile(outPath)
-	if err != nil {
-		t.Fatalf("expected file saved, err: %v", err)
-	}
-	if string(data) != "mp4data" {
-		t.Fatalf("expected content saved, got: %s", string(data))
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, "mp4data", string(data))
 }
 
 // --- Tests for Process ---
@@ -641,9 +609,8 @@ func TestBrowsersProcessExec_PrintsSummary(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, process: fake}
 	_ = b.ProcessExec(context.Background(), BrowsersProcessExecInput{Identifier: "id", Command: "echo"})
 	out := outBuf.String()
-	if !strings.Contains(out, "Exit Code") || !strings.Contains(out, "Duration") {
-		t.Fatalf("expected exec summary, got: %s", out)
-	}
+	assert.Contains(t, out, "Exit Code")
+	assert.Contains(t, out, "Duration")
 }
 
 func TestBrowsersProcessSpawn_PrintsInfo(t *testing.T) {
@@ -656,9 +623,8 @@ func TestBrowsersProcessSpawn_PrintsInfo(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, process: fake}
 	_ = b.ProcessSpawn(context.Background(), BrowsersProcessSpawnInput{Identifier: "id", Command: "sleep"})
 	out := outBuf.String()
-	if !strings.Contains(out, "Process ID") || !strings.Contains(out, "PID") {
-		t.Fatalf("expected spawn info, got: %s", out)
-	}
+	assert.Contains(t, out, "Process ID")
+	assert.Contains(t, out, "PID")
 }
 
 func TestBrowsersProcessKill_PrintsSuccess(t *testing.T) {
@@ -671,9 +637,7 @@ func TestBrowsersProcessKill_PrintsSuccess(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, process: fake}
 	_ = b.ProcessKill(context.Background(), BrowsersProcessKillInput{Identifier: "id", ProcessID: "proc", Signal: "TERM"})
 	out := outBuf.String()
-	if !strings.Contains(out, "Sent TERM to process proc") {
-		t.Fatalf("expected kill message, got: %s", out)
-	}
+	assert.Contains(t, out, "Sent TERM to process proc")
 }
 
 func TestBrowsersProcessStatus_PrintsFields(t *testing.T) {
@@ -686,9 +650,9 @@ func TestBrowsersProcessStatus_PrintsFields(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, process: fake}
 	_ = b.ProcessStatus(context.Background(), BrowsersProcessStatusInput{Identifier: "id", ProcessID: "proc"})
 	out := outBuf.String()
-	if !strings.Contains(out, "State") || !strings.Contains(out, "CPU %") || !strings.Contains(out, "Mem Bytes") {
-		t.Fatalf("expected status fields, got: %s", out)
-	}
+	assert.Contains(t, out, "State")
+	assert.Contains(t, out, "CPU %")
+	assert.Contains(t, out, "Mem Bytes")
 }
 
 func TestBrowsersProcessStdin_PrintsSuccess(t *testing.T) {
@@ -701,9 +665,7 @@ func TestBrowsersProcessStdin_PrintsSuccess(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, process: fake}
 	_ = b.ProcessStdin(context.Background(), BrowsersProcessStdinInput{Identifier: "id", ProcessID: "proc", DataB64: "ZGF0YQ=="})
 	out := outBuf.String()
-	if !strings.Contains(out, "Wrote to stdin") {
-		t.Fatalf("expected stdin message, got: %s", out)
-	}
+	assert.Contains(t, out, "Wrote to stdin")
 }
 
 func TestBrowsersProcessStdoutStream_PrintsExit(t *testing.T) {
@@ -716,9 +678,7 @@ func TestBrowsersProcessStdoutStream_PrintsExit(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, process: fake}
 	_ = b.ProcessStdoutStream(context.Background(), BrowsersProcessStdoutStreamInput{Identifier: "id", ProcessID: "proc"})
 	out := outBuf.String()
-	if !strings.Contains(out, "process exited with code 0") {
-		t.Fatalf("expected exit message, got: %s", out)
-	}
+	assert.Contains(t, out, "process exited with code 0")
 }
 
 // --- Tests for FS ---
@@ -733,9 +693,7 @@ func TestBrowsersFSNewDirectory_PrintsSuccess(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
 	_ = b.FSNewDirectory(context.Background(), BrowsersFSNewDirInput{Identifier: "id", Path: "/tmp/x"})
 	out := outBuf.String()
-	if !strings.Contains(out, "Created directory /tmp/x") {
-		t.Fatalf("expected created message, got: %s", out)
-	}
+	assert.Contains(t, out, "Created directory /tmp/x")
 }
 
 func TestBrowsersFSDeleteDirectory_PrintsSuccess(t *testing.T) {
@@ -748,9 +706,7 @@ func TestBrowsersFSDeleteDirectory_PrintsSuccess(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
 	_ = b.FSDeleteDirectory(context.Background(), BrowsersFSDeleteDirInput{Identifier: "id", Path: "/tmp/x"})
 	out := outBuf.String()
-	if !strings.Contains(out, "Deleted directory /tmp/x") {
-		t.Fatalf("expected deleted message, got: %s", out)
-	}
+	assert.Contains(t, out, "Deleted directory /tmp/x")
 }
 
 func TestBrowsersFSDeleteFile_PrintsSuccess(t *testing.T) {
@@ -763,9 +719,7 @@ func TestBrowsersFSDeleteFile_PrintsSuccess(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
 	_ = b.FSDeleteFile(context.Background(), BrowsersFSDeleteFileInput{Identifier: "id", Path: "/tmp/file"})
 	out := outBuf.String()
-	if !strings.Contains(out, "Deleted file /tmp/file") {
-		t.Fatalf("expected deleted message, got: %s", out)
-	}
+	assert.Contains(t, out, "Deleted file /tmp/file")
 }
 
 func TestBrowsersFSDownloadDirZip_SavesFile(t *testing.T) {
@@ -779,9 +733,8 @@ func TestBrowsersFSDownloadDirZip_SavesFile(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
 	_ = b.FSDownloadDirZip(context.Background(), BrowsersFSDownloadDirZipInput{Identifier: "id", Path: "/tmp", Output: outPath})
 	data, err := os.ReadFile(outPath)
-	if err != nil || len(data) == 0 {
-		t.Fatalf("expected zip saved, err=%v size=%d", err, len(data))
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, "zip", string(data))
 }
 
 func TestBrowsersFSFileInfo_PrintsFields(t *testing.T) {
@@ -796,9 +749,8 @@ func TestBrowsersFSFileInfo_PrintsFields(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
 	_ = b.FSFileInfo(context.Background(), BrowsersFSFileInfoInput{Identifier: "id", Path: "/tmp/a"})
 	out := outBuf.String()
-	if !strings.Contains(out, "Path") || !strings.Contains(out, "/tmp/a") {
-		t.Fatalf("expected fields, got: %s", out)
-	}
+	assert.Contains(t, out, "Path")
+	assert.Contains(t, out, "/tmp/a")
 }
 
 func TestBrowsersFSListFiles_PrintsRows(t *testing.T) {
@@ -811,9 +763,8 @@ func TestBrowsersFSListFiles_PrintsRows(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
 	_ = b.FSListFiles(context.Background(), BrowsersFSListFilesInput{Identifier: "id", Path: "/"})
 	out := outBuf.String()
-	if !strings.Contains(out, "f1") || !strings.Contains(out, "/f1") {
-		t.Fatalf("expected list row, got: %s", out)
-	}
+	assert.Contains(t, out, "f1")
+	assert.Contains(t, out, "/f1")
 }
 
 func TestBrowsersFSMove_PrintsSuccess(t *testing.T) {
@@ -826,9 +777,7 @@ func TestBrowsersFSMove_PrintsSuccess(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
 	_ = b.FSMove(context.Background(), BrowsersFSMoveInput{Identifier: "id", SrcPath: "/a", DestPath: "/b"})
 	out := outBuf.String()
-	if !strings.Contains(out, "Moved /a -> /b") {
-		t.Fatalf("expected move message, got: %s", out)
-	}
+	assert.Contains(t, out, "Moved /a -> /b")
 }
 
 func TestBrowsersFSReadFile_SavesFile(t *testing.T) {
@@ -842,9 +791,8 @@ func TestBrowsersFSReadFile_SavesFile(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
 	_ = b.FSReadFile(context.Background(), BrowsersFSReadFileInput{Identifier: "id", Path: "/tmp/x", Output: outPath})
 	data, err := os.ReadFile(outPath)
-	if err != nil || string(data) != "content" {
-		t.Fatalf("expected file saved, err=%v content=%s", err, string(data))
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, "content", string(data))
 }
 
 func TestBrowsersFSSetPermissions_PrintsSuccess(t *testing.T) {
@@ -857,9 +805,7 @@ func TestBrowsersFSSetPermissions_PrintsSuccess(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
 	_ = b.FSSetPermissions(context.Background(), BrowsersFSSetPermsInput{Identifier: "id", Path: "/tmp/a", Mode: "644"})
 	out := outBuf.String()
-	if !strings.Contains(out, "Updated permissions for /tmp/a") {
-		t.Fatalf("expected perms message, got: %s", out)
-	}
+	assert.Contains(t, out, "Updated permissions for /tmp/a")
 }
 
 func TestBrowsersFSUpload_MappingAndDestDir_Success(t *testing.T) {
@@ -880,12 +826,8 @@ func TestBrowsersFSUpload_MappingAndDestDir_Success(t *testing.T) {
 	}{{Local: __writeTempFile(t, "a"), Dest: "/remote/a"}}, DestDir: "/remote/dir", Paths: []string{__writeTempFile(t, "b")}}
 	_ = b.FSUpload(context.Background(), in)
 	out := outBuf.String()
-	if !strings.Contains(out, "Uploaded") {
-		t.Fatalf("expected upload message, got: %s", out)
-	}
-	if len(captured.Files) != 2 {
-		t.Fatalf("expected 2 files sent, got %d", len(captured.Files))
-	}
+	assert.Contains(t, out, "Uploaded")
+	assert.Equal(t, 2, len(captured.Files))
 }
 
 func TestBrowsersFSUploadZip_Success(t *testing.T) {
@@ -901,9 +843,7 @@ func TestBrowsersFSUploadZip_Success(t *testing.T) {
 	b := BrowsersCmd{browsers: fakeBrowsers, fs: fake}
 	_ = b.FSUploadZip(context.Background(), BrowsersFSUploadZipInput{Identifier: "id", ZipPath: z, DestDir: "/dst"})
 	out := outBuf.String()
-	if !strings.Contains(out, "Uploaded zip") {
-		t.Fatalf("expected upload zip message, got: %s", out)
-	}
+	assert.Contains(t, out, "Uploaded zip")
 }
 
 func TestBrowsersFSWriteFile_FromBase64_And_FromInput(t *testing.T) {
@@ -920,21 +860,16 @@ func TestBrowsersFSWriteFile_FromBase64_And_FromInput(t *testing.T) {
 	p := __writeTempFile(t, "hello")
 	_ = b.FSWriteFile(context.Background(), BrowsersFSWriteFileInput{Identifier: "id", DestPath: "/y", SourcePath: p, Mode: "644"})
 	out := outBuf.String()
-	if !strings.Contains(out, "Wrote file to /y") {
-		t.Fatalf("expected write messages, got: %s", out)
-	}
+	assert.Contains(t, out, "Wrote file to /y")
 }
 
 // helper to create temp file with contents
 func __writeTempFile(t *testing.T, data string) string {
 	t.Helper()
 	f, err := os.CreateTemp(t.TempDir(), "cli-test-*")
-	if err != nil {
-		t.Fatalf("temp: %v", err)
-	}
-	if _, err := f.WriteString(data); err != nil {
-		t.Fatalf("write: %v", err)
-	}
+	assert.NoError(t, err)
+	_, err = f.WriteString(data)
+	assert.NoError(t, err)
 	_ = f.Close()
 	return f.Name()
 }
