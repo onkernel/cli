@@ -321,7 +321,3 @@ For complete documentation, visit:
 ---
 
 For development and contribution information, see [DEVELOPMENT.md](./DEVELOPMENT.md).
-
-```
-
-```
