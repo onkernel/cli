@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/charmbracelet/fang"
 	"github.com/onkernel/cli/pkg/auth"
+	"github.com/onkernel/cli/pkg/update"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/onkernel/kernel-go-sdk/option"
 	"github.com/pterm/pterm"
@@ -123,6 +125,12 @@ func init() {
 	rootCmd.AddCommand(invokeCmd)
 	rootCmd.AddCommand(browsersCmd)
 	rootCmd.AddCommand(appCmd)
+
+	rootCmd.PersistentPostRunE = func(cmd *cobra.Command, args []string) error {
+		// running synchronously so we never slow the command
+		update.MaybeShowMessage(cmd.Context(), metadata.Version, 24*time.Hour)
+		return nil
+	}
 }
 
 func initConfig() {
