@@ -577,6 +577,30 @@ func (b BrowsersCmd) ProcessExec(ctx context.Context, in BrowsersProcessExecInpu
 	}
 	rows := pterm.TableData{{"Property", "Value"}, {"Exit Code", fmt.Sprintf("%d", res.ExitCode)}, {"Duration (ms)", fmt.Sprintf("%d", res.DurationMs)}}
 	printTableNoPad(rows, true)
+	if res.StdoutB64 != "" {
+		data, err := base64.StdEncoding.DecodeString(res.StdoutB64)
+		if err != nil {
+			pterm.Error.Printf("stdout decode error: %v\n", err)
+		} else if len(data) > 0 {
+			pterm.Info.Println("stdout:")
+			os.Stdout.Write(data)
+			if data[len(data)-1] != '\n' {
+				fmt.Println()
+			}
+		}
+	}
+	if res.StderrB64 != "" {
+		data, err := base64.StdEncoding.DecodeString(res.StderrB64)
+		if err != nil {
+			pterm.Error.Printf("stderr decode error: %v\n", err)
+		} else if len(data) > 0 {
+			pterm.Info.Println("stderr:")
+			os.Stderr.Write(data)
+			if data[len(data)-1] != '\n' {
+				fmt.Fprintln(os.Stderr)
+			}
+		}
+	}
 	return nil
 }
 

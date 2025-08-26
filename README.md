@@ -106,17 +106,20 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 ### App Management
 
 - `kernel deploy <file>` - Deploy an app to Kernel
+
   - `--version <version>` - Specify app version (default: latest)
   - `--force` - Allow overwriting existing version
   - `--env <KEY=VALUE>`, `-e` - Set environment variables (can be used multiple times)
   - `--env-file <file>` - Load environment variables from file (can be used multiple times)
 
 - `kernel invoke <app> <action>` - Run an app action
+
   - `--version <version>`, `-v` - Specify app version (default: latest)
   - `--payload <json>`, `-p` - JSON payload for the action
   - `--sync`, `-s` - Invoke synchronously (timeout after 60s)
 
 - `kernel app list` - List deployed apps
+
   - `--name <app_name>` - Filter by app name
   - `--version <version>` - Filter by version
 
@@ -140,6 +143,86 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 - `kernel browsers delete <id or persistent id>` - Delete a browser
   - `-y, --yes` - Skip confirmation prompt
 - `kernel browsers view <id or persistent id>` - Get live view URL for a browser
+
+### Browser Logs
+
+- `kernel browsers logs stream <id or persistent id>` - Stream browser logs
+  - `--source <source>` - Log source: "path" or "supervisor" (required)
+  - `--follow` - Follow the log stream (default: true)
+  - `--path <path>` - File path when source=path
+  - `--supervisor-process <name>` - Supervisor process name when source=supervisor. Most useful value is "chromium"
+
+### Browser Replays
+
+- `kernel browsers replays list <id or persistent id>` - List replays for a browser
+- `kernel browsers replays start <id or persistent id>` - Start a replay recording
+  - `--framerate <fps>` - Recording framerate (fps)
+  - `--max-duration <seconds>` - Maximum duration in seconds
+- `kernel browsers replays stop <id or persistent id> <replay-id>` - Stop a replay recording
+- `kernel browsers replays download <id or persistent id> <replay-id>` - Download a replay video
+  - `-o, --output <path>` - Output file path for the replay video
+
+### Browser Process Control
+
+- `kernel browsers process exec <id or persistent id> [--] [command...]` - Execute a command synchronously
+  - `--command <cmd>` - Command to execute (optional; if omitted, trailing args are executed via /bin/bash -c)
+  - `--args <args>` - Command arguments
+  - `--cwd <path>` - Working directory
+  - `--timeout <seconds>` - Timeout in seconds
+  - `--as-user <user>` - Run as user
+  - `--as-root` - Run as root
+- `kernel browsers process spawn <id or persistent id> [--] [command...]` - Execute a command asynchronously
+  - `--command <cmd>` - Command to execute (optional; if omitted, trailing args are executed via /bin/bash -c)
+  - `--args <args>` - Command arguments
+  - `--cwd <path>` - Working directory
+  - `--timeout <seconds>` - Timeout in seconds
+  - `--as-user <user>` - Run as user
+  - `--as-root` - Run as root
+- `kernel browsers process kill <id or persistent id> <process-id>` - Send a signal to a process
+  - `--signal <signal>` - Signal to send: TERM, KILL, INT, HUP (default: TERM)
+- `kernel browsers process status <id or persistent id> <process-id>` - Get process status
+- `kernel browsers process stdin <id or persistent id> <process-id>` - Write to process stdin (base64)
+  - `--data-b64 <data>` - Base64-encoded data to write to stdin (required)
+- `kernel browsers process stdout-stream <id or persistent id> <process-id>` - Stream process stdout/stderr
+
+### Browser Filesystem
+
+- `kernel browsers fs new-directory <id or persistent id>` - Create a new directory
+  - `--path <path>` - Absolute directory path to create (required)
+  - `--mode <mode>` - Directory mode (octal string)
+- `kernel browsers fs delete-directory <id or persistent id>` - Delete a directory
+  - `--path <path>` - Absolute directory path to delete (required)
+- `kernel browsers fs delete-file <id or persistent id>` - Delete a file
+  - `--path <path>` - Absolute file path to delete (required)
+- `kernel browsers fs download-dir-zip <id or persistent id>` - Download a directory as zip
+  - `--path <path>` - Absolute directory path to download (required)
+  - `-o, --output <path>` - Output zip file path
+- `kernel browsers fs file-info <id or persistent id>` - Get file or directory info
+  - `--path <path>` - Absolute file or directory path (required)
+- `kernel browsers fs list-files <id or persistent id>` - List files in a directory
+  - `--path <path>` - Absolute directory path (required)
+- `kernel browsers fs move <id or persistent id>` - Move or rename a file or directory
+  - `--src <path>` - Absolute source path (required)
+  - `--dest <path>` - Absolute destination path (required)
+- `kernel browsers fs read-file <id or persistent id>` - Read a file
+  - `--path <path>` - Absolute file path (required)
+  - `-o, --output <path>` - Output file path (optional)
+- `kernel browsers fs set-permissions <id or persistent id>` - Set file permissions or ownership
+  - `--path <path>` - Absolute path (required)
+  - `--mode <mode>` - File mode bits (octal string) (required)
+  - `--owner <user>` - New owner username or UID
+  - `--group <group>` - New group name or GID
+- `kernel browsers fs upload <id or persistent id>` - Upload one or more files
+  - `--file <local:remote>` - Mapping local:remote (repeatable)
+  - `--dest-dir <path>` - Destination directory for uploads
+  - `--paths <paths>` - Local file paths to upload
+- `kernel browsers fs upload-zip <id or persistent id>` - Upload a zip and extract it
+  - `--zip <path>` - Local zip file path (required)
+  - `--dest-dir <path>` - Destination directory to extract to (required)
+- `kernel browsers fs write-file <id or persistent id>` - Write a file from local data
+  - `--path <path>` - Destination absolute file path (required)
+  - `--mode <mode>` - File mode (octal string)
+  - `--source <path>` - Local source file path (required)
 
 ## Examples
 
@@ -199,6 +282,21 @@ kernel browsers delete --by-persistent-id my-browser-session --yes
 
 # Get live view URL
 kernel browsers view --by-id browser123
+
+# Stream browser logs
+kernel browsers logs stream my-browser --source supervisor --follow --supervisor-process chromium
+
+# Start a replay recording
+kernel browsers replays start my-browser --framerate 30 --max-duration 300
+
+# Execute a command in the browser VM
+kernel browsers process exec my-browser -- ls -alh /tmp
+
+# Upload files to the browser VM
+kernel browsers fs upload my-browser --file "local.txt:remote.txt" --dest-dir "/tmp"
+
+# List files in a directory
+kernel browsers fs list-files my-browser --path "/tmp"
 ```
 
 ## Getting Help
@@ -223,3 +321,7 @@ For complete documentation, visit:
 ---
 
 For development and contribution information, see [DEVELOPMENT.md](./DEVELOPMENT.md).
+
+```
+
+```

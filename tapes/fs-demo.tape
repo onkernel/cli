@@ -7,25 +7,25 @@ Set Shell "bash"
 Set FontSize 32
 Set Width 2400
 Set Height 1200
-Set TypingSpeed 20ms
+Set TypingSpeed 100ms
 
-Type "kernel browsers create -H -p demo > /dev/null" Enter
+Type "kernel browsers create -H -p fs-demo" Enter
 Sleep 2s
-Type "kernel browsers fs new-directory demo --path /tmp/test" Enter
+Type "kernel browsers fs new-directory fs-demo --path /tmp/test" Enter
 Sleep 2s
 Type "echo 'hello world' > /tmp/hello_world.txt" Enter
 Sleep 2s
-Type "kernel browsers fs write-file demo --source /tmp/hello_world.txt --path /tmp/test/hello_world" Enter
+Type "kernel browsers fs write-file fs-demo --source /tmp/hello_world.txt --path /tmp/test/hello_world" Enter
 Sleep 2s
-Type "kernel browsers fs list-files demo --path /tmp/test" Enter
+Type "kernel browsers fs list-files fs-demo --path /tmp/test" Enter
 Sleep 2s
-Type "kernel browsers fs file-info demo --path /tmp/test/hello_world" Enter
+Type "kernel browsers fs file-info fs-demo --path /tmp/test/hello_world" Enter
 Sleep 2s
-Type "kernel browsers fs read-file demo --path /tmp/test/hello_world" Enter
+Type "kernel browsers fs read-file fs-demo --path /tmp/test/hello_world" Enter
 Sleep 2s
-Type "kernel browsers fs download-dir-zip demo --path /tmp/test --output /tmp/test.zip" Enter
+Type "kernel browsers fs download-dir-zip fs-demo --path /tmp/test --output /tmp/test.zip" Enter
 Sleep 2s
 Type "unzip -l /tmp/test.zip" Enter
 Sleep 2s
-Type "kernel browsers delete -y demo" Enter
+Type "kernel browsers delete -y fs-demo" Enter
 Sleep 5s
