@@ -311,10 +311,6 @@ func (b BrowsersCmd) LogsStream(ctx context.Context, in BrowsersLogsStreamInput)
 		pterm.Error.Println("logs service not available")
 		return nil
 	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
-		return nil
-	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -372,14 +368,6 @@ type BrowsersReplaysDownloadInput struct {
 }
 
 func (b BrowsersCmd) ReplaysList(ctx context.Context, in BrowsersReplaysListInput) error {
-	if b.replays == nil {
-		pterm.Error.Println("replays service not available")
-		return nil
-	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
-		return nil
-	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -405,14 +393,6 @@ func (b BrowsersCmd) ReplaysList(ctx context.Context, in BrowsersReplaysListInpu
 }
 
 func (b BrowsersCmd) ReplaysStart(ctx context.Context, in BrowsersReplaysStartInput) error {
-	if b.replays == nil {
-		pterm.Error.Println("replays service not available")
-		return nil
-	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
-		return nil
-	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -438,14 +418,6 @@ func (b BrowsersCmd) ReplaysStart(ctx context.Context, in BrowsersReplaysStartIn
 }
 
 func (b BrowsersCmd) ReplaysStop(ctx context.Context, in BrowsersReplaysStopInput) error {
-	if b.replays == nil {
-		pterm.Error.Println("replays service not available")
-		return nil
-	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
-		return nil
-	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -463,14 +435,6 @@ func (b BrowsersCmd) ReplaysStop(ctx context.Context, in BrowsersReplaysStopInpu
 }
 
 func (b BrowsersCmd) ReplaysDownload(ctx context.Context, in BrowsersReplaysDownloadInput) error {
-	if b.replays == nil {
-		pterm.Error.Println("replays service not available")
-		return nil
-	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
-		return nil
-	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -543,10 +507,6 @@ func (b BrowsersCmd) ProcessExec(ctx context.Context, in BrowsersProcessExecInpu
 		pterm.Error.Println("process service not available")
 		return nil
 	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
-		return nil
-	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -609,10 +569,6 @@ func (b BrowsersCmd) ProcessSpawn(ctx context.Context, in BrowsersProcessSpawnIn
 		pterm.Error.Println("process service not available")
 		return nil
 	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
-		return nil
-	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -651,10 +607,6 @@ func (b BrowsersCmd) ProcessKill(ctx context.Context, in BrowsersProcessKillInpu
 		pterm.Error.Println("process service not available")
 		return nil
 	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
-		return nil
-	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -675,10 +627,6 @@ func (b BrowsersCmd) ProcessKill(ctx context.Context, in BrowsersProcessKillInpu
 func (b BrowsersCmd) ProcessStatus(ctx context.Context, in BrowsersProcessStatusInput) error {
 	if b.process == nil {
 		pterm.Error.Println("process service not available")
-		return nil
-	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
 		return nil
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
@@ -703,10 +651,6 @@ func (b BrowsersCmd) ProcessStdin(ctx context.Context, in BrowsersProcessStdinIn
 		pterm.Error.Println("process service not available")
 		return nil
 	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
-		return nil
-	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -726,10 +670,6 @@ func (b BrowsersCmd) ProcessStdin(ctx context.Context, in BrowsersProcessStdinIn
 func (b BrowsersCmd) ProcessStdoutStream(ctx context.Context, in BrowsersProcessStdoutStreamInput) error {
 	if b.process == nil {
 		pterm.Error.Println("process service not available")
-		return nil
-	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
 		return nil
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
@@ -847,10 +787,6 @@ func (b BrowsersCmd) FSNewDirectory(ctx context.Context, in BrowsersFSNewDirInpu
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
-		return nil
-	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -875,10 +811,6 @@ func (b BrowsersCmd) FSDeleteDirectory(ctx context.Context, in BrowsersFSDeleteD
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
-		return nil
-	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -899,10 +831,6 @@ func (b BrowsersCmd) FSDeleteFile(ctx context.Context, in BrowsersFSDeleteFileIn
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
-		return nil
-	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -921,10 +849,6 @@ func (b BrowsersCmd) FSDeleteFile(ctx context.Context, in BrowsersFSDeleteFileIn
 func (b BrowsersCmd) FSDownloadDirZip(ctx context.Context, in BrowsersFSDownloadDirZipInput) error {
 	if b.fs == nil {
 		pterm.Error.Println("fs service not available")
-		return nil
-	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
 		return nil
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
@@ -964,10 +888,6 @@ func (b BrowsersCmd) FSFileInfo(ctx context.Context, in BrowsersFSFileInfoInput)
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
-		return nil
-	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -988,10 +908,6 @@ func (b BrowsersCmd) FSFileInfo(ctx context.Context, in BrowsersFSFileInfoInput)
 func (b BrowsersCmd) FSListFiles(ctx context.Context, in BrowsersFSListFilesInput) error {
 	if b.fs == nil {
 		pterm.Error.Println("fs service not available")
-		return nil
-	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
 		return nil
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
@@ -1023,10 +939,6 @@ func (b BrowsersCmd) FSMove(ctx context.Context, in BrowsersFSMoveInput) error {
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
-		return nil
-	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -1045,10 +957,6 @@ func (b BrowsersCmd) FSMove(ctx context.Context, in BrowsersFSMoveInput) error {
 func (b BrowsersCmd) FSReadFile(ctx context.Context, in BrowsersFSReadFileInput) error {
 	if b.fs == nil {
 		pterm.Error.Println("fs service not available")
-		return nil
-	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
 		return nil
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
@@ -1087,10 +995,6 @@ func (b BrowsersCmd) FSSetPermissions(ctx context.Context, in BrowsersFSSetPerms
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
-		return nil
-	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -1116,10 +1020,6 @@ func (b BrowsersCmd) FSSetPermissions(ctx context.Context, in BrowsersFSSetPerms
 func (b BrowsersCmd) FSUpload(ctx context.Context, in BrowsersFSUploadInput) error {
 	if b.fs == nil {
 		pterm.Error.Println("fs service not available")
-		return nil
-	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
 		return nil
 	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
@@ -1184,10 +1084,6 @@ func (b BrowsersCmd) FSUploadZip(ctx context.Context, in BrowsersFSUploadZipInpu
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
-		return nil
-	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -1214,14 +1110,9 @@ func (b BrowsersCmd) FSWriteFile(ctx context.Context, in BrowsersFSWriteFileInpu
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	if b.browsers == nil {
-		pterm.Error.Println("browsers service not available")
-		return nil
-	}
 	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
-		pterm.Error.Printf("Failed to write file: %v\n", err)
-		return nil
+		return util.CleanedUpSdkError{Err: err}
 	}
 	if br == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -1716,7 +1607,7 @@ func (b BrowsersCmd) resolveBrowserByIdentifier(ctx context.Context, identifier 
 	if err != nil {
 		return nil, err
 	}
-	if browsers == nil || len(*browsers) == 0 {
+	if browsers == nil {
 		return nil, nil
 	}
 	for _, br := range *browsers {
