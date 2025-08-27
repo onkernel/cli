@@ -1186,7 +1186,7 @@ func init() {
 	logsStream.Flags().String("source", "", "Log source: path or supervisor")
 	logsStream.Flags().Bool("follow", true, "Follow the log stream")
 	logsStream.Flags().String("path", "", "File path when source=path")
-	logsStream.Flags().String("supervisor-process", "", "Supervisor process name when source=supervisor")
+	logsStream.Flags().String("supervisor-process", "", "Supervisor process name when source=supervisor. Useful values to use: chromium, kernel-images-api, neko")
 	_ = logsStream.MarkFlagRequired("source")
 	logsRoot.AddCommand(logsStream)
 	browsersCmd.AddCommand(logsRoot)
