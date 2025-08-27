@@ -3,6 +3,7 @@ module github.com/onkernel/cli
 go 1.25.0
 
 require (
+	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/boyter/gocodewalker v1.4.0
 	github.com/charmbracelet/fang v0.2.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
