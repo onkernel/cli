@@ -75,10 +75,11 @@ func getKernelClient(cmd *cobra.Command) kernel.Client {
 
 // isAuthExempt returns true if the command or any of its parents should skip auth.
 func isAuthExempt(cmd *cobra.Command) bool {
+	// bare root command does not need auth
+	if cmd == rootCmd {
+		return true
+	}
 	for c := cmd; c != nil; c = c.Parent() {
-		if c == rootCmd {
-			return true
-		}
 		switch c.Name() {
 		case "login", "logout", "auth", "help", "completion":
 			return true
