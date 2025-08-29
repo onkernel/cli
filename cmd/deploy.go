@@ -124,7 +124,7 @@ func runDeploy(cmd *cobra.Command, args []string) (err error) {
 		EnvVars:           envVars,
 	}, option.WithMaxRetries(0))
 	if err != nil {
-		return &util.CleanedUpSdkError{Err: err}
+		return util.CleanedUpSdkError{Err: err}
 	}
 
 	// Follow deployment events via SSE

@@ -3,15 +3,17 @@ module github.com/onkernel/cli
 go 1.25.0
 
 require (
+	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/boyter/gocodewalker v1.4.0
 	github.com/charmbracelet/fang v0.2.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/joho/godotenv v1.5.1
-	github.com/onkernel/kernel-go-sdk v0.9.1
+	github.com/onkernel/kernel-go-sdk v0.10.1-0.20250827184402-40919678c68e
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/pterm/pterm v0.12.80
 	github.com/samber/lo v1.51.0
 	github.com/spf13/cobra v1.9.1
+	github.com/stretchr/testify v1.11.0
 	github.com/zalando/go-keyring v0.2.6
 	golang.org/x/oauth2 v0.30.0
 )
@@ -30,6 +32,7 @@ require (
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/danieljoos/wincred v1.2.2 // indirect
 	github.com/danwakefield/fnmatch v0.0.0-20160403171240-cbb64ac3d964 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gookit/color v1.5.4 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -41,6 +44,7 @@ require (
 	github.com/muesli/mango-cobra v1.2.0 // indirect
 	github.com/muesli/mango-pflag v0.1.0 // indirect
 	github.com/muesli/roff v0.1.0 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
@@ -52,4 +56,5 @@ require (
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/term v0.26.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
