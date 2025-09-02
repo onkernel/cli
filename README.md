@@ -103,7 +103,7 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 - `kernel logout` - Clear stored credentials
 - `kernel auth` - Check authentication status
 
-### Deployments
+### App Deployment
 
 - `kernel deploy <file>` - Deploy an app to Kernel
   - `--version <version>` - Specify app version (default: latest)
