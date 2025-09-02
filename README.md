@@ -103,14 +103,23 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 - `kernel logout` - Clear stored credentials
 - `kernel auth` - Check authentication status
 
-### App Management
+### Deployments
 
 - `kernel deploy <file>` - Deploy an app to Kernel
-
   - `--version <version>` - Specify app version (default: latest)
   - `--force` - Allow overwriting existing version
   - `--env <KEY=VALUE>`, `-e` - Set environment variables (can be used multiple times)
   - `--env-file <file>` - Load environment variables from file (can be used multiple times)
+
+- `kernel deploy logs <deployment_id>` - Stream logs for a deployment
+  - `--follow`, `-f` - Follow logs in real-time (stream continuously)
+  - `--since`, `-s` - How far back to retrieve logs. Duration formats: ns, us, ms, s, m, h (e.g., 5m, 2h, 1h30m). Timestamps also supported: 2006-01-02, 2006-01-02T15:04, 2006-01-02T15:04:05, 2006-01-02T15:04:05.000
+  - `--with-timestamps`, `-t` - Include timestamps in each log line
+
+- `kernel deploy history [app_name]` - Show deployment history
+  - `--all` - Show deployment history for all applications
+
+### App Management
 
 - `kernel invoke <app> <action>` - Run an app action
 
