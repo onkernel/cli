@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/onkernel/kernel-go-sdk/option"
 	"github.com/pterm/pterm"
@@ -83,7 +84,7 @@ func runLogs(cmd *cobra.Command, args []string) error {
 			case "log":
 				logEntry := data.AsLog()
 				if timestamps {
-					fmt.Printf("%s %s\n", logEntry.Timestamp.Format(time.RFC3339Nano), logEntry.Message)
+					fmt.Printf("%s %s\n", util.FormatLocal(logEntry.Timestamp), logEntry.Message)
 				} else {
 					fmt.Println(logEntry.Message)
 				}
@@ -117,7 +118,7 @@ func runLogs(cmd *cobra.Command, args []string) error {
 					case "log":
 						logEntry := data.AsLog()
 						if timestamps {
-							fmt.Printf("%s %s\n", logEntry.Timestamp.Format(time.RFC3339Nano), logEntry.Message)
+							fmt.Printf("%s %s\n", util.FormatLocal(logEntry.Timestamp), logEntry.Message)
 						} else {
 							fmt.Println(logEntry.Message)
 						}
