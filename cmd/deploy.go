@@ -15,6 +15,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var deployLogsCmd = &cobra.Command{
+	Use:   "logs <deployment_id>",
+	Short: "Stream logs for a deployment",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runDeployLogs,
+}
+
+var deployHistoryCmd = &cobra.Command{
+	Use:   "history [app_name]",
+	Short: "Show deployment history",
+	Args:  cobra.RangeArgs(0, 1),
+	RunE:  runDeployHistory,
+}
+
 var deployCmd = &cobra.Command{
 	Use:   "deploy <entrypoint>",
 	Short: "Deploy a Kernel application",
@@ -27,6 +41,15 @@ func init() {
 	deployCmd.Flags().Bool("force", false, "Allow overwrite of an existing version with the same name")
 	deployCmd.Flags().StringArrayP("env", "e", []string{}, "Set environment variables (e.g., KEY=value). May be specified multiple times")
 	deployCmd.Flags().StringArray("env-file", []string{}, "Read environment variables from a file (.env format). May be specified multiple times")
+
+	// Subcommands under deploy
+	deployLogsCmd.Flags().BoolP("follow", "f", false, "Follow logs in real-time (stream continuously)")
+	deployLogsCmd.Flags().StringP("since", "s", "", "How far back to retrieve logs. Supports duration formats: ns, us, ms, s, m, h (e.g., 5m, 2h, 1h30m). Note: 'd' not supported; use hours instead. Can also specify timestamps: 2006-01-02, 2006-01-02T15:04, 2006-01-02T15:04:05, 2006-01-02T15:04:05.000. Max lookback ~167h.")
+	deployLogsCmd.Flags().BoolP("with-timestamps", "t", false, "Include timestamps in each log line")
+	deployCmd.AddCommand(deployLogsCmd)
+
+	deployHistoryCmd.Flags().Bool("all", false, "Show deployment history for all applications")
+	deployCmd.AddCommand(deployHistoryCmd)
 }
 
 func runDeploy(cmd *cobra.Command, args []string) (err error) {
@@ -54,7 +77,7 @@ func runDeploy(cmd *cobra.Command, args []string) (err error) {
 		spinner.Fail("Failed to compress files")
 		return err
 	}
-	spinner.Info("Compressed files")
+	spinner.Success("Compressed files")
 	defer os.Remove(tmpFile)
 
 	// make io.Reader from tmpFile
@@ -119,6 +142,8 @@ func runDeploy(cmd *cobra.Command, args []string) (err error) {
 			if status == string(kernel.DeploymentGetResponseStatusFailed) ||
 				status == string(kernel.DeploymentGetResponseStatusStopped) {
 				pterm.Error.Println("✖ Deployment failed")
+				pterm.Error.Printf("Deployment ID: %s\n", resp.ID)
+				pterm.Info.Printf("View logs: kernel deploy logs %s --since 1h\n", resp.ID)
 				err = fmt.Errorf("deployment %s: %s", status, deploymentState.Deployment.StatusReason)
 				return err
 			}
@@ -136,6 +161,8 @@ func runDeploy(cmd *cobra.Command, args []string) (err error) {
 			}
 		case "error":
 			errorEv := data.AsErrorEvent()
+			pterm.Error.Printf("Deployment ID: %s\n", resp.ID)
+			pterm.Info.Printf("View logs: kernel deploy logs %s --since 1h\n", resp.ID)
 			err = fmt.Errorf("%s: %s", errorEv.Error.Code, errorEv.Error.Message)
 			return err
 		}
@@ -143,14 +170,150 @@ func runDeploy(cmd *cobra.Command, args []string) (err error) {
 
 	if serr := stream.Err(); serr != nil {
 		pterm.Error.Println("✖ Stream error")
+		pterm.Error.Printf("Deployment ID: %s\n", resp.ID)
+		pterm.Info.Printf("View logs: kernel deploy logs %s --since 1h\n", resp.ID)
 		return fmt.Errorf("stream error: %w", serr)
 	}
 	return nil
 }
 
 func quoteIfNeeded(s string) string {
-	if len(s) > 0 && (s[0] == ' ' || s[len(s)-1] == ' ') {
+	if strings.ContainsRune(s, ' ') {
 		return fmt.Sprintf("\"%s\"", s)
 	}
 	return s
+}
+
+func runDeployLogs(cmd *cobra.Command, args []string) error {
+	client := getKernelClient(cmd)
+
+	deploymentID := args[0]
+	pterm.Info.Printf("Streaming logs for deployment %s...\n", deploymentID)
+
+	since, _ := cmd.Flags().GetString("since")
+	follow, _ := cmd.Flags().GetBool("follow")
+	ts, _ := cmd.Flags().GetBool("with-timestamps")
+
+	stream := client.Deployments.FollowStreaming(cmd.Context(), deploymentID, kernel.DeploymentFollowParams{Since: kernel.Opt(since)}, option.WithMaxRetries(0))
+	defer func() { _ = stream.Close() }()
+	if stream.Err() != nil {
+		return fmt.Errorf("failed to open log stream: %w", stream.Err())
+	}
+
+	if follow {
+		for stream.Next() {
+			data := stream.Current()
+			switch data.Event {
+			case "log":
+				logEntry := data.AsLog()
+				if ts {
+					fmt.Printf("%s %s\n", logEntry.Timestamp.Format(time.RFC3339Nano), strings.TrimSuffix(logEntry.Message, "\n"))
+				} else {
+					fmt.Println(strings.TrimSuffix(logEntry.Message, "\n"))
+				}
+			case "error":
+				errEvt := data.AsErrorEvent()
+				return fmt.Errorf("%s: %s", errEvt.Error.Code, errEvt.Error.Message)
+			}
+		}
+	} else {
+		// Non-follow: exit after brief inactivity window (3s) like app logs
+		timeout := time.NewTimer(3 * time.Second)
+		defer timeout.Stop()
+		for {
+			nextCh := make(chan bool, 1)
+			go func() { nextCh <- stream.Next() }()
+			select {
+			case hasNext := <-nextCh:
+				if !hasNext {
+					return nil
+				}
+				data := stream.Current()
+				switch data.Event {
+				case "log":
+					logEntry := data.AsLog()
+					if ts {
+						fmt.Printf("%s %s\n", logEntry.Timestamp.Format(time.RFC3339Nano), strings.TrimSuffix(logEntry.Message, "\n"))
+					} else {
+						fmt.Println(strings.TrimSuffix(logEntry.Message, "\n"))
+					}
+				case "error":
+					errEvt := data.AsErrorEvent()
+					return fmt.Errorf("%s: %s", errEvt.Error.Code, errEvt.Error.Message)
+				}
+				timeout.Reset(3 * time.Second)
+			case <-timeout.C:
+				_ = stream.Close()
+				return nil
+			}
+		}
+	}
+
+	if stream.Err() != nil {
+		return fmt.Errorf("failed while streaming logs: %w", stream.Err())
+	}
+	return nil
+}
+
+func runDeployHistory(cmd *cobra.Command, args []string) error {
+	client := getKernelClient(cmd)
+
+	all, _ := cmd.Flags().GetBool("all")
+
+	var appNames []string
+	if len(args) == 1 {
+		appNames = []string{args[0]}
+	} else if all {
+		apps, err := client.Apps.List(cmd.Context(), kernel.AppListParams{})
+		if err != nil {
+			pterm.Error.Printf("Failed to list applications: %v\n", err)
+			return nil
+		}
+		for _, a := range *apps {
+			appNames = append(appNames, a.AppName)
+		}
+		// de-duplicate app names
+		seen := map[string]struct{}{}
+		uniq := make([]string, 0, len(appNames))
+		for _, n := range appNames {
+			if _, ok := seen[n]; ok {
+				continue
+			}
+			seen[n] = struct{}{}
+			uniq = append(uniq, n)
+		}
+		appNames = uniq
+	} else {
+		pterm.Error.Println("Either provide an app name or use --all")
+		return nil
+	}
+
+	table := pterm.TableData{{"Deployment ID", "Created At", "Region", "Status", "Entrypoint", "Reason"}}
+	for _, appName := range appNames {
+		params := kernel.DeploymentListParams{AppName: kernel.Opt(appName)}
+		pterm.Debug.Printf("Listing deployments for app '%s'...\n", appName)
+		deployments, err := client.Deployments.List(cmd.Context(), params)
+		if err != nil {
+			pterm.Error.Printf("Failed to list deployments for '%s': %v\n", appName, err)
+			continue
+		}
+		for _, dep := range *deployments {
+			created := dep.CreatedAt.Format(time.RFC3339)
+			status := string(dep.Status)
+			table = append(table, []string{
+				dep.ID,
+				created,
+				string(dep.Region),
+				status,
+				dep.EntrypointRelPath,
+				dep.StatusReason,
+			})
+		}
+	}
+	if len(table) == 1 {
+		pterm.Info.Println("No deployments found")
+		return nil
+	}
+	pterm.DefaultTable.WithHasHeader().WithData(table).Render()
+	return nil
 }
