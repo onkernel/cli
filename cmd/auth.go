@@ -121,7 +121,7 @@ func runAuth(cmd *cobra.Command, args []string) error {
 		logger.Debug("Time until expiry", logger.Args("time_until_expiry", timeUntilExpiry))
 		logger.Debug("Expires at", logger.Args("expires_at", tokens.ExpiresAt))
 		if timeUntilExpiry < 24*time.Hour {
-			pterm.Warning.Printf("⚠️ Access token expires in %s\n", timeUntilExpiry.Round(time.Minute))
+			pterm.Warning.Printf("⚠️ Access token expires in %s\n", timeUntilExpiry.Round(time.Second))
 		} else {
 			pterm.Success.Printf("✓ Access token valid for %s\n", timeUntilExpiry.Round(time.Second))
 		}
