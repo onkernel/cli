@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -208,17 +207,6 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 }
 
 func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
-	isNotFound := func(err error) bool {
-		if err == nil {
-			return false
-		}
-		var apierr *kernel.Error
-		if errors.As(err, &apierr) {
-			return apierr != nil && apierr.StatusCode == http.StatusNotFound
-		}
-		return false
-	}
-
 	if !in.SkipConfirm {
 		browsers, err := b.browsers.List(ctx)
 		if err != nil {
@@ -258,7 +246,7 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 		if found.Persistence.ID == in.Identifier {
 			pterm.Info.Printf("Deleting browser with persistent ID: %s\n", in.Identifier)
 			err = b.browsers.Delete(ctx, kernel.BrowserDeleteParams{PersistentID: in.Identifier})
-			if err != nil && !isNotFound(err) {
+			if err != nil && !util.IsNotFound(err) {
 				return util.CleanedUpSdkError{Err: err}
 			}
 			pterm.Success.Printf("Successfully deleted browser with persistent ID: %s\n", in.Identifier)
@@ -267,7 +255,7 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 
 		pterm.Info.Printf("Deleting browser with ID: %s\n", in.Identifier)
 		err = b.browsers.DeleteByID(ctx, in.Identifier)
-		if err != nil && !isNotFound(err) {
+		if err != nil && !util.IsNotFound(err) {
 			return util.CleanedUpSdkError{Err: err}
 		}
 		pterm.Success.Printf("Successfully deleted browser with ID: %s\n", in.Identifier)
@@ -280,14 +268,14 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 
 	// Attempt by session ID
 	if err := b.browsers.DeleteByID(ctx, in.Identifier); err != nil {
-		if !isNotFound(err) {
+		if !util.IsNotFound(err) {
 			nonNotFoundErrors = append(nonNotFoundErrors, err)
 		}
 	}
 
 	// Attempt by persistent ID
 	if err := b.browsers.Delete(ctx, kernel.BrowserDeleteParams{PersistentID: in.Identifier}); err != nil {
-		if !isNotFound(err) {
+		if !util.IsNotFound(err) {
 			nonNotFoundErrors = append(nonNotFoundErrors, err)
 		}
 	}

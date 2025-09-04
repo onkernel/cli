@@ -123,27 +123,21 @@ func (p ProfilesCmd) Create(ctx context.Context, in ProfilesCreateInput) error {
 }
 
 func (p ProfilesCmd) Delete(ctx context.Context, in ProfilesDeleteInput) error {
-	if !in.SkipConfirm {
-		// Try to resolve for a nicer message; avoid prompting for missing entries
-		list, err := p.profiles.List(ctx)
-		if err != nil {
-			return util.CleanedUpSdkError{Err: err}
-		}
-		var found *kernel.Profile
-		if list != nil {
-			for _, pr := range *list {
-				if pr.ID == in.Identifier || (pr.Name != "" && pr.Name == in.Identifier) {
-					cp := pr
-					found = &cp
-					break
-				}
-			}
-		}
-		if found == nil {
-			pterm.Error.Printf("Profile '%s' not found\n", in.Identifier)
+	// Resolve using Get first; treat not found as success with a message
+	item, err := p.profiles.Get(ctx, in.Identifier)
+	if err != nil {
+		if util.IsNotFound(err) {
+			pterm.Info.Printf("Profile '%s' not found\n", in.Identifier)
 			return nil
 		}
-		// Confirm
+		return util.CleanedUpSdkError{Err: err}
+	}
+	if item == nil || item.ID == "" {
+		pterm.Info.Printf("Profile '%s' not found\n", in.Identifier)
+		return nil
+	}
+
+	if !in.SkipConfirm {
 		msg := fmt.Sprintf("Are you sure you want to delete profile '%s'?", in.Identifier)
 		pterm.DefaultInteractiveConfirm.DefaultText = msg
 		ok, _ := pterm.DefaultInteractiveConfirm.Show()
@@ -154,6 +148,10 @@ func (p ProfilesCmd) Delete(ctx context.Context, in ProfilesDeleteInput) error {
 	}
 
 	if err := p.profiles.Delete(ctx, in.Identifier); err != nil {
+		if util.IsNotFound(err) {
+			pterm.Info.Printf("Profile '%s' not found\n", in.Identifier)
+			return nil
+		}
 		return util.CleanedUpSdkError{Err: err}
 	}
 	pterm.Success.Printf("Deleted profile: %s\n", in.Identifier)
