@@ -3,6 +3,7 @@ package util
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -64,4 +65,16 @@ func NewClient(opts ...option.RequestOption) kernel.Client {
 func showUpgradeMessage() {
 	pterm.Error.Println("Your Kernel CLI is out of date and is not compatible with this API.")
 	pterm.Info.Println("Please upgrade by running: `brew upgrade onkernel/tap/kernel`")
+}
+
+// IsNotFound returns true if the error is a Kernel API error with HTTP 404.
+func IsNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	var apierr *kernel.Error
+	if errors.As(err, &apierr) {
+		return apierr != nil && apierr.StatusCode == http.StatusNotFound
+	}
+	return false
 }

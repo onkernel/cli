@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"strings"
-	"time"
 
+	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/pterm/pterm"
 	"github.com/samber/lo"
@@ -133,7 +133,7 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, dep := range *deployments {
-		created := dep.CreatedAt.Format(time.RFC3339)
+		created := util.FormatLocal(dep.CreatedAt)
 		status := string(dep.Status)
 
 		tableData = append(tableData, []string{
