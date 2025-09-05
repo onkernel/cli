@@ -49,6 +49,7 @@ func init() {
 	deployCmd.AddCommand(deployLogsCmd)
 
 	deployHistoryCmd.Flags().Bool("all", false, "Show deployment history for all applications")
+	deployHistoryCmd.Flags().Int("limit", 100, "Max rows to return (default 100)")
 	deployCmd.AddCommand(deployHistoryCmd)
 }
 
@@ -259,6 +260,7 @@ func runDeployHistory(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 
 	all, _ := cmd.Flags().GetBool("all")
+	lim, _ := cmd.Flags().GetInt("limit")
 
 	var appNames []string
 	if len(args) == 1 {
@@ -288,16 +290,15 @@ func runDeployHistory(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	rows := 0
 	table := pterm.TableData{{"Deployment ID", "Created At", "Region", "Status", "Entrypoint", "Reason"}}
+AppsLoop:
 	for _, appName := range appNames {
 		params := kernel.DeploymentListParams{AppName: kernel.Opt(appName)}
 		pterm.Debug.Printf("Listing deployments for app '%s'...\n", appName)
-		deployments, err := client.Deployments.List(cmd.Context(), params)
-		if err != nil {
-			pterm.Error.Printf("Failed to list deployments for '%s': %v\n", appName, err)
-			continue
-		}
-		for _, dep := range *deployments {
+		iter := client.Deployments.ListAutoPaging(cmd.Context(), params)
+		for iter.Next() {
+			dep := iter.Current()
 			created := dep.CreatedAt.Format(time.RFC3339)
 			status := string(dep.Status)
 			table = append(table, []string{
@@ -308,6 +309,14 @@ func runDeployHistory(cmd *cobra.Command, args []string) error {
 				dep.EntrypointRelPath,
 				dep.StatusReason,
 			})
+			rows++
+			if lim > 0 && rows >= lim {
+				break AppsLoop
+			}
+		}
+		if iter.Err() != nil {
+			pterm.Error.Printf("Failed to list deployments for '%s': %v\n", appName, iter.Err())
+			continue
 		}
 	}
 	if len(table) == 1 {

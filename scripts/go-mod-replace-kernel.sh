@@ -28,9 +28,9 @@ ref="$1"
 commit=""
 tmp_dir="/tmp/kernel-go"
 
-# Clone the stainless-sdks/kernel-go repo at the provided commit (shallow clone for speed)
+# Clone the onkernel/kernel-go-sdk repo at the provided commit (shallow clone for speed)
 rm -rf "$tmp_dir"
-git clone --filter=blob:none --quiet git@github.com:stainless-sdks/kernel-go "$tmp_dir"
+git clone --filter=blob:none --quiet git@github.com:onkernel/kernel-go-sdk.git "$tmp_dir"
 
 # Determine the commit hash corresponding to the provided ref (commit hash or branch name)
 pushd "$tmp_dir" >/dev/null
@@ -63,8 +63,8 @@ fi
 # Remove any existing replace directive for the SDK (ignore error if it doesn't exist)
 # Then add the new replace directive pointing at the desired commit
 go mod edit -dropreplace=github.com/onkernel/kernel-go-sdk 2>/dev/null || true
-go mod edit -replace=github.com/onkernel/kernel-go-sdk=github.com/stainless-sdks/kernel-go@"$gomod_version"
+go mod edit -replace=github.com/onkernel/kernel-go-sdk=github.com/onkernel/kernel-go-sdk@"$gomod_version"
 go mod tidy
 
-echo "go.mod updated to use github.com/stainless-sdks/kernel-go @ $gomod_version"
+echo "go.mod updated to use github.com/onkernel/kernel-go-sdk @ $gomod_version"
 

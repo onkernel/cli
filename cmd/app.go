@@ -39,6 +39,9 @@ func init() {
 	// Add optional filters for list
 	appListCmd.Flags().String("name", "", "Filter by application name")
 	appListCmd.Flags().String("version", "", "Filter by version label")
+
+	// Limit rows returned for app history (0 = all)
+	appHistoryCmd.Flags().Int("limit", 100, "Max rows to return (default 100)")
 }
 
 func runAppList(cmd *cobra.Command, args []string) error {
@@ -109,6 +112,7 @@ func runAppList(cmd *cobra.Command, args []string) error {
 func runAppHistory(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	appName := args[0]
+	lim, _ := cmd.Flags().GetInt("limit")
 
 	pterm.Debug.Printf("Fetching deployment history for app '%s'...\n", appName)
 
@@ -117,13 +121,13 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 		params.AppName = kernel.Opt(appName)
 	}
 
-	deployments, err := client.Deployments.List(cmd.Context(), params)
+	page, err := client.Deployments.List(cmd.Context(), params)
 	if err != nil {
 		pterm.Error.Printf("Failed to list deployments: %v\n", err)
 		return nil
 	}
 
-	if deployments == nil || len(*deployments) == 0 {
+	if page == nil || len(page.Items) == 0 {
 		pterm.Info.Println("No deployments found for this application")
 		return nil
 	}
@@ -132,18 +136,36 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 		{"Deployment ID", "Created At", "Region", "Status", "Entrypoint", "Reason"},
 	}
 
-	for _, dep := range *deployments {
-		created := dep.CreatedAt.Format(time.RFC3339)
-		status := string(dep.Status)
+	rows := 0
+	stop := false
+	for page != nil && !stop {
+		for _, dep := range page.Items {
+			created := dep.CreatedAt.Format(time.RFC3339)
+			status := string(dep.Status)
 
-		tableData = append(tableData, []string{
-			dep.ID,
-			created,
-			string(dep.Region),
-			status,
-			dep.EntrypointRelPath,
-			dep.StatusReason,
-		})
+			tableData = append(tableData, []string{
+				dep.ID,
+				created,
+				string(dep.Region),
+				status,
+				dep.EntrypointRelPath,
+				dep.StatusReason,
+			})
+
+			rows++
+			if lim > 0 && rows >= lim {
+				stop = true
+				break
+			}
+		}
+		if stop {
+			break
+		}
+		page, err = page.GetNextPage()
+		if err != nil {
+			pterm.Error.Printf("Failed to fetch next page: %v\n", err)
+			break
+		}
 	}
 
 	printTableNoPad(tableData, true)
