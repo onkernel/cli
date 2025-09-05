@@ -91,8 +91,9 @@ func NewOAuthConfig() (*OAuthConfig, error) {
 		RedirectURL: redirectURI,
 		Scopes:      strings.Split(DefaultScope, " "),
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  AuthURL,
-			TokenURL: TokenURL,
+			AuthURL:   AuthURL,
+			TokenURL:  TokenURL,
+			AuthStyle: oauth2.AuthStyleInParams,
 		},
 	}
 
