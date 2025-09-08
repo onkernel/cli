@@ -118,6 +118,8 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 
 - `kernel deploy history [app_name]` - Show deployment history
   - `--all` - Show deployment history for all applications
+  - `--limit <n>` - Max rows to return (default: 100; 0 = all)
+  - `--offset <n>` - Number of rows to skip from the start
 
 ### App Management
 
@@ -133,6 +135,8 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
   - `--version <version>` - Filter by version
 
 - `kernel app history <app_name>` - Show deployment history for an app
+  - `--limit <n>` - Max rows to return (default: 100; 0 = all)
+  - `--offset <n>` - Number of rows to skip from the start
 
 ### Logs
 

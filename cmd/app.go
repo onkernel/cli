@@ -42,6 +42,7 @@ func init() {
 
 	// Limit rows returned for app history (0 = all)
 	appHistoryCmd.Flags().Int("limit", 100, "Max rows to return (default 100)")
+	appHistoryCmd.Flags().Int("offset", 0, "Number of rows to skip from the start")
 }
 
 func runAppList(cmd *cobra.Command, args []string) error {
@@ -113,6 +114,7 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	appName := args[0]
 	lim, _ := cmd.Flags().GetInt("limit")
+	offset, _ := cmd.Flags().GetInt("offset")
 
 	pterm.Debug.Printf("Fetching deployment history for app '%s'...\n", appName)
 
@@ -137,9 +139,16 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 	}
 
 	rows := 0
+	seen := 0
 	stop := false
 	for page != nil && !stop {
 		for _, dep := range page.Items {
+			// apply offset before collecting
+			if offset > 0 && seen < offset {
+				seen++
+				continue
+			}
+
 			created := dep.CreatedAt.Format(time.RFC3339)
 			status := string(dep.Status)
 
@@ -153,6 +162,7 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 			})
 
 			rows++
+			seen++
 			if lim > 0 && rows >= lim {
 				stop = true
 				break
