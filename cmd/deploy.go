@@ -299,37 +299,30 @@ AppsLoop:
 	for _, appName := range appNames {
 		params := kernel.DeploymentListParams{AppName: kernel.Opt(appName)}
 		pterm.Debug.Printf("Listing deployments for app '%s'...\n", appName)
-		page, err := client.Deployments.List(cmd.Context(), params)
+		deployments, err := client.Deployments.List(cmd.Context(), params)
 		if err != nil {
 			pterm.Error.Printf("Failed to list deployments for '%s': %v\n", appName, err)
 			continue
 		}
-		for page != nil {
-			for _, dep := range page.Items {
-				if offset > 0 && seen < offset {
-					seen++
-					continue
-				}
-				created := dep.CreatedAt.Format(time.RFC3339)
-				status := string(dep.Status)
-				table = append(table, []string{
-					dep.ID,
-					created,
-					string(dep.Region),
-					status,
-					dep.EntrypointRelPath,
-					dep.StatusReason,
-				})
-				rows++
+		for _, dep := range *deployments {
+			if offset > 0 && seen < offset {
 				seen++
-				if lim > 0 && rows >= lim {
-					break AppsLoop
-				}
+				continue
 			}
-			page, err = page.GetNextPage()
-			if err != nil {
-				pterm.Error.Printf("Failed to fetch next page for '%s': %v\n", appName, err)
-				break
+			created := dep.CreatedAt.Format(time.RFC3339)
+			status := string(dep.Status)
+			table = append(table, []string{
+				dep.ID,
+				created,
+				string(dep.Region),
+				status,
+				dep.EntrypointRelPath,
+				dep.StatusReason,
+			})
+			rows++
+			seen++
+			if lim > 0 && rows >= lim {
+				break AppsLoop
 			}
 		}
 	}

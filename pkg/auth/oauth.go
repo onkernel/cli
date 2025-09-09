@@ -91,8 +91,9 @@ func NewOAuthConfig() (*OAuthConfig, error) {
 		RedirectURL: redirectURI,
 		Scopes:      strings.Split(DefaultScope, " "),
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  AuthURL,
-			TokenURL: TokenURL,
+			AuthURL:   AuthURL,
+			TokenURL:  TokenURL,
+			AuthStyle: oauth2.AuthStyleInParams,
 		},
 	}
 
@@ -271,6 +272,9 @@ func RefreshTokens(ctx context.Context, tokens *TokenStorage) (*TokenStorage, er
 	values.Set("refresh_token", tokens.RefreshToken)
 	values.Set("client_id", ClientID)
 	values.Set("scope", DefaultScope)
+	if tokens.OrgID != "" {
+		values.Set("org_id", tokens.OrgID)
+	}
 
 	// Make the token request manually to ensure client_id is included
 	req, err := http.NewRequestWithContext(ctx, "POST", TokenURL, strings.NewReader(values.Encode()))
@@ -316,6 +320,7 @@ func RefreshTokens(ctx context.Context, tokens *TokenStorage) (*TokenStorage, er
 		AccessToken:  newToken.AccessToken,
 		RefreshToken: newToken.RefreshToken,
 		ExpiresAt:    newToken.Expiry,
+		OrgID:        tokens.OrgID,
 	}, nil
 }
 

@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -76,10 +75,13 @@ type BoolFlag struct {
 
 // Inputs for each command
 type BrowsersCreateInput struct {
-	PersistenceID  string
-	TimeoutSeconds int
-	Stealth        BoolFlag
-	Headless       BoolFlag
+	PersistenceID      string
+	TimeoutSeconds     int
+	Stealth            BoolFlag
+	Headless           BoolFlag
+	ProfileID          string
+	ProfileName        string
+	ProfileSaveChanges BoolFlag
 }
 
 type BrowsersDeleteInput struct {
@@ -115,7 +117,7 @@ func (b BrowsersCmd) List(ctx context.Context) error {
 
 	// Prepare table data
 	tableData := pterm.TableData{
-		{"Browser ID", "Created At", "Persistent ID", "CDP WS URL", "Live View URL"},
+		{"Browser ID", "Created At", "Persistent ID", "Profile", "CDP WS URL", "Live View URL"},
 	}
 
 	for _, browser := range *browsers {
@@ -124,10 +126,18 @@ func (b BrowsersCmd) List(ctx context.Context) error {
 			persistentID = browser.Persistence.ID
 		}
 
+		profile := "-"
+		if browser.Profile.Name != "" {
+			profile = browser.Profile.Name
+		} else if browser.Profile.ID != "" {
+			profile = browser.Profile.ID
+		}
+
 		tableData = append(tableData, []string{
 			browser.SessionID,
-			browser.CreatedAt.Format("2006-01-02 15:04:05"),
+			util.FormatLocal(browser.CreatedAt),
 			persistentID,
+			profile,
 			truncateURL(browser.CdpWsURL, 50),
 			truncateURL(browser.BrowserLiveViewURL, 50),
 		})
@@ -153,6 +163,21 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 		params.Headless = kernel.Opt(in.Headless.Value)
 	}
 
+	// Validate profile selection: at most one of profile-id or profile-name must be provided
+	if in.ProfileID != "" && in.ProfileName != "" {
+		pterm.Error.Println("must specify at most one of --profile-id or --profile-name")
+		return nil
+	} else if in.ProfileID != "" || in.ProfileName != "" {
+		params.Profile = kernel.BrowserNewParamsProfile{
+			SaveChanges: kernel.Opt(in.ProfileSaveChanges.Value),
+		}
+		if in.ProfileID != "" {
+			params.Profile.ID = kernel.Opt(in.ProfileID)
+		} else if in.ProfileName != "" {
+			params.Profile.Name = kernel.Opt(in.ProfileName)
+		}
+	}
+
 	browser, err := b.browsers.New(ctx, params)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -169,23 +194,19 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 	if browser.Persistence.ID != "" {
 		tableData = append(tableData, []string{"Persistent ID", browser.Persistence.ID})
 	}
+	if browser.Profile.ID != "" || browser.Profile.Name != "" {
+		profVal := browser.Profile.Name
+		if profVal == "" {
+			profVal = browser.Profile.ID
+		}
+		tableData = append(tableData, []string{"Profile", profVal})
+	}
 
 	printTableNoPad(tableData, true)
 	return nil
 }
 
 func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
-	isNotFound := func(err error) bool {
-		if err == nil {
-			return false
-		}
-		var apierr *kernel.Error
-		if errors.As(err, &apierr) {
-			return apierr != nil && apierr.StatusCode == http.StatusNotFound
-		}
-		return false
-	}
-
 	if !in.SkipConfirm {
 		browsers, err := b.browsers.List(ctx)
 		if err != nil {
@@ -225,7 +246,7 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 		if found.Persistence.ID == in.Identifier {
 			pterm.Info.Printf("Deleting browser with persistent ID: %s\n", in.Identifier)
 			err = b.browsers.Delete(ctx, kernel.BrowserDeleteParams{PersistentID: in.Identifier})
-			if err != nil && !isNotFound(err) {
+			if err != nil && !util.IsNotFound(err) {
 				return util.CleanedUpSdkError{Err: err}
 			}
 			pterm.Success.Printf("Successfully deleted browser with persistent ID: %s\n", in.Identifier)
@@ -234,7 +255,7 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 
 		pterm.Info.Printf("Deleting browser with ID: %s\n", in.Identifier)
 		err = b.browsers.DeleteByID(ctx, in.Identifier)
-		if err != nil && !isNotFound(err) {
+		if err != nil && !util.IsNotFound(err) {
 			return util.CleanedUpSdkError{Err: err}
 		}
 		pterm.Success.Printf("Successfully deleted browser with ID: %s\n", in.Identifier)
@@ -247,14 +268,14 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 
 	// Attempt by session ID
 	if err := b.browsers.DeleteByID(ctx, in.Identifier); err != nil {
-		if !isNotFound(err) {
+		if !util.IsNotFound(err) {
 			nonNotFoundErrors = append(nonNotFoundErrors, err)
 		}
 	}
 
 	// Attempt by persistent ID
 	if err := b.browsers.Delete(ctx, kernel.BrowserDeleteParams{PersistentID: in.Identifier}); err != nil {
-		if !isNotFound(err) {
+		if !util.IsNotFound(err) {
 			nonNotFoundErrors = append(nonNotFoundErrors, err)
 		}
 	}
@@ -337,7 +358,7 @@ func (b BrowsersCmd) LogsStream(ctx context.Context, in BrowsersLogsStreamInput)
 	defer stream.Close()
 	for stream.Next() {
 		ev := stream.Current()
-		pterm.Println(fmt.Sprintf("[%s] %s", ev.Timestamp.Format("2006-01-02 15:04:05"), ev.Message))
+		pterm.Println(fmt.Sprintf("[%s] %s", util.FormatLocal(ev.Timestamp), ev.Message))
 	}
 	if err := stream.Err(); err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -386,7 +407,7 @@ func (b BrowsersCmd) ReplaysList(ctx context.Context, in BrowsersReplaysListInpu
 	}
 	rows := pterm.TableData{{"Replay ID", "Started At", "Finished At", "View URL"}}
 	for _, r := range *items {
-		rows = append(rows, []string{r.ReplayID, r.StartedAt.Format("2006-01-02 15:04:05"), r.FinishedAt.Format("2006-01-02 15:04:05"), truncateURL(r.ReplayViewURL, 60)})
+		rows = append(rows, []string{r.ReplayID, util.FormatLocal(r.StartedAt), util.FormatLocal(r.FinishedAt), truncateURL(r.ReplayViewURL, 60)})
 	}
 	printTableNoPad(rows, true)
 	return nil
@@ -412,7 +433,7 @@ func (b BrowsersCmd) ReplaysStart(ctx context.Context, in BrowsersReplaysStartIn
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
 	}
-	rows := pterm.TableData{{"Property", "Value"}, {"Replay ID", res.ReplayID}, {"View URL", res.ReplayViewURL}, {"Started At", res.StartedAt.Format("2006-01-02 15:04:05")}}
+	rows := pterm.TableData{{"Property", "Value"}, {"Replay ID", res.ReplayID}, {"View URL", res.ReplayViewURL}, {"Started At", util.FormatLocal(res.StartedAt)}}
 	printTableNoPad(rows, true)
 	return nil
 }
@@ -597,7 +618,7 @@ func (b BrowsersCmd) ProcessSpawn(ctx context.Context, in BrowsersProcessSpawnIn
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
 	}
-	rows := pterm.TableData{{"Property", "Value"}, {"Process ID", res.ProcessID}, {"PID", fmt.Sprintf("%d", res.Pid)}, {"Started At", res.StartedAt.Format("2006-01-02 15:04:05")}}
+	rows := pterm.TableData{{"Property", "Value"}, {"Process ID", res.ProcessID}, {"PID", fmt.Sprintf("%d", res.Pid)}, {"Started At", util.FormatLocal(res.StartedAt)}}
 	printTableNoPad(rows, true)
 	return nil
 }
@@ -900,7 +921,7 @@ func (b BrowsersCmd) FSFileInfo(ctx context.Context, in BrowsersFSFileInfoInput)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
 	}
-	rows := pterm.TableData{{"Property", "Value"}, {"Path", res.Path}, {"Name", res.Name}, {"Mode", res.Mode}, {"IsDir", fmt.Sprintf("%t", res.IsDir)}, {"SizeBytes", fmt.Sprintf("%d", res.SizeBytes)}, {"ModTime", res.ModTime.Format("2006-01-02 15:04:05")}}
+	rows := pterm.TableData{{"Property", "Value"}, {"Path", res.Path}, {"Name", res.Name}, {"Mode", res.Mode}, {"IsDir", fmt.Sprintf("%t", res.IsDir)}, {"SizeBytes", fmt.Sprintf("%d", res.SizeBytes)}, {"ModTime", util.FormatLocal(res.ModTime)}}
 	printTableNoPad(rows, true)
 	return nil
 }
@@ -928,7 +949,7 @@ func (b BrowsersCmd) FSListFiles(ctx context.Context, in BrowsersFSListFilesInpu
 	}
 	rows := pterm.TableData{{"Mode", "Size", "ModTime", "Name", "Path"}}
 	for _, f := range *res {
-		rows = append(rows, []string{f.Mode, fmt.Sprintf("%d", f.SizeBytes), f.ModTime.Format("2006-01-02 15:04:05"), f.Name, f.Path})
+		rows = append(rows, []string{f.Mode, fmt.Sprintf("%d", f.SizeBytes), util.FormatLocal(f.ModTime), f.Name, f.Path})
 	}
 	printTableNoPad(rows, true)
 	return nil
@@ -1297,6 +1318,9 @@ func init() {
 	browsersCreateCmd.Flags().BoolP("stealth", "s", false, "Launch browser in stealth mode to avoid detection")
 	browsersCreateCmd.Flags().BoolP("headless", "H", false, "Launch browser without GUI access")
 	browsersCreateCmd.Flags().IntP("timeout", "t", 60, "Timeout in seconds for the browser session")
+	browsersCreateCmd.Flags().String("profile-id", "", "Profile ID to load into the browser session (mutually exclusive with --profile-name)")
+	browsersCreateCmd.Flags().String("profile-name", "", "Profile name to load into the browser session (mutually exclusive with --profile-id)")
+	browsersCreateCmd.Flags().Bool("save-changes", false, "If set, save changes back to the profile when the session ends")
 
 	// Add flags for delete command
 	browsersDeleteCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
@@ -1319,12 +1343,18 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 	stealthVal, _ := cmd.Flags().GetBool("stealth")
 	headlessVal, _ := cmd.Flags().GetBool("headless")
 	timeout, _ := cmd.Flags().GetInt("timeout")
+	profileID, _ := cmd.Flags().GetString("profile-id")
+	profileName, _ := cmd.Flags().GetString("profile-name")
+	saveChanges, _ := cmd.Flags().GetBool("save-changes")
 
 	in := BrowsersCreateInput{
-		PersistenceID:  persistenceID,
-		TimeoutSeconds: timeout,
-		Stealth:        BoolFlag{Set: cmd.Flags().Changed("stealth"), Value: stealthVal},
-		Headless:       BoolFlag{Set: cmd.Flags().Changed("headless"), Value: headlessVal},
+		PersistenceID:      persistenceID,
+		TimeoutSeconds:     timeout,
+		Stealth:            BoolFlag{Set: cmd.Flags().Changed("stealth"), Value: stealthVal},
+		Headless:           BoolFlag{Set: cmd.Flags().Changed("headless"), Value: headlessVal},
+		ProfileID:          profileID,
+		ProfileName:        profileName,
+		ProfileSaveChanges: BoolFlag{Set: cmd.Flags().Changed("save-changes"), Value: saveChanges},
 	}
 
 	svc := client.Browsers

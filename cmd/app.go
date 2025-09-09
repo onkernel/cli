@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"strings"
-	"time"
 
+	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/pterm/pterm"
 	"github.com/samber/lo"
@@ -123,13 +123,13 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 		params.AppName = kernel.Opt(appName)
 	}
 
-	page, err := client.Deployments.List(cmd.Context(), params)
+	deployments, err := client.Deployments.List(cmd.Context(), params)
 	if err != nil {
 		pterm.Error.Printf("Failed to list deployments: %v\n", err)
 		return nil
 	}
 
-	if page == nil || len(page.Items) == 0 {
+	if deployments == nil || len(*deployments) == 0 {
 		pterm.Info.Println("No deployments found for this application")
 		return nil
 	}
@@ -140,40 +140,28 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 
 	rows := 0
 	seen := 0
-	stop := false
-	for page != nil && !stop {
-		for _, dep := range page.Items {
-			// apply offset before collecting
-			if offset > 0 && seen < offset {
-				seen++
-				continue
-			}
-
-			created := dep.CreatedAt.Format(time.RFC3339)
-			status := string(dep.Status)
-
-			tableData = append(tableData, []string{
-				dep.ID,
-				created,
-				string(dep.Region),
-				status,
-				dep.EntrypointRelPath,
-				dep.StatusReason,
-			})
-
-			rows++
+	for _, dep := range *deployments {
+		// apply offset before collecting
+		if offset > 0 && seen < offset {
 			seen++
-			if lim > 0 && rows >= lim {
-				stop = true
-				break
-			}
+			continue
 		}
-		if stop {
-			break
-		}
-		page, err = page.GetNextPage()
-		if err != nil {
-			pterm.Error.Printf("Failed to fetch next page: %v\n", err)
+
+		created := util.FormatLocal(dep.CreatedAt)
+		status := string(dep.Status)
+
+		tableData = append(tableData, []string{
+			dep.ID,
+			created,
+			string(dep.Region),
+			status,
+			dep.EntrypointRelPath,
+			dep.StatusReason,
+		})
+
+		rows++
+		seen++
+		if lim > 0 && rows >= lim {
 			break
 		}
 	}
