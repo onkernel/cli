@@ -49,8 +49,7 @@ func init() {
 	deployCmd.AddCommand(deployLogsCmd)
 
 	deployHistoryCmd.Flags().Bool("all", false, "Show deployment history for all applications")
-	deployHistoryCmd.Flags().Int("limit", 100, "Max rows to return (default 100)")
-	deployHistoryCmd.Flags().Int("offset", 0, "Number of rows to skip from the start")
+	deployHistoryCmd.Flags().Int("limit", 100, "Max deployments to return (default 100)")
 	deployCmd.AddCommand(deployHistoryCmd)
 }
 
@@ -262,7 +261,6 @@ func runDeployHistory(cmd *cobra.Command, args []string) error {
 
 	all, _ := cmd.Flags().GetBool("all")
 	lim, _ := cmd.Flags().GetInt("limit")
-	offset, _ := cmd.Flags().GetInt("offset")
 
 	var appNames []string
 	if len(args) == 1 {
@@ -293,7 +291,6 @@ func runDeployHistory(cmd *cobra.Command, args []string) error {
 	}
 
 	rows := 0
-	seen := 0
 	table := pterm.TableData{{"Deployment ID", "Created At", "Region", "Status", "Entrypoint", "Reason"}}
 AppsLoop:
 	for _, appName := range appNames {
@@ -305,10 +302,6 @@ AppsLoop:
 			continue
 		}
 		for _, dep := range *deployments {
-			if offset > 0 && seen < offset {
-				seen++
-				continue
-			}
 			created := dep.CreatedAt.Format(time.RFC3339)
 			status := string(dep.Status)
 			table = append(table, []string{
@@ -320,7 +313,6 @@ AppsLoop:
 				dep.StatusReason,
 			})
 			rows++
-			seen++
 			if lim > 0 && rows >= lim {
 				break AppsLoop
 			}

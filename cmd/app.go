@@ -41,8 +41,7 @@ func init() {
 	appListCmd.Flags().String("version", "", "Filter by version label")
 
 	// Limit rows returned for app history (0 = all)
-	appHistoryCmd.Flags().Int("limit", 100, "Max rows to return (default 100)")
-	appHistoryCmd.Flags().Int("offset", 0, "Number of rows to skip from the start")
+	appHistoryCmd.Flags().Int("limit", 100, "Max deployments to return (default 100)")
 }
 
 func runAppList(cmd *cobra.Command, args []string) error {
@@ -114,7 +113,6 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	appName := args[0]
 	lim, _ := cmd.Flags().GetInt("limit")
-	offset, _ := cmd.Flags().GetInt("offset")
 
 	pterm.Debug.Printf("Fetching deployment history for app '%s'...\n", appName)
 
@@ -139,14 +137,7 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 	}
 
 	rows := 0
-	seen := 0
 	for _, dep := range *deployments {
-		// apply offset before collecting
-		if offset > 0 && seen < offset {
-			seen++
-			continue
-		}
-
 		created := util.FormatLocal(dep.CreatedAt)
 		status := string(dep.Status)
 
@@ -160,7 +151,6 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 		})
 
 		rows++
-		seen++
 		if lim > 0 && rows >= lim {
 			break
 		}
