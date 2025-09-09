@@ -301,8 +301,8 @@ AppsLoop:
 			pterm.Error.Printf("Failed to list deployments for '%s': %v\n", appName, err)
 			continue
 		}
-		for _, dep := range *deployments {
-			created := dep.CreatedAt.Format(time.RFC3339)
+		for _, dep := range deployments.Items {
+			created := util.FormatLocal(dep.CreatedAt)
 			status := string(dep.Status)
 			table = append(table, []string{
 				dep.ID,

@@ -127,7 +127,7 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if deployments == nil || len(*deployments) == 0 {
+	if deployments == nil || len(deployments.Items) == 0 {
 		pterm.Info.Println("No deployments found for this application")
 		return nil
 	}
@@ -137,7 +137,7 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 	}
 
 	rows := 0
-	for _, dep := range *deployments {
+	for _, dep := range deployments.Items {
 		created := util.FormatLocal(dep.CreatedAt)
 		status := string(dep.Status)
 
