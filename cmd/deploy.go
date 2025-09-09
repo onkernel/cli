@@ -48,7 +48,6 @@ func init() {
 	deployLogsCmd.Flags().BoolP("with-timestamps", "t", false, "Include timestamps in each log line")
 	deployCmd.AddCommand(deployLogsCmd)
 
-	deployHistoryCmd.Flags().Bool("all", false, "Show deployment history for all applications")
 	deployHistoryCmd.Flags().Int("limit", 100, "Max deployments to return (default 100)")
 	deployCmd.AddCommand(deployHistoryCmd)
 }
@@ -259,13 +258,12 @@ func runDeployLogs(cmd *cobra.Command, args []string) error {
 func runDeployHistory(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 
-	all, _ := cmd.Flags().GetBool("all")
 	lim, _ := cmd.Flags().GetInt("limit")
 
 	var appNames []string
 	if len(args) == 1 {
 		appNames = []string{args[0]}
-	} else if all {
+	} else {
 		apps, err := client.Apps.List(cmd.Context(), kernel.AppListParams{})
 		if err != nil {
 			pterm.Error.Printf("Failed to list applications: %v\n", err)
@@ -285,9 +283,6 @@ func runDeployHistory(cmd *cobra.Command, args []string) error {
 			uniq = append(uniq, n)
 		}
 		appNames = uniq
-	} else {
-		pterm.Error.Println("Either provide an app name or use --all")
-		return nil
 	}
 
 	rows := 0
