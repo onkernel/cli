@@ -39,6 +39,9 @@ func init() {
 	// Add optional filters for list
 	appListCmd.Flags().String("name", "", "Filter by application name")
 	appListCmd.Flags().String("version", "", "Filter by version label")
+
+	// Limit rows returned for app history (0 = all)
+	appHistoryCmd.Flags().Int("limit", 100, "Max deployments to return (default 100)")
 }
 
 func runAppList(cmd *cobra.Command, args []string) error {
@@ -109,6 +112,7 @@ func runAppList(cmd *cobra.Command, args []string) error {
 func runAppHistory(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	appName := args[0]
+	lim, _ := cmd.Flags().GetInt("limit")
 
 	pterm.Debug.Printf("Fetching deployment history for app '%s'...\n", appName)
 
@@ -123,7 +127,7 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if deployments == nil || len(*deployments) == 0 {
+	if deployments == nil || len(deployments.Items) == 0 {
 		pterm.Info.Println("No deployments found for this application")
 		return nil
 	}
@@ -132,7 +136,8 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 		{"Deployment ID", "Created At", "Region", "Status", "Entrypoint", "Reason"},
 	}
 
-	for _, dep := range *deployments {
+	rows := 0
+	for _, dep := range deployments.Items {
 		created := util.FormatLocal(dep.CreatedAt)
 		status := string(dep.Status)
 
@@ -144,6 +149,11 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 			dep.EntrypointRelPath,
 			dep.StatusReason,
 		})
+
+		rows++
+		if lim > 0 && rows >= lim {
+			break
+		}
 	}
 
 	printTableNoPad(tableData, true)

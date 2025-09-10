@@ -48,7 +48,7 @@ func init() {
 	deployLogsCmd.Flags().BoolP("with-timestamps", "t", false, "Include timestamps in each log line")
 	deployCmd.AddCommand(deployLogsCmd)
 
-	deployHistoryCmd.Flags().Bool("all", false, "Show deployment history for all applications")
+	deployHistoryCmd.Flags().Int("limit", 100, "Max deployments to return (default 100)")
 	deployCmd.AddCommand(deployHistoryCmd)
 }
 
@@ -258,12 +258,12 @@ func runDeployLogs(cmd *cobra.Command, args []string) error {
 func runDeployHistory(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 
-	all, _ := cmd.Flags().GetBool("all")
+	lim, _ := cmd.Flags().GetInt("limit")
 
 	var appNames []string
 	if len(args) == 1 {
 		appNames = []string{args[0]}
-	} else if all {
+	} else {
 		apps, err := client.Apps.List(cmd.Context(), kernel.AppListParams{})
 		if err != nil {
 			pterm.Error.Printf("Failed to list applications: %v\n", err)
@@ -273,22 +273,21 @@ func runDeployHistory(cmd *cobra.Command, args []string) error {
 			appNames = append(appNames, a.AppName)
 		}
 		// de-duplicate app names
-		seen := map[string]struct{}{}
+		seenApps := map[string]struct{}{}
 		uniq := make([]string, 0, len(appNames))
 		for _, n := range appNames {
-			if _, ok := seen[n]; ok {
+			if _, ok := seenApps[n]; ok {
 				continue
 			}
-			seen[n] = struct{}{}
+			seenApps[n] = struct{}{}
 			uniq = append(uniq, n)
 		}
 		appNames = uniq
-	} else {
-		pterm.Error.Println("Either provide an app name or use --all")
-		return nil
 	}
 
+	rows := 0
 	table := pterm.TableData{{"Deployment ID", "Created At", "Region", "Status", "Entrypoint", "Reason"}}
+AppsLoop:
 	for _, appName := range appNames {
 		params := kernel.DeploymentListParams{AppName: kernel.Opt(appName)}
 		pterm.Debug.Printf("Listing deployments for app '%s'...\n", appName)
@@ -297,8 +296,8 @@ func runDeployHistory(cmd *cobra.Command, args []string) error {
 			pterm.Error.Printf("Failed to list deployments for '%s': %v\n", appName, err)
 			continue
 		}
-		for _, dep := range *deployments {
-			created := dep.CreatedAt.Format(time.RFC3339)
+		for _, dep := range deployments.Items {
+			created := util.FormatLocal(dep.CreatedAt)
 			status := string(dep.Status)
 			table = append(table, []string{
 				dep.ID,
@@ -308,6 +307,10 @@ func runDeployHistory(cmd *cobra.Command, args []string) error {
 				dep.EntrypointRelPath,
 				dep.StatusReason,
 			})
+			rows++
+			if lim > 0 && rows >= lim {
+				break AppsLoop
+			}
 		}
 	}
 	if len(table) == 1 {

@@ -67,4 +67,3 @@ go mod edit -replace=github.com/onkernel/kernel-go-sdk=github.com/stainless-sdks
 go mod tidy
 
 echo "go.mod updated to use github.com/stainless-sdks/kernel-go @ $gomod_version"
-

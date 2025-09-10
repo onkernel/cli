@@ -117,7 +117,7 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
   - `--with-timestamps`, `-t` - Include timestamps in each log line
 
 - `kernel deploy history [app_name]` - Show deployment history
-  - `--all` - Show deployment history for all applications
+  - `--limit <n>` - Max deployments to return (default: 100; 0 = all)
 
 ### App Management
 
@@ -133,6 +133,7 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
   - `--version <version>` - Filter by version
 
 - `kernel app history <app_name>` - Show deployment history for an app
+  - `--limit <n>` - Max deployments to return (default: 100; 0 = all)
 
 ### Logs
 
