@@ -65,7 +65,13 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 
 	pterm.Info.Printf("Invoking \"%s\" (action: %s, version: %s)…\n", appName, actionName, version)
 
-	// Coordinate cleanup across all early-returns
+	// Create the invocation
+	resp, err := client.Invocations.New(cmd.Context(), params, option.WithMaxRetries(0))
+	if err != nil {
+		return handleSdkError(err)
+	}
+	// coordinate the cleanup with the polling loop to ensure this is given enough time to run
+	// before this function returns
 	cleanupDone := make(chan struct{})
 	cleanupStarted := atomic.Bool{}
 	defer func() {
@@ -73,41 +79,6 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 			<-cleanupDone
 		}
 	}()
-
-	// Track invocation ID once created so we can mark it failed on cancel
-	var invocationID string
-	// Ensure we only run cancel cleanup once
-	once := sync.Once{}
-	// When cancelled, explicitly mark the invocation as failed via the update endpoint
-	onCancel(cmd.Context(), func() {
-		once.Do(func() {
-			cleanupStarted.Store(true)
-			defer close(cleanupDone)
-			pterm.Warning.Println("Invocation cancelled...cleaning up...")
-			if invocationID != "" {
-				if _, err := client.Invocations.Update(
-					context.Background(),
-					invocationID,
-					kernel.InvocationUpdateParams{
-						Status: kernel.InvocationUpdateParamsStatusFailed,
-						Output: kernel.Opt(`{"error":"Invocation cancelled by user"}`),
-					},
-					option.WithRequestTimeout(30*time.Second),
-				); err != nil {
-					pterm.Error.Printf("Failed to mark invocation as failed: %v\n", err)
-				}
-			} else {
-				pterm.Warning.Println("Cancellation received before invocation was created.")
-			}
-		})
-	})
-
-	// Create the invocation
-	resp, err := client.Invocations.New(cmd.Context(), params, option.WithMaxRetries(0))
-	if err != nil {
-		return handleSdkError(err)
-	}
-	invocationID = resp.ID
 
 	if resp.Status != kernel.InvocationNewResponseStatusQueued {
 		succeeded := resp.Status == kernel.InvocationNewResponseStatusSucceeded
@@ -121,7 +92,26 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// cancellation handler already registered above
+	// On cancel, mark the invocation as failed via the update endpoint
+	once := sync.Once{}
+	onCancel(cmd.Context(), func() {
+		once.Do(func() {
+			cleanupStarted.Store(true)
+			defer close(cleanupDone)
+			pterm.Warning.Println("Invocation cancelled...cleaning up...")
+			if _, err := client.Invocations.Update(
+				context.Background(),
+				resp.ID,
+				kernel.InvocationUpdateParams{
+					Status: kernel.InvocationUpdateParamsStatusFailed,
+					Output: kernel.Opt(`{"error":"Invocation cancelled by user"}`),
+				},
+				option.WithRequestTimeout(30*time.Second),
+			); err != nil {
+				pterm.Error.Printf("Failed to mark invocation as failed: %v\n", err)
+			}
+		})
+	})
 
 	// Start following events
 	stream := client.Invocations.FollowStreaming(cmd.Context(), resp.ID, option.WithMaxRetries(0))
