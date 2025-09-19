@@ -59,9 +59,9 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 		}
 		params.Payload = kernel.Opt(payloadStr)
 	}
-	// Create a separate signal context for cancellation so we don't cancel
-	// the invocation creation request.
-	sigCtx, _ := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	// we don't really care to cancel the context, we just want to handle signals
+	ctx, _ := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+	cmd.SetContext(ctx)
 
 	pterm.Info.Printf("Invoking \"%s\" (action: %s, version: %s)…\n", appName, actionName, version)
 
@@ -79,7 +79,7 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 	// Ensure we only run cancel cleanup once
 	once := sync.Once{}
 	// When cancelled, explicitly mark the invocation as failed via the update endpoint
-	onCancel(sigCtx, func() {
+	onCancel(cmd.Context(), func() {
 		once.Do(func() {
 			cleanupStarted.Store(true)
 			defer close(cleanupDone)
@@ -124,7 +124,7 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 	// cancellation handler already registered above
 
 	// Start following events
-	stream := client.Invocations.FollowStreaming(sigCtx, resp.ID, option.WithMaxRetries(0))
+	stream := client.Invocations.FollowStreaming(cmd.Context(), resp.ID, option.WithMaxRetries(0))
 	for stream.Next() {
 		ev := stream.Current()
 
