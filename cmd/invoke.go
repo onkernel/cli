@@ -92,16 +92,23 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// this is a little indirect but we try to fail out of the invocation by deleting the
-	// underlying browser sessions
+	// On cancel, mark the invocation as failed via the update endpoint
 	once := sync.Once{}
 	onCancel(cmd.Context(), func() {
 		once.Do(func() {
 			cleanupStarted.Store(true)
 			defer close(cleanupDone)
 			pterm.Warning.Println("Invocation cancelled...cleaning up...")
-			if err := client.Invocations.DeleteBrowsers(context.Background(), resp.ID, option.WithRequestTimeout(30*time.Second)); err != nil {
-				pterm.Error.Printf("Failed to cancel invocation: %v\n", err)
+			if _, err := client.Invocations.Update(
+				context.Background(),
+				resp.ID,
+				kernel.InvocationUpdateParams{
+					Status: kernel.InvocationUpdateParamsStatusFailed,
+					Output: kernel.Opt(`{"error":"Invocation cancelled by user"}`),
+				},
+				option.WithRequestTimeout(30*time.Second),
+			); err != nil {
+				pterm.Error.Printf("Failed to mark invocation as failed: %v\n", err)
 			}
 		})
 	})
