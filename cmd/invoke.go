@@ -99,9 +99,6 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 			cleanupStarted.Store(true)
 			defer close(cleanupDone)
 			pterm.Warning.Println("Invocation cancelled...cleaning up...")
-			if err := client.Invocations.DeleteBrowsers(context.Background(), resp.ID, option.WithRequestTimeout(30*time.Second)); err != nil {
-				pterm.Error.Printf("Failed to cancel invocation: %v\n", err)
-			}
 			if _, err := client.Invocations.Update(
 				context.Background(),
 				resp.ID,
@@ -112,6 +109,9 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 				option.WithRequestTimeout(30*time.Second),
 			); err != nil {
 				pterm.Error.Printf("Failed to mark invocation as failed: %v\n", err)
+			}
+			if err := client.Invocations.DeleteBrowsers(context.Background(), resp.ID, option.WithRequestTimeout(30*time.Second)); err != nil {
+				pterm.Error.Printf("Failed to cancel invocation: %v\n", err)
 			}
 		})
 	})
