@@ -110,6 +110,9 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 			); err != nil {
 				pterm.Error.Printf("Failed to mark invocation as failed: %v\n", err)
 			}
+			if err := client.Invocations.DeleteBrowsers(context.Background(), resp.ID, option.WithRequestTimeout(30*time.Second)); err != nil {
+				pterm.Error.Printf("Failed to cancel invocation: %v\n", err)
+			}
 		})
 	})
 
