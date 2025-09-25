@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"io"
@@ -130,49 +131,55 @@ func TestExtensionsDownload_MissingOutput(t *testing.T) {
 	}}
 	e := ExtensionsCmd{extensions: fake}
 	_ = e.Download(context.Background(), ExtensionsDownloadInput{Identifier: "e1", Output: ""})
-	assert.Contains(t, buf.String(), "Missing --to output file path")
+	assert.Contains(t, buf.String(), "Missing --to output directory")
 }
 
-func TestExtensionsDownload_RawSuccess(t *testing.T) {
+func TestExtensionsDownload_ExtractsToDir(t *testing.T) {
 	buf := captureExtensionsOutput(t)
-	f, err := os.CreateTemp("", "extension-*.zip")
-	assert.NoError(t, err)
-	name := f.Name()
-	_ = f.Close()
-	defer os.Remove(name)
+	// Create a small in-memory zip
+	var zbuf bytes.Buffer
+	zw := zip.NewWriter(&zbuf)
+	w, _ := zw.Create("manifest.json")
+	_, _ = w.Write([]byte("{}"))
+	_ = zw.Close()
 
-	content := "hello"
 	fake := &FakeExtensionsService{DownloadFunc: func(ctx context.Context, idOrName string, opts ...option.RequestOption) (*http.Response, error) {
-		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(content)), Header: http.Header{}}, nil
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(zbuf.Bytes())), Header: http.Header{}}, nil
 	}}
 	e := ExtensionsCmd{extensions: fake}
-	_ = e.Download(context.Background(), ExtensionsDownloadInput{Identifier: "e1", Output: name})
 
-	b, readErr := os.ReadFile(name)
-	assert.NoError(t, readErr)
-	assert.Equal(t, content, string(b))
-	assert.Contains(t, buf.String(), "Saved extension to "+name)
+	outDir := filepath.Join(os.TempDir(), "extdl-test")
+	_ = os.RemoveAll(outDir)
+	_ = e.Download(context.Background(), ExtensionsDownloadInput{Identifier: "e1", Output: outDir})
+
+	// Ensure extracted
+	_, statErr := os.Stat(filepath.Join(outDir, "manifest.json"))
+	assert.NoError(t, statErr)
+	assert.Contains(t, buf.String(), "Extracted extension to "+outDir)
+	_ = os.RemoveAll(outDir)
 }
 
-func TestExtensionsDownloadWebStore_Success(t *testing.T) {
+func TestExtensionsDownloadWebStore_ExtractsToDir(t *testing.T) {
 	buf := captureExtensionsOutput(t)
-	f, err := os.CreateTemp("", "webstore-*.zip")
-	assert.NoError(t, err)
-	name := f.Name()
-	_ = f.Close()
-	defer os.Remove(name)
+	var zbuf bytes.Buffer
+	zw := zip.NewWriter(&zbuf)
+	w, _ := zw.Create("manifest.json")
+	_, _ = w.Write([]byte("{}"))
+	_ = zw.Close()
 
-	content := "zip-bytes"
 	fake := &FakeExtensionsService{DownloadFromChromeStoreFn: func(ctx context.Context, query kernel.ExtensionDownloadFromChromeStoreParams, opts ...option.RequestOption) (*http.Response, error) {
-		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(content)), Header: http.Header{}}, nil
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(zbuf.Bytes())), Header: http.Header{}}, nil
 	}}
 	e := ExtensionsCmd{extensions: fake}
-	_ = e.DownloadWebStore(context.Background(), ExtensionsDownloadWebStoreInput{URL: "https://store/link", Output: name, OS: "linux"})
 
-	b, readErr := os.ReadFile(name)
-	assert.NoError(t, readErr)
-	assert.Equal(t, content, string(b))
-	assert.Contains(t, buf.String(), "Saved extension to "+name)
+	outDir := filepath.Join(os.TempDir(), "webstoredl-test")
+	_ = os.RemoveAll(outDir)
+	_ = e.DownloadWebStore(context.Background(), ExtensionsDownloadWebStoreInput{URL: "https://store/link", Output: outDir, OS: "linux"})
+
+	_, statErr := os.Stat(filepath.Join(outDir, "manifest.json"))
+	assert.NoError(t, statErr)
+	assert.Contains(t, buf.String(), "Extracted extension to "+outDir)
+	_ = os.RemoveAll(outDir)
 }
 
 func TestExtensionsDownloadWebStore_InvalidOS(t *testing.T) {

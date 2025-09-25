@@ -3,7 +3,6 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -121,21 +120,58 @@ func (e ExtensionsCmd) Download(ctx context.Context, in ExtensionsDownloadInput)
 	}
 	defer res.Body.Close()
 	if in.Output == "" {
-		pterm.Error.Println("Missing --to output file path")
+		pterm.Error.Println("Missing --to output directory")
 		_, _ = io.Copy(io.Discard, res.Body)
 		return nil
 	}
-	f, err := os.Create(in.Output)
+
+	outDir, err := filepath.Abs(in.Output)
 	if err != nil {
-		pterm.Error.Printf("Failed to create file: %v\n", err)
+		pterm.Error.Printf("Failed to resolve output path: %v\n", err)
+		_, _ = io.Copy(io.Discard, res.Body)
 		return nil
 	}
-	defer f.Close()
-	if _, err := io.Copy(f, res.Body); err != nil {
-		pterm.Error.Printf("Failed to write file: %v\n", err)
+	// Create directory if not exists; if exists, ensure empty
+	if st, err := os.Stat(outDir); err == nil {
+		if !st.IsDir() {
+			pterm.Error.Printf("Output path exists and is not a directory: %s\n", outDir)
+			_, _ = io.Copy(io.Discard, res.Body)
+			return nil
+		}
+		entries, _ := os.ReadDir(outDir)
+		if len(entries) > 0 {
+			pterm.Error.Printf("Output directory must be empty: %s\n", outDir)
+			_, _ = io.Copy(io.Discard, res.Body)
+			return nil
+		}
+	} else {
+		if err := os.MkdirAll(outDir, 0o755); err != nil {
+			pterm.Error.Printf("Failed to create output directory: %v\n", err)
+			_, _ = io.Copy(io.Discard, res.Body)
+			return nil
+		}
+	}
+
+	// Write response to a temp zip, then extract
+	tmpZip, err := os.CreateTemp("", "kernel-ext-*.zip")
+	if err != nil {
+		pterm.Error.Printf("Failed to create temp zip: %v\n", err)
+		_, _ = io.Copy(io.Discard, res.Body)
 		return nil
 	}
-	pterm.Success.Printf("Saved extension to %s\n", in.Output)
+	tmpName := tmpZip.Name()
+	defer func() { _ = os.Remove(tmpName) }()
+	if _, err := io.Copy(tmpZip, res.Body); err != nil {
+		_ = tmpZip.Close()
+		pterm.Error.Printf("Failed to read response: %v\n", err)
+		return nil
+	}
+	_ = tmpZip.Close()
+	if err := util.Unzip(tmpName, outDir); err != nil {
+		pterm.Error.Printf("Failed to extract zip: %v\n", err)
+		return nil
+	}
+	pterm.Success.Printf("Extracted extension to %s\n", outDir)
 	return nil
 }
 
@@ -164,32 +200,61 @@ func (e ExtensionsCmd) DownloadWebStore(ctx context.Context, in ExtensionsDownlo
 	defer res.Body.Close()
 
 	if in.Output == "" {
-		pterm.Error.Println("Missing --to output file path")
+		pterm.Error.Println("Missing --to output directory")
 		_, _ = io.Copy(io.Discard, res.Body)
 		return nil
 	}
 
-	// Try to detect if it's JSON error and pretty print it if output ends with .json
-	// Otherwise just save raw bytes
+	outDir, err := filepath.Abs(in.Output)
+	if err != nil {
+		pterm.Error.Printf("Failed to resolve output path: %v\n", err)
+		_, _ = io.Copy(io.Discard, res.Body)
+		return nil
+	}
+	if st, err := os.Stat(outDir); err == nil {
+		if !st.IsDir() {
+			pterm.Error.Printf("Output path exists and is not a directory: %s\n", outDir)
+			_, _ = io.Copy(io.Discard, res.Body)
+			return nil
+		}
+		entries, _ := os.ReadDir(outDir)
+		if len(entries) > 0 {
+			pterm.Error.Printf("Output directory must be empty: %s\n", outDir)
+			_, _ = io.Copy(io.Discard, res.Body)
+			return nil
+		}
+	} else {
+		if err := os.MkdirAll(outDir, 0o755); err != nil {
+			pterm.Error.Printf("Failed to create output directory: %v\n", err)
+			_, _ = io.Copy(io.Discard, res.Body)
+			return nil
+		}
+	}
+
+	// Save to temp zip then extract
 	var bodyBuf bytes.Buffer
 	if _, err := io.Copy(&bodyBuf, res.Body); err != nil {
 		pterm.Error.Printf("Failed to read response: %v\n", err)
 		return nil
 	}
-
-	if err := os.WriteFile(in.Output, bodyBuf.Bytes(), 0644); err != nil {
-		pterm.Error.Printf("Failed to write file: %v\n", err)
+	tmpZip, err := os.CreateTemp("", "kernel-webstore-*.zip")
+	if err != nil {
+		pterm.Error.Printf("Failed to create temp zip: %v\n", err)
 		return nil
 	}
-	// If JSON, try to pretty print in place
-	if json.Valid(bodyBuf.Bytes()) && (len(in.Output) >= 5 && in.Output[len(in.Output)-5:] == ".json") {
-		var dst bytes.Buffer
-		if jerr := json.Indent(&dst, bodyBuf.Bytes(), "", "  "); jerr == nil {
-			_ = os.WriteFile(in.Output, dst.Bytes(), 0644)
-		}
+	tmpName := tmpZip.Name()
+	if _, err := tmpZip.Write(bodyBuf.Bytes()); err != nil {
+		_ = tmpZip.Close()
+		pterm.Error.Printf("Failed to write temp zip: %v\n", err)
+		return nil
 	}
-
-	pterm.Success.Printf("Saved extension to %s\n", in.Output)
+	_ = tmpZip.Close()
+	defer os.Remove(tmpName)
+	if err := util.Unzip(tmpName, outDir); err != nil {
+		pterm.Error.Printf("Failed to extract zip: %v\n", err)
+		return nil
+	}
+	pterm.Success.Printf("Extracted extension to %s\n", outDir)
 	return nil
 }
 
