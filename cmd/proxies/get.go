@@ -37,76 +37,66 @@ func (p ProxyCmd) Get(ctx context.Context, in ProxyGetInput) error {
 
 func getProxyConfigRows(proxy *kernel.ProxyGetResponse) [][]string {
 	var rows [][]string
+	config := &proxy.Config
 
 	switch proxy.Type {
-	case kernel.ProxyGetResponseTypeDatacenter:
-		dc := proxy.Config.AsProxyGetResponseConfigDatacenterProxyConfig()
-		if dc.Country != "" {
-			rows = append(rows, []string{"Country", dc.Country})
-		}
-	case kernel.ProxyGetResponseTypeIsp:
-		isp := proxy.Config.AsProxyGetResponseConfigIspProxyConfig()
-		if isp.Country != "" {
-			rows = append(rows, []string{"Country", isp.Country})
+	case kernel.ProxyGetResponseTypeDatacenter, kernel.ProxyGetResponseTypeIsp:
+		if config.Country != "" {
+			rows = append(rows, []string{"Country", config.Country})
 		}
 	case kernel.ProxyGetResponseTypeResidential:
-		res := proxy.Config.AsProxyGetResponseConfigResidentialProxyConfig()
-		if res.Country != "" || res.City != "" || res.State != "" || res.Zip != "" || res.Asn != "" || res.Os != "" {
-			if res.Country != "" {
-				rows = append(rows, []string{"Country", res.Country})
-			}
-			if res.City != "" {
-				rows = append(rows, []string{"City", res.City})
-			}
-			if res.State != "" {
-				rows = append(rows, []string{"State", res.State})
-			}
-			if res.Zip != "" {
-				rows = append(rows, []string{"ZIP", res.Zip})
-			}
-			if res.Asn != "" {
-				rows = append(rows, []string{"ASN", res.Asn})
-			}
-			if res.Os != "" {
-				rows = append(rows, []string{"OS", res.Os})
-			}
+		if config.Country != "" {
+			rows = append(rows, []string{"Country", config.Country})
+		}
+		if config.City != "" {
+			rows = append(rows, []string{"City", config.City})
+		}
+		if config.State != "" {
+			rows = append(rows, []string{"State", config.State})
+		}
+		if config.Zip != "" {
+			rows = append(rows, []string{"ZIP", config.Zip})
+		}
+		if config.Asn != "" {
+			rows = append(rows, []string{"ASN", config.Asn})
+		}
+		if config.Os != "" {
+			rows = append(rows, []string{"OS", config.Os})
 		}
 	case kernel.ProxyGetResponseTypeMobile:
-		mob := proxy.Config.AsProxyGetResponseConfigMobileProxyConfig()
-		if mob.Country != "" || mob.City != "" || mob.State != "" || mob.Zip != "" || mob.Asn != "" || mob.Carrier != "" {
-			if mob.Country != "" {
-				rows = append(rows, []string{"Country", mob.Country})
-			}
-			if mob.City != "" {
-				rows = append(rows, []string{"City", mob.City})
-			}
-			if mob.State != "" {
-				rows = append(rows, []string{"State", mob.State})
-			}
-			if mob.Zip != "" {
-				rows = append(rows, []string{"ZIP", mob.Zip})
-			}
-			if mob.Asn != "" {
-				rows = append(rows, []string{"ASN", mob.Asn})
-			}
-			if mob.Carrier != "" {
-				rows = append(rows, []string{"Carrier", mob.Carrier})
-			}
+		if config.Country != "" {
+			rows = append(rows, []string{"Country", config.Country})
+		}
+		if config.City != "" {
+			rows = append(rows, []string{"City", config.City})
+		}
+		if config.State != "" {
+			rows = append(rows, []string{"State", config.State})
+		}
+		if config.Zip != "" {
+			rows = append(rows, []string{"ZIP", config.Zip})
+		}
+		if config.Asn != "" {
+			rows = append(rows, []string{"ASN", config.Asn})
+		}
+		if config.Carrier != "" {
+			rows = append(rows, []string{"Carrier", config.Carrier})
 		}
 	case kernel.ProxyGetResponseTypeCustom:
-		custom := proxy.Config.AsProxyGetResponseConfigCustomProxyConfig()
-		if custom.Host != "" {
-			rows = append(rows, []string{"Host", custom.Host})
-			rows = append(rows, []string{"Port", fmt.Sprintf("%d", custom.Port)})
-			if custom.Username != "" {
-				rows = append(rows, []string{"Username", custom.Username})
-			}
-			hasPassword := "No"
-			if custom.HasPassword {
-				hasPassword = "Yes"
-			}
-			rows = append(rows, []string{"Has Password", hasPassword})
+		if config.Host != "" {
+			rows = append(rows, []string{"Host", config.Host})
 		}
+		if config.Port != 0 {
+			rows = append(rows, []string{"Port", fmt.Sprintf("%d", config.Port)})
+		}
+		if config.Username != "" {
+			rows = append(rows, []string{"Username", config.Username})
+		}
+		hasPassword := "No"
+		if config.HasPassword {
+			hasPassword = "Yes"
+		}
+		rows = append(rows, []string{"Has Password", hasPassword})
 	}
 
 	return rows

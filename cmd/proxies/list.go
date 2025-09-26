@@ -51,52 +51,44 @@ func (p ProxyCmd) List(ctx context.Context) error {
 }
 
 func formatProxyConfig(proxy *kernel.ProxyListResponse) string {
+	config := &proxy.Config
 	switch proxy.Type {
-	case kernel.ProxyListResponseTypeDatacenter:
-		dc := proxy.Config.AsProxyListResponseConfigDatacenterProxyConfig()
-		if dc.Country != "" {
-			return fmt.Sprintf("Country: %s", dc.Country)
-		}
-	case kernel.ProxyListResponseTypeIsp:
-		isp := proxy.Config.AsProxyListResponseConfigIspProxyConfig()
-		if isp.Country != "" {
-			return fmt.Sprintf("Country: %s", isp.Country)
+	case kernel.ProxyListResponseTypeDatacenter, kernel.ProxyListResponseTypeIsp:
+		if config.Country != "" {
+			return fmt.Sprintf("Country: %s", config.Country)
 		}
 	case kernel.ProxyListResponseTypeResidential:
-		res := proxy.Config.AsProxyListResponseConfigResidentialProxyConfig()
-		if res.Country != "" || res.City != "" || res.State != "" {
-			parts := []string{}
-			if res.Country != "" {
-				parts = append(parts, fmt.Sprintf("Country: %s", res.Country))
-			}
-			if res.City != "" {
-				parts = append(parts, fmt.Sprintf("City: %s", res.City))
-			}
-			if res.State != "" {
-				parts = append(parts, fmt.Sprintf("State: %s", res.State))
-			}
+		parts := []string{}
+		if config.Country != "" {
+			parts = append(parts, fmt.Sprintf("Country: %s", config.Country))
+		}
+		if config.City != "" {
+			parts = append(parts, fmt.Sprintf("City: %s", config.City))
+		}
+		if config.State != "" {
+			parts = append(parts, fmt.Sprintf("State: %s", config.State))
+		}
+		if len(parts) > 0 {
 			return strings.Join(parts, ", ")
 		}
 	case kernel.ProxyListResponseTypeMobile:
-		mob := proxy.Config.AsProxyListResponseConfigMobileProxyConfig()
-		if mob.Country != "" || mob.Carrier != "" {
-			parts := []string{}
-			if mob.Country != "" {
-				parts = append(parts, fmt.Sprintf("Country: %s", mob.Country))
-			}
-			if mob.Carrier != "" {
-				parts = append(parts, fmt.Sprintf("Carrier: %s", mob.Carrier))
-			}
+		parts := []string{}
+		if config.Country != "" {
+			parts = append(parts, fmt.Sprintf("Country: %s", config.Country))
+		}
+		if config.Carrier != "" {
+			parts = append(parts, fmt.Sprintf("Carrier: %s", config.Carrier))
+		}
+		if len(parts) > 0 {
 			return strings.Join(parts, ", ")
 		}
 	case kernel.ProxyListResponseTypeCustom:
-		custom := proxy.Config.AsProxyListResponseConfigCustomProxyConfig()
-		if custom.Host != "" {
+		if config.Host != "" {
 			auth := ""
-			if custom.Username != "" {
-				auth = fmt.Sprintf(", Auth: %s", custom.Username)
+			if config.Username != "" {
+				auth = fmt.Sprintf(", Auth: %s", config.Username)
 			}
-			return fmt.Sprintf("%s:%d%s", custom.Host, custom.Port, auth)
+			return fmt.Sprintf("%s:%d%s", config.Host, config.Port, auth)
 		}
 	}
 	return "-"
