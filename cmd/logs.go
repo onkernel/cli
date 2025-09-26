@@ -23,6 +23,7 @@ func init() {
 	logsCmd.Flags().BoolP("follow", "f", false, "Follow logs in real-time (stream continuously)")
 	logsCmd.Flags().String("since", "s", "How far back to retrieve logs. Supports duration formats: ns, us, ms, s, m, h (e.g., 5m, 2h, 1h30m). Note: 'd' for days is NOT supported - use hours instead. Can also specify timestamps: 2006-01-02 (day), 2006-01-02T15:04 (minute), 2006-01-02T15:04:05 (second), 2006-01-02T15:04:05.000 (ms). Maximum lookback is 167h (just under 7 days). Defaults to 5m if not following, 5s if following.")
 	logsCmd.Flags().Bool("with-timestamps", false, "Include timestamps in each log line")
+	logsCmd.Flags().StringP("invocation", "i", "", "Show logs for a specific invocation/run of the app. Accepts full ID or unambiguous prefix. If the invocation is still running, streaming respects --follow.")
 	rootCmd.AddCommand(logsCmd)
 }
 
@@ -34,6 +35,7 @@ func runLogs(cmd *cobra.Command, args []string) error {
 	follow, _ := cmd.Flags().GetBool("follow")
 	since, _ := cmd.Flags().GetString("since")
 	timestamps, _ := cmd.Flags().GetBool("with-timestamps")
+	invocationRef, _ := cmd.Flags().GetString("invocation")
 	if version == "" {
 		version = "latest"
 	}
@@ -43,6 +45,90 @@ func runLogs(cmd *cobra.Command, args []string) error {
 		} else {
 			since = "5m"
 		}
+	}
+
+	// If an invocation is specified, stream invocation-specific logs and return
+	if invocationRef != "" {
+		inv, err := client.Invocations.Get(cmd.Context(), invocationRef)
+		if err != nil {
+			return fmt.Errorf("failed to get invocation: %w", err)
+		}
+		if inv.AppName != appName {
+			return fmt.Errorf("invocation %s does not belong to app \"%s\" (found app: %s)", inv.ID, appName, inv.AppName)
+		}
+
+		pterm.Info.Printf("Streaming logs for invocation \"%s\" of app \"%s\" (action: %s, status: %s)...\n", inv.ID, inv.AppName, inv.ActionName, inv.Status)
+		if follow {
+			pterm.Info.Println("Press Ctrl+C to exit")
+		} else {
+			pterm.Info.Println("Showing recent logs (timeout after 3s with no events)")
+		}
+
+		stream := client.Invocations.FollowStreaming(cmd.Context(), inv.ID, kernel.InvocationFollowParams{}, option.WithMaxRetries(0))
+		if stream.Err() != nil {
+			return fmt.Errorf("failed to follow streaming: %w", stream.Err())
+		}
+
+		if follow {
+			for stream.Next() {
+				data := stream.Current()
+				switch data.Event {
+				case "log":
+					logEntry := data.AsLog()
+					if timestamps {
+						fmt.Printf("%s %s\n", util.FormatLocal(logEntry.Timestamp), logEntry.Message)
+					} else {
+						fmt.Println(logEntry.Message)
+					}
+				case "error":
+					errEv := data.AsError()
+					pterm.Error.Printfln("%s: %s", errEv.Error.Code, errEv.Error.Message)
+				}
+			}
+		} else {
+			timeout := time.NewTimer(3 * time.Second)
+			defer timeout.Stop()
+
+			done := false
+			for !done {
+				nextCh := make(chan bool, 1)
+				go func() {
+					hasNext := stream.Next()
+					nextCh <- hasNext
+				}()
+
+				select {
+				case hasNext := <-nextCh:
+					if !hasNext {
+						done = true
+					} else {
+						data := stream.Current()
+						switch data.Event {
+						case "log":
+							logEntry := data.AsLog()
+							if timestamps {
+								fmt.Printf("%s %s\n", util.FormatLocal(logEntry.Timestamp), logEntry.Message)
+							} else {
+								fmt.Println(logEntry.Message)
+							}
+						case "error":
+							errEv := data.AsError()
+							pterm.Error.Printfln("%s: %s", errEv.Error.Code, errEv.Error.Message)
+						}
+						timeout.Reset(3 * time.Second)
+					}
+				case <-timeout.C:
+					done = true
+					stream.Close()
+					return nil
+				}
+			}
+		}
+
+		if stream.Err() != nil {
+			return fmt.Errorf("failed to follow streaming: %w", stream.Err())
+		}
+		return nil
 	}
 
 	params := kernel.AppListParams{
@@ -88,6 +174,9 @@ func runLogs(cmd *cobra.Command, args []string) error {
 				} else {
 					fmt.Println(logEntry.Message)
 				}
+			case "error":
+				errEv := data.AsErrorEvent()
+				pterm.Error.Printfln("%s: %s", errEv.Error.Code, errEv.Error.Message)
 			}
 		}
 	} else {
@@ -122,6 +211,9 @@ func runLogs(cmd *cobra.Command, args []string) error {
 						} else {
 							fmt.Println(logEntry.Message)
 						}
+					case "error":
+						errEv := data.AsErrorEvent()
+						pterm.Error.Printfln("%s: %s", errEv.Error.Code, errEv.Error.Message)
 					}
 					timeout.Reset(3 * time.Second)
 				}
