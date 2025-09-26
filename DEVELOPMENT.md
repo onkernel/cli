@@ -13,7 +13,7 @@ brew install onkernel/tap/kernel
 Install the following tools:
 
 - Go 1.22+ ( https://go.dev/doc/install )
-- [Goreleaser](https://goreleaser.com/install/)
+- [Goreleaser Pro](https://goreleaser.com/install/#pro) - **IMPORTANT: You must install goreleaser-pro, not the standard version, as this is required for our release process**
 - [chglog](https://github.com/goreleaser/chglog)
 
 Compile the CLI:
@@ -60,7 +60,7 @@ A typical workflow we encounter is updating the API and integrating those change
 
 Prerequisites:
 
-- Make sure you have `goreleaser` _pro_ installed via `brew install --cask goreleaser/tap/goreleaser-pro`. You will need a license key (in 1pw), and then `export GORELEASER_KEY=<the key>`.
+- Make sure you have **goreleaser-pro** installed via `brew install --cask goreleaser/tap/goreleaser-pro`. You will need a license key (in 1pw), and then `export GORELEASER_KEY=<the key>`. **Note: goreleaser-pro is required, not the standard goreleaser version.**
 
 - Grab the NPM token for our org (in 1pw) and run `npm config set '//registry.npmjs.org/:_authToken'=<the token>`
 
