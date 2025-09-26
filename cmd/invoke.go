@@ -117,7 +117,7 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 	})
 
 	// Start following events
-	stream := client.Invocations.FollowStreaming(cmd.Context(), resp.ID, option.WithMaxRetries(0))
+	stream := client.Invocations.FollowStreaming(cmd.Context(), resp.ID, kernel.InvocationFollowParams{}, option.WithMaxRetries(0))
 	for stream.Next() {
 		ev := stream.Current()
 
