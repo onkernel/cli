@@ -70,6 +70,8 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return handleSdkError(err)
 	}
+	// Log the invocation ID for user reference
+	pterm.Info.Printfln("Invocation ID: %s", resp.ID)
 	// coordinate the cleanup with the polling loop to ensure this is given enough time to run
 	// before this function returns
 	cleanupDone := make(chan struct{})
@@ -117,7 +119,7 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 	})
 
 	// Start following events
-	stream := client.Invocations.FollowStreaming(cmd.Context(), resp.ID, option.WithMaxRetries(0))
+	stream := client.Invocations.FollowStreaming(cmd.Context(), resp.ID, kernel.InvocationFollowParams{}, option.WithMaxRetries(0))
 	for stream.Next() {
 		ev := stream.Current()
 
