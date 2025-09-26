@@ -13,7 +13,7 @@ brew install onkernel/tap/kernel
 Install the following tools:
 
 - Go 1.22+ ( https://go.dev/doc/install )
-- [Goreleaser](https://goreleaser.com/install/)
+- [Goreleaser Pro](https://goreleaser.com/install/) - **Note: goreleaser-pro is required, not the standard version**
 - [chglog](https://github.com/goreleaser/chglog)
 
 Compile the CLI:
