@@ -39,6 +39,7 @@ func init() {
 
 	invocationHistoryCmd.Flags().Int("limit", 100, "Max invocations to return (default 100)")
 	invocationHistoryCmd.Flags().StringP("app", "a", "", "Filter by app name")
+	invocationHistoryCmd.Flags().String("version", "", "Filter by invocation version")
 	invokeCmd.AddCommand(invocationHistoryCmd)
 }
 
@@ -209,6 +210,7 @@ func runInvocationHistory(cmd *cobra.Command, args []string) error {
 
 	lim, _ := cmd.Flags().GetInt("limit")
 	appFilter, _ := cmd.Flags().GetString("app")
+	versionFilter, _ := cmd.Flags().GetString("version")
 
 	// Build parameters for the API call
 	params := kernel.InvocationListParams{
@@ -218,7 +220,20 @@ func runInvocationHistory(cmd *cobra.Command, args []string) error {
 	// Only add app filter if specified
 	if appFilter != "" {
 		params.AppName = kernel.Opt(appFilter)
+	}
+
+	// Only add version filter if specified
+	if versionFilter != "" {
+		params.Version = kernel.Opt(versionFilter)
+	}
+
+	// Build debug message based on filters
+	if appFilter != "" && versionFilter != "" {
+		pterm.Debug.Printf("Listing invocations for app '%s' version '%s'...\n", appFilter, versionFilter)
+	} else if appFilter != "" {
 		pterm.Debug.Printf("Listing invocations for app '%s'...\n", appFilter)
+	} else if versionFilter != "" {
+		pterm.Debug.Printf("Listing invocations for version '%s'...\n", versionFilter)
 	} else {
 		pterm.Debug.Printf("Listing all invocations...\n")
 	}
@@ -230,7 +245,7 @@ func runInvocationHistory(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	table := pterm.TableData{{"Invocation ID", "App Name", "Action", "Status", "Started At", "Duration", "Output"}}
+	table := pterm.TableData{{"Invocation ID", "App Name", "Action", "Version", "Status", "Started At", "Duration", "Output"}}
 
 	for _, inv := range invocations.Items {
 		started := util.FormatLocal(inv.StartedAt)
@@ -261,6 +276,7 @@ func runInvocationHistory(cmd *cobra.Command, args []string) error {
 			inv.ID,
 			inv.AppName,
 			inv.ActionName,
+			inv.Version,
 			status,
 			started,
 			duration,
