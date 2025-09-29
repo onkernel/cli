@@ -12,9 +12,21 @@ import (
 	kernel "github.com/onkernel/kernel-go-sdk"
 	"github.com/onkernel/kernel-go-sdk/option"
 	"github.com/pterm/pterm"
+	"github.com/spf13/cobra"
 )
 
 var printedUpgradeMessage atomic.Bool
+
+// ContextKey is the type for context keys
+type ContextKey string
+
+// KernelClientKey is the context key for the kernel client
+const KernelClientKey ContextKey = "kernel_client"
+
+// GetKernelClient retrieves the kernel client from the command context
+func GetKernelClient(cmd *cobra.Command) kernel.Client {
+	return cmd.Context().Value(KernelClientKey).(kernel.Client)
+}
 
 // NewClient returns a kernel API client preconfigured with middleware that
 // detects when a newer CLI/SDK version is required and informs the user.
