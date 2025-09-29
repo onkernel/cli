@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/fang"
+	"github.com/onkernel/cli/cmd/proxies"
 	"github.com/onkernel/cli/pkg/auth"
 	"github.com/onkernel/cli/pkg/update"
 	"github.com/onkernel/kernel-go-sdk"
@@ -123,7 +124,7 @@ func init() {
 	rootCmd.AddCommand(browsersCmd)
 	rootCmd.AddCommand(appCmd)
 	rootCmd.AddCommand(profilesCmd)
-	rootCmd.AddCommand(betaCmd)
+	rootCmd.AddCommand(proxies.ProxiesCmd)
 
 	rootCmd.PersistentPostRunE = func(cmd *cobra.Command, args []string) error {
 		// running synchronously so we never slow the command
