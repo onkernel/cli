@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/onkernel/cli/pkg/util"
@@ -73,6 +74,9 @@ type BoolFlag struct {
 	Value bool
 }
 
+// Regular expression to validate CUID2 identifiers (24 lowercase alphanumeric characters).
+var cuidRegex = regexp.MustCompile(`^[a-z0-9]{24}$`)
+
 // Inputs for each command
 type BrowsersCreateInput struct {
 	PersistenceID      string
@@ -82,6 +86,7 @@ type BrowsersCreateInput struct {
 	ProfileID          string
 	ProfileName        string
 	ProfileSaveChanges BoolFlag
+	Extensions         []string
 }
 
 type BrowsersDeleteInput struct {
@@ -175,6 +180,23 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 			params.Profile.ID = kernel.Opt(in.ProfileID)
 		} else if in.ProfileName != "" {
 			params.Profile.Name = kernel.Opt(in.ProfileName)
+		}
+	}
+
+	// Map extensions (IDs or names) into params.Extensions
+	if len(in.Extensions) > 0 {
+		for _, ext := range in.Extensions {
+			val := strings.TrimSpace(ext)
+			if val == "" {
+				continue
+			}
+			item := kernel.BrowserNewParamsExtension{}
+			if cuidRegex.MatchString(val) {
+				item.ID = kernel.Opt(val)
+			} else {
+				item.Name = kernel.Opt(val)
+			}
+			params.Extensions = append(params.Extensions, item)
 		}
 	}
 
@@ -1321,6 +1343,7 @@ func init() {
 	browsersCreateCmd.Flags().String("profile-id", "", "Profile ID to load into the browser session (mutually exclusive with --profile-name)")
 	browsersCreateCmd.Flags().String("profile-name", "", "Profile name to load into the browser session (mutually exclusive with --profile-id)")
 	browsersCreateCmd.Flags().Bool("save-changes", false, "If set, save changes back to the profile when the session ends")
+	browsersCreateCmd.Flags().StringSlice("extension", []string{}, "Extension IDs or names to load (repeatable; may be passed multiple times or comma-separated)")
 
 	// Add flags for delete command
 	browsersDeleteCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
@@ -1346,6 +1369,7 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 	profileID, _ := cmd.Flags().GetString("profile-id")
 	profileName, _ := cmd.Flags().GetString("profile-name")
 	saveChanges, _ := cmd.Flags().GetBool("save-changes")
+	extensions, _ := cmd.Flags().GetStringSlice("extension")
 
 	in := BrowsersCreateInput{
 		PersistenceID:      persistenceID,
@@ -1355,6 +1379,7 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 		ProfileID:          profileID,
 		ProfileName:        profileName,
 		ProfileSaveChanges: BoolFlag{Set: cmd.Flags().Changed("save-changes"), Value: saveChanges},
+		Extensions:         extensions,
 	}
 
 	svc := client.Browsers
