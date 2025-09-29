@@ -271,7 +271,7 @@ func runInvocationHistory(cmd *cobra.Command, args []string) error {
 	if len(table) == 1 {
 		pterm.Info.Println("No invocations found.")
 	} else {
-		pterm.DefaultTable.WithHasHeader().WithBoxed().WithData(table).Render()
+		pterm.DefaultTable.WithHasHeader().WithData(table).Render()
 	}
 	return nil
 }
