@@ -172,27 +172,27 @@ func (p ProxyCmd) Create(ctx context.Context, in ProxyCreateInput) error {
 	return nil
 }
 
-func runProxiesCreate(cmd *cobra.Command, args []string) error {
-	client := GetKernelClient(cmd)
+func runProxiesCreate(command *cobra.Command, args []string) error {
+	client := command.Context().Value("kernel_client").(kernel.Client)
 
 	// Get all flag values
-	proxyType, _ := cmd.Flags().GetString("type")
-	name, _ := cmd.Flags().GetString("name")
-	country, _ := cmd.Flags().GetString("country")
-	city, _ := cmd.Flags().GetString("city")
-	state, _ := cmd.Flags().GetString("state")
-	zip, _ := cmd.Flags().GetString("zip")
-	asn, _ := cmd.Flags().GetString("asn")
-	os, _ := cmd.Flags().GetString("os")
-	carrier, _ := cmd.Flags().GetString("carrier")
-	host, _ := cmd.Flags().GetString("host")
-	port, _ := cmd.Flags().GetInt("port")
-	username, _ := cmd.Flags().GetString("username")
-	password, _ := cmd.Flags().GetString("password")
+	proxyType, _ := command.Flags().GetString("type")
+	name, _ := command.Flags().GetString("name")
+	country, _ := command.Flags().GetString("country")
+	city, _ := command.Flags().GetString("city")
+	state, _ := command.Flags().GetString("state")
+	zip, _ := command.Flags().GetString("zip")
+	asn, _ := command.Flags().GetString("asn")
+	os, _ := command.Flags().GetString("os")
+	carrier, _ := command.Flags().GetString("carrier")
+	host, _ := command.Flags().GetString("host")
+	port, _ := command.Flags().GetInt("port")
+	username, _ := command.Flags().GetString("username")
+	password, _ := command.Flags().GetString("password")
 
 	svc := client.Proxies
 	p := ProxyCmd{proxies: &svc}
-	return p.Create(cmd.Context(), ProxyCreateInput{
+	return p.Create(command.Context(), ProxyCreateInput{
 		Name:     name,
 		Type:     proxyType,
 		Country:  country,

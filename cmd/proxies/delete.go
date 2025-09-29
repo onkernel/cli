@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onkernel/cli/pkg/util"
+	"github.com/onkernel/kernel-go-sdk"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
@@ -51,13 +52,13 @@ func (p ProxyCmd) Delete(ctx context.Context, in ProxyDeleteInput) error {
 	return nil
 }
 
-func runProxiesDelete(cmd *cobra.Command, args []string) error {
-	client := GetKernelClient(cmd)
-	skipConfirm, _ := cmd.Flags().GetBool("yes")
+func runProxiesDelete(command *cobra.Command, args []string) error {
+	client := command.Context().Value("kernel_client").(kernel.Client)
+	skipConfirm, _ := command.Flags().GetBool("yes")
 
 	svc := client.Proxies
 	p := ProxyCmd{proxies: &svc}
-	return p.Delete(cmd.Context(), ProxyDeleteInput{
+	return p.Delete(command.Context(), ProxyDeleteInput{
 		ID:          args[0],
 		SkipConfirm: skipConfirm,
 	})
