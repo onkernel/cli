@@ -11,6 +11,7 @@ import (
 	"github.com/onkernel/cli/cmd/proxies"
 	"github.com/onkernel/cli/pkg/auth"
 	"github.com/onkernel/cli/pkg/update"
+	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/onkernel/kernel-go-sdk/option"
 	"github.com/pterm/pterm"
@@ -66,14 +67,8 @@ func logLevelToPterm(level string) pterm.LogLevel {
 	}
 }
 
-// ContextKey is the type for context keys
-type ContextKey string
-
-// KernelClientKey is the context key for the kernel client
-const KernelClientKey ContextKey = "kernel_client"
-
 func getKernelClient(cmd *cobra.Command) kernel.Client {
-	return cmd.Context().Value(KernelClientKey).(kernel.Client)
+	return util.GetKernelClient(cmd)
 }
 
 // isAuthExempt returns true if the command or any of its parents should skip auth.
@@ -119,7 +114,7 @@ func init() {
 			return fmt.Errorf("authentication required: %w", err)
 		}
 
-		ctx := context.WithValue(cmd.Context(), KernelClientKey, *client)
+		ctx := context.WithValue(cmd.Context(), util.KernelClientKey, *client)
 		cmd.SetContext(ctx)
 		return nil
 	}

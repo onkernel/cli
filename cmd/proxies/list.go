@@ -94,9 +94,9 @@ func formatProxyConfig(proxy *kernel.ProxyListResponse) string {
 	return "-"
 }
 
-func runProxiesList(command *cobra.Command, args []string) error {
-	client := command.Context().Value("kernel_client").(kernel.Client)
+func runProxiesList(cmd *cobra.Command, args []string) error {
+	client := util.GetKernelClient(cmd)
 	svc := client.Proxies
 	p := ProxyCmd{proxies: &svc}
-	return p.List(command.Context())
+	return p.List(cmd.Context())
 }

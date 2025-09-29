@@ -102,9 +102,9 @@ func getProxyConfigRows(proxy *kernel.ProxyGetResponse) [][]string {
 	return rows
 }
 
-func runProxiesGet(command *cobra.Command, args []string) error {
-	client := command.Context().Value("kernel_client").(kernel.Client)
+func runProxiesGet(cmd *cobra.Command, args []string) error {
+	client := util.GetKernelClient(cmd)
 	svc := client.Proxies
 	p := ProxyCmd{proxies: &svc}
-	return p.Get(command.Context(), ProxyGetInput{ID: args[0]})
+	return p.Get(cmd.Context(), ProxyGetInput{ID: args[0]})
 }
