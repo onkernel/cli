@@ -1,7 +1,13 @@
 package cmd
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"net/textproto"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,6 +42,14 @@ var deployCmd = &cobra.Command{
 	RunE:  runDeploy,
 }
 
+// deployGithubCmd deploys directly from a GitHub repository via the SDK Source flow
+var deployGithubCmd = &cobra.Command{
+	Use:   "github",
+	Short: "Deploy from a GitHub repository",
+	Args:  cobra.NoArgs,
+	RunE:  runDeployGithub,
+}
+
 func init() {
 	deployCmd.Flags().String("version", "latest", "Specify a version for the app (default: latest)")
 	deployCmd.Flags().Bool("force", false, "Allow overwrite of an existing version with the same name")
@@ -50,6 +64,172 @@ func init() {
 
 	deployHistoryCmd.Flags().Int("limit", 100, "Max deployments to return (default 100)")
 	deployCmd.AddCommand(deployHistoryCmd)
+
+	// Flags for GitHub deploy
+	deployGithubCmd.Flags().String("url", "", "GitHub repository URL (e.g., https://github.com/org/repo)")
+	deployGithubCmd.Flags().String("ref", "", "Git ref to deploy (branch, tag, or commit SHA)")
+	deployGithubCmd.Flags().String("entrypoint", "", "Entrypoint within the repo/path (e.g., src/index.ts)")
+	deployGithubCmd.Flags().String("path", "", "Optional subdirectory within the repo (e.g., apps/api)")
+	_ = deployGithubCmd.MarkFlagRequired("url")
+	_ = deployGithubCmd.MarkFlagRequired("ref")
+	_ = deployGithubCmd.MarkFlagRequired("entrypoint")
+	deployCmd.AddCommand(deployGithubCmd)
+}
+
+func runDeployGithub(cmd *cobra.Command, args []string) error {
+	client := getKernelClient(cmd)
+
+	repoURL, _ := cmd.Flags().GetString("url")
+	ref, _ := cmd.Flags().GetString("ref")
+	entrypoint, _ := cmd.Flags().GetString("entrypoint")
+	subpath, _ := cmd.Flags().GetString("path")
+
+	version, _ := cmd.Flags().GetString("version")
+	force, _ := cmd.Flags().GetBool("force")
+
+	// Collect env vars similar to runDeploy
+	envPairs, _ := cmd.Flags().GetStringArray("env")
+	envFiles, _ := cmd.Flags().GetStringArray("env-file")
+
+	envVars := make(map[string]string)
+	// Load from files first
+	for _, envFile := range envFiles {
+		fileVars, err := godotenv.Read(envFile)
+		if err != nil {
+			return fmt.Errorf("failed to read env file %s: %w", envFile, err)
+		}
+		for k, v := range fileVars {
+			envVars[k] = v
+		}
+	}
+	// Override with --env
+	for _, kv := range envPairs {
+		parts := strings.SplitN(kv, "=", 2)
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid env variable format: %s (expected KEY=value)", kv)
+		}
+		envVars[parts[0]] = parts[1]
+	}
+
+	// Build the multipart request body directly for source-based deploy
+
+	pterm.Info.Println("Deploying from GitHub source...")
+	startTime := time.Now()
+
+	// Manually POST multipart with a JSON 'source' field to match backend expectations
+	apiKey := os.Getenv("KERNEL_API_KEY")
+	if strings.TrimSpace(apiKey) == "" {
+		return fmt.Errorf("KERNEL_API_KEY is required for github deploy")
+	}
+	baseURL := os.Getenv("KERNEL_BASE_URL")
+	if strings.TrimSpace(baseURL) == "" {
+		baseURL = "https://api.onkernel.com"
+	}
+
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	// regular fields
+	_ = mw.WriteField("version", version)
+	_ = mw.WriteField("region", "aws.us-east-1a")
+	if force {
+		_ = mw.WriteField("force", "true")
+	} else {
+		_ = mw.WriteField("force", "false")
+	}
+	// env vars as env_vars[KEY]
+	for k, v := range envVars {
+		_ = mw.WriteField(fmt.Sprintf("env_vars[%s]", k), v)
+	}
+	// source as application/json part
+	sourcePayload := map[string]any{
+		"type":       "github",
+		"url":        repoURL,
+		"ref":        ref,
+		"entrypoint": entrypoint,
+	}
+	if strings.TrimSpace(subpath) != "" {
+		sourcePayload["path"] = subpath
+	}
+	srcJSON, _ := json.Marshal(sourcePayload)
+	hdr := textproto.MIMEHeader{}
+	hdr.Set("Content-Disposition", "form-data; name=\"source\"")
+	hdr.Set("Content-Type", "application/json")
+	part, _ := mw.CreatePart(hdr)
+	_, _ = part.Write(srcJSON)
+	_ = mw.Close()
+
+	reqHTTP, _ := http.NewRequestWithContext(cmd.Context(), http.MethodPost, strings.TrimRight(baseURL, "/")+"/deployments", &body)
+	reqHTTP.Header.Set("Authorization", "Bearer "+apiKey)
+	reqHTTP.Header.Set("Content-Type", mw.FormDataContentType())
+	httpResp, err := http.DefaultClient.Do(reqHTTP)
+	if err != nil {
+		return fmt.Errorf("post deployments: %w", err)
+	}
+	defer httpResp.Body.Close()
+	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
+		b, _ := io.ReadAll(httpResp.Body)
+		return fmt.Errorf("deployments POST failed: %s: %s", httpResp.Status, strings.TrimSpace(string(b)))
+	}
+	var depCreated struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(httpResp.Body).Decode(&depCreated); err != nil {
+		return fmt.Errorf("decode deployment response: %w", err)
+	}
+
+	// Follow deployment events via SSE using the same base URL and API key
+	stream := client.Deployments.FollowStreaming(
+		cmd.Context(),
+		depCreated.ID,
+		kernel.DeploymentFollowParams{},
+		option.WithBaseURL(baseURL),
+		option.WithHeader("Authorization", "Bearer "+apiKey),
+		option.WithMaxRetries(0),
+	)
+	for stream.Next() {
+		data := stream.Current()
+		switch data.Event {
+		case "log":
+			logEv := data.AsLog()
+			msg := strings.TrimSuffix(logEv.Message, "\n")
+			pterm.Info.Println(pterm.Gray(msg))
+		case "deployment_state":
+			deploymentState := data.AsDeploymentState()
+			status := deploymentState.Deployment.Status
+			if status == string(kernel.DeploymentGetResponseStatusFailed) ||
+				status == string(kernel.DeploymentGetResponseStatusStopped) {
+				pterm.Error.Println("✖ Deployment failed")
+				pterm.Error.Printf("Deployment ID: %s\n", depCreated.ID)
+				pterm.Info.Printf("View logs: kernel deploy logs %s --since 1h\n", depCreated.ID)
+				return fmt.Errorf("deployment %s: %s", status, deploymentState.Deployment.StatusReason)
+			}
+			if status == string(kernel.DeploymentGetResponseStatusRunning) {
+				duration := time.Since(startTime)
+				pterm.Success.Printfln("✔ Deployment complete in %s", duration.Round(time.Millisecond))
+				return nil
+			}
+		case "app_version_summary":
+			appVersionSummary := data.AsDeploymentFollowResponseAppVersionSummaryEvent()
+			pterm.Info.Printf("App \"%s\" deployed (version: %s)\n", appVersionSummary.AppName, appVersionSummary.Version)
+			if len(appVersionSummary.Actions) > 0 {
+				action0Name := appVersionSummary.Actions[0].Name
+				pterm.Info.Printf("Invoke with: kernel invoke %s %s --payload '{...}'\n", quoteIfNeeded(appVersionSummary.AppName), quoteIfNeeded(action0Name))
+			}
+		case "error":
+			errorEv := data.AsErrorEvent()
+			pterm.Error.Printf("Deployment ID: %s\n", depCreated.ID)
+			pterm.Info.Printf("View logs: kernel deploy logs %s --since 1h\n", depCreated.ID)
+			return fmt.Errorf("%s: %s", errorEv.Error.Code, errorEv.Error.Message)
+		}
+	}
+
+	if serr := stream.Err(); serr != nil {
+		pterm.Error.Println("✖ Stream error")
+		pterm.Error.Printf("Deployment ID: %s\n", depCreated.ID)
+		pterm.Info.Printf("View logs: kernel deploy logs %s --since 1h\n", depCreated.ID)
+		return fmt.Errorf("stream error: %w", serr)
+	}
+	return nil
 }
 
 func runDeploy(cmd *cobra.Command, args []string) (err error) {
@@ -120,7 +300,7 @@ func runDeploy(cmd *cobra.Command, args []string) (err error) {
 		File:              file,
 		Version:           kernel.Opt(version),
 		Force:             kernel.Opt(force),
-		EntrypointRelPath: filepath.Base(resolvedEntrypoint),
+		EntrypointRelPath: kernel.Opt(filepath.Base(resolvedEntrypoint)),
 		EnvVars:           envVars,
 	}, option.WithMaxRetries(0))
 	if err != nil {
