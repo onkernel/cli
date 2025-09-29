@@ -65,12 +65,8 @@ func logLevelToPterm(level string) pterm.LogLevel {
 	}
 }
 
-type contextKey string
-
-const KernelClientKey contextKey = "kernel_client"
-
 func getKernelClient(cmd *cobra.Command) kernel.Client {
-	return cmd.Context().Value(KernelClientKey).(kernel.Client)
+	return cmd.Context().Value("kernel_client").(kernel.Client)
 }
 
 // isAuthExempt returns true if the command or any of its parents should skip auth.
@@ -116,7 +112,7 @@ func init() {
 			return fmt.Errorf("authentication required: %w", err)
 		}
 
-		ctx := context.WithValue(cmd.Context(), KernelClientKey, *client)
+		ctx := context.WithValue(cmd.Context(), "kernel_client", *client)
 		cmd.SetContext(ctx)
 		return nil
 	}

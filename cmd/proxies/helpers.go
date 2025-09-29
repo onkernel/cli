@@ -6,13 +6,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type contextKey string
-
-const KernelClientKey contextKey = "kernel_client"
-
 // GetKernelClient retrieves the kernel client from the command context
 func GetKernelClient(cmd *cobra.Command) kernel.Client {
-	return cmd.Context().Value(KernelClientKey).(kernel.Client)
+	// Use the raw string key to match what cmd package uses
+	// This avoids type mismatch between different contextKey types
+	return cmd.Context().Value("kernel_client").(kernel.Client)
 }
 
 // PrintTableNoPad prints a table without padding (delegating to cmd package)
