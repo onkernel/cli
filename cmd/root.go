@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/charmbracelet/fang"
+	"github.com/onkernel/cli/cmd/proxies"
 	"github.com/onkernel/cli/pkg/auth"
 	"github.com/onkernel/cli/pkg/update"
+	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/onkernel/kernel-go-sdk/option"
 	"github.com/pterm/pterm"
@@ -65,12 +67,8 @@ func logLevelToPterm(level string) pterm.LogLevel {
 	}
 }
 
-type contextKey string
-
-const KernelClientKey contextKey = "kernel_client"
-
 func getKernelClient(cmd *cobra.Command) kernel.Client {
-	return cmd.Context().Value(KernelClientKey).(kernel.Client)
+	return util.GetKernelClient(cmd)
 }
 
 // isAuthExempt returns true if the command or any of its parents should skip auth.
@@ -116,7 +114,7 @@ func init() {
 			return fmt.Errorf("authentication required: %w", err)
 		}
 
-		ctx := context.WithValue(cmd.Context(), KernelClientKey, *client)
+		ctx := context.WithValue(cmd.Context(), util.KernelClientKey, *client)
 		cmd.SetContext(ctx)
 		return nil
 	}
@@ -127,6 +125,7 @@ func init() {
 	rootCmd.AddCommand(browsersCmd)
 	rootCmd.AddCommand(appCmd)
 	rootCmd.AddCommand(profilesCmd)
+	rootCmd.AddCommand(proxies.ProxiesCmd)
 
 	rootCmd.PersistentPostRunE = func(cmd *cobra.Command, args []string) error {
 		// running synchronously so we never slow the command
