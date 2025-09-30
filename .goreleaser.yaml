@@ -43,7 +43,7 @@ npms:
     repository: "https://github.com/onkernel"
     bugs: https://github.com/onkernel/cli/issues
     description: Kernel CLI
-    homepage: https://docs.onkernel.com
+    homepage: https://onkernel.com/docs
     license: MIT
     author: "Rafael Garcia <raf@onkernel.com>"
     access: public
@@ -89,7 +89,7 @@ release:
 
     ## What to do next?
 
-    - Read the [documentation](https://docs.onkernel.com)
+    - Read the [documentation](https://onkernel.com/docs)
     - Join our [Discord server](https://discord.gg/FBrveQRcud)
     - Follow us on Twitter [here](https://twitter.com/rfgarcia) and [here](https://x.com/juecd__)
 

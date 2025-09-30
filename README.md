@@ -13,7 +13,7 @@
 
 The Kernel CLI is a fast, friendly command‑line interface for Kernel — the platform that provides sandboxed, ready‑to‑use Chrome browsers for browser automations and web agents.
 
-Sign up at [onkernel.com](https://www.onkernel.com/) and read the [docs](https://docs.onkernel.com/introduction).
+Sign up at [onkernel.com](https://www.onkernel.com/) and read the [docs](https://onkernel.com/docs/introduction).
 
 ## What's Kernel?
 
@@ -318,15 +318,15 @@ kernel browsers fs list-files my-browser --path "/tmp"
 
 For complete documentation, visit:
 
-- [📖 Documentation](https://docs.onkernel.com)
-- [🚀 Quickstart Guide](https://docs.onkernel.com/quickstart)
-- [📋 CLI Reference](https://docs.onkernel.com/reference/cli)
+- [📖 Documentation](https://onkernel.com/docs)
+- [🚀 Quickstart Guide](https://onkernel.com/docs/quickstart)
+- [📋 CLI Reference](https://onkernel.com/docs/reference/cli)
 
 ## Support
 
 - [Discord Community](https://discord.gg/kernel)
 - [GitHub Issues](https://github.com/onkernel/kernel/issues)
-- [Documentation](https://docs.onkernel.com)
+- [Documentation](https://onkernel.com/docs)
 
 ---
 

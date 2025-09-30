@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/onkernel/kernel-go-sdk/option"
 	"github.com/pterm/pterm"
@@ -21,17 +22,31 @@ import (
 var invokeCmd = &cobra.Command{
 	Use:   "invoke <app_name> <action_name> [flags]",
 	Short: "Invoke a deployed Kernel application",
-	Args:  cobra.ExactArgs(2),
 	RunE:  runInvoke,
+}
+
+var invocationHistoryCmd = &cobra.Command{
+	Use:   "history",
+	Short: "Show invocation history",
+	Args:  cobra.NoArgs,
+	RunE:  runInvocationHistory,
 }
 
 func init() {
 	invokeCmd.Flags().StringP("version", "v", "latest", "Specify a version of the app to invoke (optional, defaults to 'latest')")
 	invokeCmd.Flags().StringP("payload", "p", "", "JSON payload for the invocation (optional)")
 	invokeCmd.Flags().BoolP("sync", "s", false, "Invoke synchronously (default false). A synchronous invocation will open a long-lived HTTP POST to the Kernel API to wait for the invocation to complete. This will time out after 60 seconds, so only use this option if you expect your invocation to complete in less than 60 seconds. The default is to invoke asynchronously, in which case the CLI will open an SSE connection to the Kernel API after submitting the invocation and wait for the invocation to complete.")
+
+	invocationHistoryCmd.Flags().Int("limit", 100, "Max invocations to return (default 100)")
+	invocationHistoryCmd.Flags().StringP("app", "a", "", "Filter by app name")
+	invocationHistoryCmd.Flags().String("version", "", "Filter by invocation version")
+	invokeCmd.AddCommand(invocationHistoryCmd)
 }
 
 func runInvoke(cmd *cobra.Command, args []string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("requires exactly 2 arguments: <app_name> <action_name>")
+	}
 	startTime := time.Now()
 	client := getKernelClient(cmd)
 	appName := args[0]
@@ -70,6 +85,8 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return handleSdkError(err)
 	}
+	// Log the invocation ID for user reference
+	pterm.Info.Printfln("Invocation ID: %s", resp.ID)
 	// coordinate the cleanup with the polling loop to ensure this is given enough time to run
 	// before this function returns
 	cleanupDone := make(chan struct{})
@@ -92,14 +109,24 @@ func runInvoke(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// this is a little indirect but we try to fail out of the invocation by deleting the
-	// underlying browser sessions
+	// On cancel, mark the invocation as failed via the update endpoint
 	once := sync.Once{}
 	onCancel(cmd.Context(), func() {
 		once.Do(func() {
 			cleanupStarted.Store(true)
 			defer close(cleanupDone)
 			pterm.Warning.Println("Invocation cancelled...cleaning up...")
+			if _, err := client.Invocations.Update(
+				context.Background(),
+				resp.ID,
+				kernel.InvocationUpdateParams{
+					Status: kernel.InvocationUpdateParamsStatusFailed,
+					Output: kernel.Opt(`{"error":"Invocation cancelled by user"}`),
+				},
+				option.WithRequestTimeout(30*time.Second),
+			); err != nil {
+				pterm.Error.Printf("Failed to mark invocation as failed: %v\n", err)
+			}
 			if err := client.Invocations.DeleteBrowsers(context.Background(), resp.ID, option.WithRequestTimeout(30*time.Second)); err != nil {
 				pterm.Error.Printf("Failed to cancel invocation: %v\n", err)
 			}
@@ -176,4 +203,91 @@ func printResult(success bool, output string) {
 	} else {
 		pterm.Error.Printf("Result:\n%s\n", output)
 	}
+}
+
+func runInvocationHistory(cmd *cobra.Command, args []string) error {
+	client := getKernelClient(cmd)
+
+	lim, _ := cmd.Flags().GetInt("limit")
+	appFilter, _ := cmd.Flags().GetString("app")
+	versionFilter, _ := cmd.Flags().GetString("version")
+
+	// Build parameters for the API call
+	params := kernel.InvocationListParams{
+		Limit: kernel.Opt(int64(lim)),
+	}
+
+	// Only add app filter if specified
+	if appFilter != "" {
+		params.AppName = kernel.Opt(appFilter)
+	}
+
+	// Only add version filter if specified
+	if versionFilter != "" {
+		params.Version = kernel.Opt(versionFilter)
+	}
+
+	// Build debug message based on filters
+	if appFilter != "" && versionFilter != "" {
+		pterm.Debug.Printf("Listing invocations for app '%s' version '%s'...\n", appFilter, versionFilter)
+	} else if appFilter != "" {
+		pterm.Debug.Printf("Listing invocations for app '%s'...\n", appFilter)
+	} else if versionFilter != "" {
+		pterm.Debug.Printf("Listing invocations for version '%s'...\n", versionFilter)
+	} else {
+		pterm.Debug.Printf("Listing all invocations...\n")
+	}
+
+	// Make a single API call to get invocations
+	invocations, err := client.Invocations.List(cmd.Context(), params)
+	if err != nil {
+		pterm.Error.Printf("Failed to list invocations: %v\n", err)
+		return nil
+	}
+
+	table := pterm.TableData{{"Invocation ID", "App Name", "Action", "Version", "Status", "Started At", "Duration", "Output"}}
+
+	for _, inv := range invocations.Items {
+		started := util.FormatLocal(inv.StartedAt)
+		status := string(inv.Status)
+
+		// Calculate duration
+		var duration string
+		if !inv.FinishedAt.IsZero() {
+			dur := inv.FinishedAt.Sub(inv.StartedAt)
+			duration = dur.Round(time.Millisecond).String()
+		} else if status == "running" {
+			dur := time.Since(inv.StartedAt)
+			duration = dur.Round(time.Second).String() + " (running)"
+		} else {
+			duration = "-"
+		}
+
+		// Truncate output for display
+		output := inv.Output
+		if len(output) > 50 {
+			output = output[:47] + "..."
+		}
+		if output == "" {
+			output = "-"
+		}
+
+		table = append(table, []string{
+			inv.ID,
+			inv.AppName,
+			inv.ActionName,
+			inv.Version,
+			status,
+			started,
+			duration,
+			output,
+		})
+	}
+
+	if len(table) == 1 {
+		pterm.Info.Println("No invocations found.")
+	} else {
+		pterm.DefaultTable.WithHasHeader().WithData(table).Render()
+	}
+	return nil
 }
