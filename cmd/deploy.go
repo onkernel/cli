@@ -70,6 +70,7 @@ func init() {
 	deployGithubCmd.Flags().String("ref", "", "Git ref to deploy (branch, tag, or commit SHA)")
 	deployGithubCmd.Flags().String("entrypoint", "", "Entrypoint within the repo/path (e.g., src/index.ts)")
 	deployGithubCmd.Flags().String("path", "", "Optional subdirectory within the repo (e.g., apps/api)")
+	deployGithubCmd.Flags().String("github-token", "", "GitHub token for private repositories (PAT or installation access token)")
 	_ = deployGithubCmd.MarkFlagRequired("url")
 	_ = deployGithubCmd.MarkFlagRequired("ref")
 	_ = deployGithubCmd.MarkFlagRequired("entrypoint")
@@ -83,6 +84,7 @@ func runDeployGithub(cmd *cobra.Command, args []string) error {
 	ref, _ := cmd.Flags().GetString("ref")
 	entrypoint, _ := cmd.Flags().GetString("entrypoint")
 	subpath, _ := cmd.Flags().GetString("path")
+	ghToken, _ := cmd.Flags().GetString("github-token")
 
 	version, _ := cmd.Flags().GetString("version")
 	force, _ := cmd.Flags().GetBool("force")
@@ -149,6 +151,13 @@ func runDeployGithub(cmd *cobra.Command, args []string) error {
 	}
 	if strings.TrimSpace(subpath) != "" {
 		sourcePayload["path"] = subpath
+	}
+	if strings.TrimSpace(ghToken) != "" {
+		// Add auth only when token is provided to support private repositories
+		sourcePayload["auth"] = map[string]any{
+			"method": "github_token",
+			"token":  ghToken,
+		}
 	}
 	srcJSON, _ := json.Marshal(sourcePayload)
 	hdr := textproto.MIMEHeader{}
