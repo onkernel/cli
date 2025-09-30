@@ -12,12 +12,12 @@ fi
 
 # Ensure the user's git configuration rewrites GitHub HTTPS URLs to SSH. This is
 # required to clone private repositories via SSH without using a Github PAT.
-# if ! git config --global --get-all url."git@github.com:".insteadOf | grep -q "https://github.com/"; then
-#   echo "Your git configuration is missing the rewrite from HTTPS to SSH for GitHub repositories." >&2
-#   echo "Run the following command and try again:" >&2
-#   echo "  git config --global url.\"git@github.com:\".insteadOf \"https://github.com/\"" >&2
-#   exit 1
-# fi
+if ! git config --global --get-all url."git@github.com:".insteadOf | grep -q "https://github.com/"; then
+  echo "Your git configuration is missing the rewrite from HTTPS to SSH for GitHub repositories." >&2
+  echo "Run the following command and try again:" >&2
+  echo "  git config --global url.\"git@github.com:\".insteadOf \"https://github.com/\"" >&2
+  exit 1
+fi
 
 # Ensure exactly one ref (commit hash or branch name) is provided
 if [ "$#" -ne 1 ]; then
