@@ -90,6 +90,7 @@ type BrowsersCreateInput struct {
 	ProfileID          string
 	ProfileName        string
 	ProfileSaveChanges BoolFlag
+	ProxyID            string
 	Extensions         []string
 }
 
@@ -205,6 +206,11 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 		} else if in.ProfileName != "" {
 			params.Profile.Name = kernel.Opt(in.ProfileName)
 		}
+	}
+
+	// Add proxy if specified
+	if in.ProxyID != "" {
+		params.ProxyID = kernel.Opt(in.ProxyID)
 	}
 
 	// Map extensions (IDs or names) into params.Extensions
@@ -1474,6 +1480,7 @@ func init() {
 	browsersCreateCmd.Flags().String("profile-id", "", "Profile ID to load into the browser session (mutually exclusive with --profile-name)")
 	browsersCreateCmd.Flags().String("profile-name", "", "Profile name to load into the browser session (mutually exclusive with --profile-id)")
 	browsersCreateCmd.Flags().Bool("save-changes", false, "If set, save changes back to the profile when the session ends")
+	browsersCreateCmd.Flags().String("proxy-id", "", "Proxy ID to use for the browser session")
 	browsersCreateCmd.Flags().StringSlice("extension", []string{}, "Extension IDs or names to load (repeatable; may be passed multiple times or comma-separated)")
 
 	// Add flags for delete command
@@ -1501,6 +1508,7 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 	profileID, _ := cmd.Flags().GetString("profile-id")
 	profileName, _ := cmd.Flags().GetString("profile-name")
 	saveChanges, _ := cmd.Flags().GetBool("save-changes")
+	proxyID, _ := cmd.Flags().GetString("proxy-id")
 	extensions, _ := cmd.Flags().GetStringSlice("extension")
 
 	in := BrowsersCreateInput{
@@ -1511,6 +1519,7 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 		ProfileID:          profileID,
 		ProfileName:        profileName,
 		ProfileSaveChanges: BoolFlag{Set: cmd.Flags().Changed("save-changes"), Value: saveChanges},
+		ProxyID:            proxyID,
 		Extensions:         extensions,
 	}
 
