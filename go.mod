@@ -59,4 +59,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/onkernel/kernel-go-sdk => github.com/stainless-sdks/kernel-go v0.0.0-20250929191717-4fa8c7612d56
+replace github.com/onkernel/kernel-go-sdk => github.com/stainless-sdks/kernel-go v0.0.0-20250930185317-f1e3beca6b4c

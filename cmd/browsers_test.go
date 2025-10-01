@@ -97,7 +97,7 @@ func TestBrowsersList_PrintsEmptyMessage(t *testing.T) {
 		},
 	}
 	b := BrowsersCmd{browsers: fake}
-	_ = b.List(context.Background())
+	_ = b.List(context.Background(), BrowsersListInput{})
 
 	out := outBuf.String()
 	assert.Contains(t, out, "No running or persistent browsers found")
@@ -130,7 +130,7 @@ func TestBrowsersList_PrintsTableWithRows(t *testing.T) {
 		},
 	}
 	b := BrowsersCmd{browsers: fake}
-	_ = b.List(context.Background())
+	_ = b.List(context.Background(), BrowsersListInput{})
 
 	out := outBuf.String()
 	assert.Contains(t, out, "sess-1")
@@ -147,7 +147,7 @@ func TestBrowsersList_PrintsErrorOnFailure(t *testing.T) {
 		},
 	}
 	b := BrowsersCmd{browsers: fake}
-	err := b.List(context.Background())
+	err := b.List(context.Background(), BrowsersListInput{})
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "list failed")
