@@ -26,7 +26,7 @@ func (p ProxyCmd) List(ctx context.Context) error {
 
 	// Prepare table data
 	tableData := pterm.TableData{
-		{"ID", "Name", "Type", "Config"},
+		{"ID", "Name", "Type", "Config", "Status", "Last Checked"},
 	}
 
 	for _, proxy := range *items {
@@ -38,11 +38,26 @@ func (p ProxyCmd) List(ctx context.Context) error {
 		// Format config based on type
 		configStr := formatProxyConfig(&proxy)
 
+		// Format status with color
+		status := string(proxy.Status)
+		if status == "" {
+			status = "-"
+		} else if status == "available" {
+			status = pterm.Green(status)
+		} else if status == "unavailable" {
+			status = pterm.Red(status)
+		}
+
+		// Format last checked timestamp
+		lastChecked := util.FormatLocal(proxy.LastChecked)
+
 		tableData = append(tableData, []string{
 			proxy.ID,
 			name,
 			string(proxy.Type),
 			configStr,
+			status,
+			lastChecked,
 		})
 	}
 
