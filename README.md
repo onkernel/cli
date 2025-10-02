@@ -106,12 +106,14 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 ### App Deployment
 
 - `kernel deploy <file>` - Deploy an app to Kernel
+
   - `--version <version>` - Specify app version (default: latest)
   - `--force` - Allow overwriting existing version
   - `--env <KEY=VALUE>`, `-e` - Set environment variables (can be used multiple times)
   - `--env-file <file>` - Load environment variables from file (can be used multiple times)
 
 - `kernel deploy logs <deployment_id>` - Stream logs for a deployment
+
   - `--follow`, `-f` - Follow logs in real-time (stream continuously)
   - `--since`, `-s` - How far back to retrieve logs. Duration formats: ns, us, ms, s, m, h (e.g., 5m, 2h, 1h30m). Timestamps also supported: 2006-01-02, 2006-01-02T15:04, 2006-01-02T15:04:05, 2006-01-02T15:04:05.000
   - `--with-timestamps`, `-t` - Include timestamps in each log line
@@ -234,6 +236,23 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
   - `--mode <mode>` - File mode (octal string)
   - `--source <path>` - Local source file path (required)
 
+### Browser Extensions
+
+- `kernel browsers extensions upload <id or persistent id> <extension-path>...` - Ad-hoc upload of one or more unpacked extensions to a running browser instance.
+
+### Extension Management
+
+- `kernel extensions list` - List all uploaded extensions
+- `kernel extensions upload <directory>` - Upload an unpacked browser extension directory
+  - `--name <name>` - Optional unique extension name
+- `kernel extensions download <id-or-name>` - Download an extension archive
+  - `--to <directory>` - Output directory (required)
+- `kernel extensions download-web-store <url>` - Download an extension from the Chrome Web Store
+  - `--to <directory>` - Output directory (required)
+  - `--os <os>` - Target OS: mac, win, or linux (default: linux)
+- `kernel extensions delete <id-or-name>` - Delete an extension by ID or name
+  - `-y, --yes` - Skip confirmation prompt
+
 ## Examples
 
 ### Deploy with environment variables
@@ -307,6 +326,28 @@ kernel browsers fs upload my-browser --file "local.txt:remote.txt" --dest-dir "/
 
 # List files in a directory
 kernel browsers fs list-files my-browser --path "/tmp"
+```
+
+### Extension management
+
+```bash
+# List all uploaded extensions
+kernel extensions list
+
+# Upload an unpacked extension directory
+kernel extensions upload ./my-extension --name my-custom-extension
+
+# Download an extension from Chrome Web Store
+kernel extensions download-web-store "https://chrome.google.com/webstore/detail/extension-id" --to ./downloaded-extension
+
+# Download a previously uploaded extension
+kernel extensions download my-extension-id --to ./my-extension
+
+# Delete an extension
+kernel extensions delete my-extension-name --yes
+
+# Upload extensions to a running browser instance
+kernel browsers extensions upload my-browser ./extension1 ./extension2
 ```
 
 ## Getting Help
