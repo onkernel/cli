@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/onkernel/cli/pkg/table"
 	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/pterm/pterm"
@@ -68,7 +69,7 @@ func (p ProxyCmd) List(ctx context.Context) error {
 		})
 	}
 
-	PrintTableNoPad(tableData, true)
+	table.PrintTableNoPad(tableData, true)
 	return nil
 }
 

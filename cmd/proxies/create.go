@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onkernel/cli/pkg/table"
 	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/pterm/pterm"
@@ -188,7 +189,7 @@ func (p ProxyCmd) Create(ctx context.Context, in ProxyCreateInput) error {
 	}
 	rows = append(rows, []string{"Protocol", protocol})
 
-	PrintTableNoPad(rows, true)
+	table.PrintTableNoPad(rows, true)
 	return nil
 }
 

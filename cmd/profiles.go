@@ -73,7 +73,7 @@ func (p ProfilesCmd) List(ctx context.Context) error {
 			util.FormatLocal(prof.LastUsedAt),
 		})
 	}
-	printTableNoPad(rows, true)
+	PrintTableNoPad(rows, true)
 	return nil
 }
 
@@ -96,7 +96,7 @@ func (p ProfilesCmd) Get(ctx context.Context, in ProfilesGetInput) error {
 	rows = append(rows, []string{"Created At", util.FormatLocal(item.CreatedAt)})
 	rows = append(rows, []string{"Updated At", util.FormatLocal(item.UpdatedAt)})
 	rows = append(rows, []string{"Last Used At", util.FormatLocal(item.LastUsedAt)})
-	printTableNoPad(rows, true)
+	PrintTableNoPad(rows, true)
 	return nil
 }
 
@@ -118,7 +118,7 @@ func (p ProfilesCmd) Create(ctx context.Context, in ProfilesCreateInput) error {
 	rows = append(rows, []string{"Name", name})
 	rows = append(rows, []string{"Created At", util.FormatLocal(item.CreatedAt)})
 	rows = append(rows, []string{"Last Used At", util.FormatLocal(item.LastUsedAt)})
-	printTableNoPad(rows, true)
+	PrintTableNoPad(rows, true)
 	return nil
 }
 
