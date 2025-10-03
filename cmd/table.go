@@ -141,12 +141,15 @@ func truncateTableData(data pterm.TableData, termWidth int) pterm.TableData {
 	}
 
 	// Calculate natural widths (what each column would want)
+	// Strip color codes to measure visible characters only
 	naturalWidths := make([]int, numCols)
 	for colIdx := 0; colIdx < numCols; colIdx++ {
 		maxWidth := 0
 		for _, row := range data {
 			if colIdx < len(row) {
-				cellWidth := utf8.RuneCountInString(row[colIdx])
+				// Strip ANSI color codes to get visible character count
+				visibleText := pterm.RemoveColorFromString(row[colIdx])
+				cellWidth := utf8.RuneCountInString(visibleText)
 				if cellWidth > maxWidth {
 					maxWidth = cellWidth
 				}
@@ -177,8 +180,9 @@ func truncateTableData(data pterm.TableData, termWidth int) pterm.TableData {
 	return result
 }
 
-// distributeColumnWidths calculates optimal width for each column
-// The first column (typically ID) is always given its full natural width and never truncated
+// distributeColumnWidths calculates optimal width for each column using a two-pass strategy:
+// Pass 1: ID and short columns get their full natural width
+// Pass 2: Long columns share the remaining space
 func distributeColumnWidths(naturalWidths, minWidths []int, availableWidth int) []int {
 	numCols := len(naturalWidths)
 	result := make([]int, numCols)
@@ -197,55 +201,66 @@ func distributeColumnWidths(naturalWidths, minWidths []int, availableWidth int) 
 		return result
 	}
 
-	// Priority: Always give the first column its full natural width
-	if numCols > 0 {
-		result[0] = naturalWidths[0]
-		availableWidth -= naturalWidths[0]
+	// Define threshold for "short" columns (these get priority)
+	const shortColumnThreshold = 15
+
+	// Pass 1: Give ID (index 0) and short columns their full natural width
+	remainingWidth := availableWidth
+	longColumnIndices := []int{}
+
+	for i := 0; i < numCols; i++ {
+		if i == 0 || naturalWidths[i] <= shortColumnThreshold {
+			// Short column or ID - give full natural width
+			result[i] = naturalWidths[i]
+			remainingWidth -= naturalWidths[i]
+		} else {
+			// Long column - defer to pass 2
+			longColumnIndices = append(longColumnIndices, i)
+		}
 	}
 
-	// Now distribute remaining width among other columns (excluding first)
-	if numCols <= 1 {
+	// Pass 2: Distribute remaining space among long columns
+	if len(longColumnIndices) == 0 {
 		return result
 	}
 
-	// Calculate needs for non-first columns
-	otherCols := numCols - 1
-	totalMinForOthers := 0
-	totalNaturalForOthers := 0
-	for i := 1; i < numCols; i++ {
-		totalMinForOthers += minWidths[i]
-		totalNaturalForOthers += naturalWidths[i]
+	// Calculate how much long columns want
+	totalLongNatural := 0
+	totalLongMin := 0
+	for _, idx := range longColumnIndices {
+		totalLongNatural += naturalWidths[idx]
+		totalLongMin += minWidths[idx]
 	}
 
-	if totalNaturalForOthers <= availableWidth {
-		// Other columns fit naturally
-		for i := 1; i < numCols; i++ {
-			result[i] = naturalWidths[i]
+	if totalLongNatural <= remainingWidth {
+		// Long columns fit naturally
+		for _, idx := range longColumnIndices {
+			result[idx] = naturalWidths[idx]
 		}
 		return result
 	}
 
-	if totalMinForOthers > availableWidth {
-		// Even minimums don't fit for other columns, distribute equally
-		for i := 1; i < numCols; i++ {
-			result[i] = availableWidth / otherCols
-			if result[i] < 5 {
-				result[i] = 5 // absolute minimum
+	if totalLongMin > remainingWidth {
+		// Even minimums don't fit, distribute equally
+		for _, idx := range longColumnIndices {
+			result[idx] = remainingWidth / len(longColumnIndices)
+			if result[idx] < 5 {
+				result[idx] = 5 // absolute minimum
 			}
 		}
 		return result
 	}
 
-	// Give other columns minimum, then distribute remainder proportionally
-	remainingWidth := availableWidth - totalMinForOthers
-	remainingNeed := totalNaturalForOthers - totalMinForOthers
+	// Give long columns minimum, then distribute remainder proportionally
+	extraSpace := remainingWidth - totalLongMin
+	extraNeed := totalLongNatural - totalLongMin
 
-	for i := 1; i < numCols; i++ {
-		result[i] = minWidths[i]
-		if remainingNeed > 0 {
-			additionalNeed := naturalWidths[i] - minWidths[i]
-			additionalGrant := (additionalNeed * remainingWidth) / remainingNeed
-			result[i] += additionalGrant
+	for _, idx := range longColumnIndices {
+		result[idx] = minWidths[idx]
+		if extraNeed > 0 {
+			additionalNeed := naturalWidths[idx] - minWidths[idx]
+			additionalGrant := (additionalNeed * extraSpace) / extraNeed
+			result[idx] += additionalGrant
 		}
 	}
 
@@ -253,19 +268,26 @@ func distributeColumnWidths(naturalWidths, minWidths []int, availableWidth int) 
 }
 
 // truncateCell truncates a cell to maxWidth, adding "..." if truncated
+// Handles ANSI color codes properly by measuring visible characters only
 func truncateCell(cell string, maxWidth int) string {
-	cellWidth := utf8.RuneCountInString(cell)
+	// Strip ANSI codes to measure visible width
+	visibleText := pterm.RemoveColorFromString(cell)
+	cellWidth := utf8.RuneCountInString(visibleText)
+
 	if cellWidth <= maxWidth {
 		return cell
 	}
 
+	// Cell needs truncation
+	// If the cell has color codes, we need to be careful about truncation
+	// For simplicity, strip colors, truncate, then return without color
 	if maxWidth <= 3 {
 		// Too narrow for "...", just truncate
-		return truncateString(cell, maxWidth)
+		return truncateString(visibleText, maxWidth)
 	}
 
 	// Truncate and add "..."
-	return truncateString(cell, maxWidth-3) + "..."
+	return truncateString(visibleText, maxWidth-3) + "..."
 }
 
 // truncateString truncates a string to the specified number of runes
