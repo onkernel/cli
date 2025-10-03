@@ -6,6 +6,7 @@ import (
 
 	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
+	"github.com/onkernel/kernel-go-sdk/option"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
@@ -148,9 +149,20 @@ func (p ProxyCmd) Create(ctx context.Context, in ProxyCreateInput) error {
 		}
 	}
 
+	// Validate protocol
+	if in.Protocol != "" && in.Protocol != "http" && in.Protocol != "https" {
+		return fmt.Errorf("invalid protocol: %s (must be http or https)", in.Protocol)
+	}
+
 	pterm.Info.Printf("Creating %s proxy...\n", proxyType)
 
-	proxy, err := p.proxies.New(ctx, params)
+	// Use WithJSONSet to add the protocol field to the request since the SDK doesn't support it yet
+	var opts []option.RequestOption
+	if in.Protocol != "" {
+		opts = append(opts, option.WithJSONSet("protocol", in.Protocol))
+	}
+
+	proxy, err := p.proxies.New(ctx, params, opts...)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
 	}
@@ -178,6 +190,7 @@ func runProxiesCreate(cmd *cobra.Command, args []string) error {
 	// Get all flag values
 	proxyType, _ := cmd.Flags().GetString("type")
 	name, _ := cmd.Flags().GetString("name")
+	protocol, _ := cmd.Flags().GetString("protocol")
 	country, _ := cmd.Flags().GetString("country")
 	city, _ := cmd.Flags().GetString("city")
 	state, _ := cmd.Flags().GetString("state")
@@ -195,6 +208,7 @@ func runProxiesCreate(cmd *cobra.Command, args []string) error {
 	return p.Create(cmd.Context(), ProxyCreateInput{
 		Name:     name,
 		Type:     proxyType,
+		Protocol: protocol,
 		Country:  country,
 		City:     city,
 		State:    state,

@@ -35,6 +35,9 @@ func (p ProxyCmd) List(ctx context.Context) error {
 			name = "-"
 		}
 
+		// Note: Protocol field is not yet available in the SDK
+		// Once the SDK is updated, we can display it here
+
 		// Format config based on type
 		configStr := formatProxyConfig(&proxy)
 
