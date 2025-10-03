@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onkernel/cli/pkg/table"
 	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/pterm/pterm"
@@ -53,7 +54,7 @@ func (p ProxyCmd) Get(ctx context.Context, in ProxyGetInput) error {
 	lastChecked := util.FormatLocal(item.LastChecked)
 	rows = append(rows, []string{"Last Checked", lastChecked})
 
-	PrintTableNoPad(rows, true)
+	table.PrintTableNoPad(rows, true)
 	return nil
 }
 

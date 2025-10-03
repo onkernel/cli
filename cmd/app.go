@@ -99,7 +99,7 @@ func runAppList(cmd *cobra.Command, args []string) error {
 		})
 	}
 
-	printTableNoPad(tableData, true)
+	PrintTableNoPad(tableData, true)
 	return nil
 }
 
@@ -150,6 +150,6 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	printTableNoPad(tableData, true)
+	PrintTableNoPad(tableData, true)
 	return nil
 }
