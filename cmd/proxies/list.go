@@ -26,7 +26,7 @@ func (p ProxyCmd) List(ctx context.Context) error {
 
 	// Prepare table data
 	tableData := pterm.TableData{
-		{"ID", "Name", "Type", "Config", "Status", "Last Checked"},
+		{"ID", "Name", "Type", "Protocol", "Config", "Status", "Last Checked"},
 	}
 
 	for _, proxy := range *items {
@@ -35,8 +35,11 @@ func (p ProxyCmd) List(ctx context.Context) error {
 			name = "-"
 		}
 
-		// Note: Protocol field is not yet available in the SDK
-		// Once the SDK is updated, we can display it here
+		// Get protocol (default to https if not set, since that's the default)
+		protocol := string(proxy.Protocol)
+		if protocol == "" {
+			protocol = "https"
+		}
 
 		// Format config based on type
 		configStr := formatProxyConfig(&proxy)
@@ -58,6 +61,7 @@ func (p ProxyCmd) List(ctx context.Context) error {
 			proxy.ID,
 			name,
 			string(proxy.Type),
+			protocol,
 			configStr,
 			status,
 			lastChecked,

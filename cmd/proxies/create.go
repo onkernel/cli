@@ -6,7 +6,6 @@ import (
 
 	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
-	"github.com/onkernel/kernel-go-sdk/option"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
@@ -149,20 +148,22 @@ func (p ProxyCmd) Create(ctx context.Context, in ProxyCreateInput) error {
 		}
 	}
 
-	// Validate protocol
-	if in.Protocol != "" && in.Protocol != "http" && in.Protocol != "https" {
-		return fmt.Errorf("invalid protocol: %s (must be http or https)", in.Protocol)
+	// Set protocol (defaults to https if not specified)
+	if in.Protocol != "" {
+		// Validate and convert protocol
+		switch in.Protocol {
+		case "http":
+			params.Protocol = kernel.ProxyNewParamsProtocolHTTP
+		case "https":
+			params.Protocol = kernel.ProxyNewParamsProtocolHTTPS
+		default:
+			return fmt.Errorf("invalid protocol: %s (must be http or https)", in.Protocol)
+		}
 	}
 
 	pterm.Info.Printf("Creating %s proxy...\n", proxyType)
 
-	// Use WithJSONSet to add the protocol field to the request since the SDK doesn't support it yet
-	var opts []option.RequestOption
-	if in.Protocol != "" {
-		opts = append(opts, option.WithJSONSet("protocol", in.Protocol))
-	}
-
-	proxy, err := p.proxies.New(ctx, params, opts...)
+	proxy, err := p.proxies.New(ctx, params)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
 	}
@@ -179,6 +180,13 @@ func (p ProxyCmd) Create(ctx context.Context, in ProxyCreateInput) error {
 	}
 	rows = append(rows, []string{"Name", name})
 	rows = append(rows, []string{"Type", string(proxy.Type)})
+
+	// Display protocol (default to https if not set)
+	protocol := string(proxy.Protocol)
+	if protocol == "" {
+		protocol = "https"
+	}
+	rows = append(rows, []string{"Protocol", protocol})
 
 	PrintTableNoPad(rows, true)
 	return nil
