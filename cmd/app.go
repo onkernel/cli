@@ -80,9 +80,6 @@ func runAppList(cmd *cobra.Command, args []string) error {
 		envVarsStr := "-"
 		if len(app.EnvVars) > 0 {
 			envVarsStr = strings.Join(lo.Keys(app.EnvVars), ", ")
-			if len(envVarsStr) > 50 {
-				envVarsStr = envVarsStr[:47] + "..."
-			}
 		}
 
 		actionsStr := "-"
@@ -90,9 +87,6 @@ func runAppList(cmd *cobra.Command, args []string) error {
 			actionsStr = strings.Join(lo.Map(app.Actions, func(a kernel.AppAction, _ int) string {
 				return a.Name
 			}), ", ")
-			if len(actionsStr) > 50 {
-				actionsStr = actionsStr[:47] + "..."
-			}
 		}
 
 		tableData = append(tableData, []string{

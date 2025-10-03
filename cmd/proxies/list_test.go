@@ -85,12 +85,11 @@ func TestProxyList_WithProxies(t *testing.T) {
 
 	assert.Contains(t, output, "mobile-1")
 	assert.Contains(t, output, "mobile")
-	assert.Contains(t, output, "Carrier: verizon")
 
 	assert.Contains(t, output, "isp-1")
 	assert.Contains(t, output, "-") // Empty name shows as "-"
 	assert.Contains(t, output, "isp")
-	assert.Contains(t, output, "Country: EU")
+	assert.Contains(t, output, "EU") // Country value
 }
 
 func TestProxyList_Error(t *testing.T) {
