@@ -38,6 +38,21 @@ func (p ProxyCmd) Get(ctx context.Context, in ProxyGetInput) error {
 	// Display type-specific config details
 	rows = append(rows, getProxyConfigRows(item)...)
 
+	// Display status with color
+	status := string(item.Status)
+	if status == "" {
+		status = "-"
+	} else if status == "available" {
+		status = pterm.Green(status)
+	} else if status == "unavailable" {
+		status = pterm.Red(status)
+	}
+	rows = append(rows, []string{"Status", status})
+
+	// Display last checked timestamp
+	lastChecked := util.FormatLocal(item.LastChecked)
+	rows = append(rows, []string{"Last Checked", lastChecked})
+
 	PrintTableNoPad(rows, true)
 	return nil
 }
