@@ -11,9 +11,10 @@ import (
 )
 
 var appCmd = &cobra.Command{
-	Use:   "app",
-	Short: "Manage deployed applications",
-	Long:  "Commands for managing deployed Kernel applications",
+	Use:     "app",
+	Aliases: []string{"apps"},
+	Short:   "Manage deployed applications",
+	Long:    "Commands for managing deployed Kernel applications",
 }
 
 // --- app list subcommand
