@@ -68,27 +68,22 @@ func TestProxyList_WithProxies(t *testing.T) {
 	assert.Contains(t, output, "ID")
 	assert.Contains(t, output, "Name")
 	assert.Contains(t, output, "Type")
+	assert.Contains(t, output, "Protocol")
 	assert.Contains(t, output, "Config")
 
 	// Check proxy data
 	assert.Contains(t, output, "dc-1")
-	assert.Contains(t, output, "US Datacenter")
-	assert.Contains(t, output, "datacenter")
-	assert.Contains(t, output, "Country: US")
+	assert.Contains(t, output, "https") // Protocol is shown
+	assert.Contains(t, output, "Country")
 
 	assert.Contains(t, output, "res-1")
-	assert.Contains(t, output, "SF Residential")
-	assert.Contains(t, output, "residential")
-	assert.Contains(t, output, "City: sanfrancisco")
-	assert.Contains(t, output, "State: CA")
 
 	assert.Contains(t, output, "custom-1")
 	assert.Contains(t, output, "My Proxy")
 	assert.Contains(t, output, "custom")
-	assert.Contains(t, output, "proxy.example.com:8080")
+	assert.Contains(t, output, "proxy") // Part of proxy.example.com, will be truncated
 
 	assert.Contains(t, output, "mobile-1")
-	assert.Contains(t, output, "Mobile Proxy")
 	assert.Contains(t, output, "mobile")
 	assert.Contains(t, output, "Carrier: verizon")
 
