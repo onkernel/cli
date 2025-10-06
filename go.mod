@@ -8,7 +8,7 @@ require (
 	github.com/charmbracelet/fang v0.2.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/joho/godotenv v1.5.1
-	github.com/onkernel/kernel-go-sdk v0.13.0
+	github.com/onkernel/kernel-go-sdk v0.14.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/pterm/pterm v0.12.80
 	github.com/samber/lo v1.51.0
@@ -59,4 +59,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/onkernel/kernel-go-sdk => github.com/stainless-sdks/kernel-go v0.0.0-20251001233449-2d91eca4bce0
+replace github.com/onkernel/kernel-go-sdk => github.com/stainless-sdks/kernel-go v0.0.0-20251002005356-49e9894b47bc

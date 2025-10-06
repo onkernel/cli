@@ -240,6 +240,53 @@ func TestProxyCreate_InvalidType(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid proxy type: invalid")
 }
 
+func TestProxyCreate_Protocol_Valid(t *testing.T) {
+	tests := []struct {
+		name     string
+		protocol string
+	}{
+		{"http protocol", "http"},
+		{"https protocol", "https"},
+		{"empty protocol", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake := &FakeProxyService{
+				NewFunc: func(ctx context.Context, body kernel.ProxyNewParams, opts ...option.RequestOption) (*kernel.ProxyNewResponse, error) {
+					return &kernel.ProxyNewResponse{
+						ID:   "test-proxy",
+						Name: "Test Proxy",
+						Type: kernel.ProxyNewResponseTypeDatacenter,
+					}, nil
+				},
+			}
+
+			p := ProxyCmd{proxies: fake}
+			err := p.Create(context.Background(), ProxyCreateInput{
+				Type:     "datacenter",
+				Country:  "US",
+				Protocol: tt.protocol,
+			})
+
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestProxyCreate_Protocol_Invalid(t *testing.T) {
+	fake := &FakeProxyService{}
+	p := ProxyCmd{proxies: fake}
+	err := p.Create(context.Background(), ProxyCreateInput{
+		Type:     "datacenter",
+		Country:  "US",
+		Protocol: "ftp",
+	})
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid protocol: ftp")
+}
+
 func TestProxyCreate_APIError(t *testing.T) {
 	_ = captureOutput(t)
 

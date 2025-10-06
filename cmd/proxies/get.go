@@ -28,6 +28,13 @@ func (p ProxyCmd) Get(ctx context.Context, in ProxyGetInput) error {
 	rows = append(rows, []string{"Name", name})
 	rows = append(rows, []string{"Type", string(item.Type)})
 
+	// Display protocol (default to https if not set)
+	protocol := string(item.Protocol)
+	if protocol == "" {
+		protocol = "https"
+	}
+	rows = append(rows, []string{"Protocol", protocol})
+
 	// Display type-specific config details
 	rows = append(rows, getProxyConfigRows(item)...)
 

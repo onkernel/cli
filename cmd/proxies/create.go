@@ -148,6 +148,19 @@ func (p ProxyCmd) Create(ctx context.Context, in ProxyCreateInput) error {
 		}
 	}
 
+	// Set protocol (defaults to https if not specified)
+	if in.Protocol != "" {
+		// Validate and convert protocol
+		switch in.Protocol {
+		case "http":
+			params.Protocol = kernel.ProxyNewParamsProtocolHTTP
+		case "https":
+			params.Protocol = kernel.ProxyNewParamsProtocolHTTPS
+		default:
+			return fmt.Errorf("invalid protocol: %s (must be http or https)", in.Protocol)
+		}
+	}
+
 	pterm.Info.Printf("Creating %s proxy...\n", proxyType)
 
 	proxy, err := p.proxies.New(ctx, params)
@@ -168,6 +181,13 @@ func (p ProxyCmd) Create(ctx context.Context, in ProxyCreateInput) error {
 	rows = append(rows, []string{"Name", name})
 	rows = append(rows, []string{"Type", string(proxy.Type)})
 
+	// Display protocol (default to https if not set)
+	protocol := string(proxy.Protocol)
+	if protocol == "" {
+		protocol = "https"
+	}
+	rows = append(rows, []string{"Protocol", protocol})
+
 	PrintTableNoPad(rows, true)
 	return nil
 }
@@ -178,6 +198,7 @@ func runProxiesCreate(cmd *cobra.Command, args []string) error {
 	// Get all flag values
 	proxyType, _ := cmd.Flags().GetString("type")
 	name, _ := cmd.Flags().GetString("name")
+	protocol, _ := cmd.Flags().GetString("protocol")
 	country, _ := cmd.Flags().GetString("country")
 	city, _ := cmd.Flags().GetString("city")
 	state, _ := cmd.Flags().GetString("state")
@@ -195,6 +216,7 @@ func runProxiesCreate(cmd *cobra.Command, args []string) error {
 	return p.Create(cmd.Context(), ProxyCreateInput{
 		Name:     name,
 		Type:     proxyType,
+		Protocol: protocol,
 		Country:  country,
 		City:     city,
 		State:    state,

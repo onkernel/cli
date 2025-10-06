@@ -28,8 +28,9 @@ type ProxyGetInput struct {
 }
 
 type ProxyCreateInput struct {
-	Name string
-	Type string
+	Name     string
+	Type     string
+	Protocol string
 	// Datacenter/ISP config
 	Country string
 	// Residential/Mobile config

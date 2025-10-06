@@ -70,6 +70,7 @@ func init() {
 	proxiesCreateCmd.Flags().String("name", "", "Proxy configuration name")
 	proxiesCreateCmd.Flags().String("type", "", "Proxy type (datacenter|isp|residential|mobile|custom)")
 	_ = proxiesCreateCmd.MarkFlagRequired("type")
+	proxiesCreateCmd.Flags().String("protocol", "https", "Protocol to use for the proxy connection (http|https)")
 
 	// Location flags (datacenter, isp, residential, mobile)
 	proxiesCreateCmd.Flags().String("country", "", "ISO 3166 country code or EU")
