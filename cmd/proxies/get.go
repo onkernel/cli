@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onkernel/cli/pkg/table"
 	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/pterm/pterm"
@@ -38,7 +39,22 @@ func (p ProxyCmd) Get(ctx context.Context, in ProxyGetInput) error {
 	// Display type-specific config details
 	rows = append(rows, getProxyConfigRows(item)...)
 
-	PrintTableNoPad(rows, true)
+	// Display status with color
+	status := string(item.Status)
+	if status == "" {
+		status = "-"
+	} else if status == "available" {
+		status = pterm.Green(status)
+	} else if status == "unavailable" {
+		status = pterm.Red(status)
+	}
+	rows = append(rows, []string{"Status", status})
+
+	// Display last checked timestamp
+	lastChecked := util.FormatLocal(item.LastChecked)
+	rows = append(rows, []string{"Last Checked", lastChecked})
+
+	table.PrintTableNoPad(rows, true)
 	return nil
 }
 

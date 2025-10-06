@@ -144,7 +144,7 @@ func (b BrowsersCmd) List(ctx context.Context) error {
 		})
 	}
 
-	printTableNoPad(tableData, true)
+	PrintTableNoPad(tableData, true)
 	return nil
 }
 
@@ -208,7 +208,7 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 		tableData = append(tableData, []string{"Profile", profVal})
 	}
 
-	printTableNoPad(tableData, true)
+	PrintTableNoPad(tableData, true)
 	return nil
 }
 
@@ -415,7 +415,7 @@ func (b BrowsersCmd) ReplaysList(ctx context.Context, in BrowsersReplaysListInpu
 	for _, r := range *items {
 		rows = append(rows, []string{r.ReplayID, util.FormatLocal(r.StartedAt), util.FormatLocal(r.FinishedAt), truncateURL(r.ReplayViewURL, 60)})
 	}
-	printTableNoPad(rows, true)
+	PrintTableNoPad(rows, true)
 	return nil
 }
 
@@ -440,7 +440,7 @@ func (b BrowsersCmd) ReplaysStart(ctx context.Context, in BrowsersReplaysStartIn
 		return util.CleanedUpSdkError{Err: err}
 	}
 	rows := pterm.TableData{{"Property", "Value"}, {"Replay ID", res.ReplayID}, {"View URL", res.ReplayViewURL}, {"Started At", util.FormatLocal(res.StartedAt)}}
-	printTableNoPad(rows, true)
+	PrintTableNoPad(rows, true)
 	return nil
 }
 
@@ -563,7 +563,7 @@ func (b BrowsersCmd) ProcessExec(ctx context.Context, in BrowsersProcessExecInpu
 		return util.CleanedUpSdkError{Err: err}
 	}
 	rows := pterm.TableData{{"Property", "Value"}, {"Exit Code", fmt.Sprintf("%d", res.ExitCode)}, {"Duration (ms)", fmt.Sprintf("%d", res.DurationMs)}}
-	printTableNoPad(rows, true)
+	PrintTableNoPad(rows, true)
 	if res.StdoutB64 != "" {
 		data, err := base64.StdEncoding.DecodeString(res.StdoutB64)
 		if err != nil {
@@ -625,7 +625,7 @@ func (b BrowsersCmd) ProcessSpawn(ctx context.Context, in BrowsersProcessSpawnIn
 		return util.CleanedUpSdkError{Err: err}
 	}
 	rows := pterm.TableData{{"Property", "Value"}, {"Process ID", res.ProcessID}, {"PID", fmt.Sprintf("%d", res.Pid)}, {"Started At", util.FormatLocal(res.StartedAt)}}
-	printTableNoPad(rows, true)
+	PrintTableNoPad(rows, true)
 	return nil
 }
 
@@ -669,7 +669,7 @@ func (b BrowsersCmd) ProcessStatus(ctx context.Context, in BrowsersProcessStatus
 		return util.CleanedUpSdkError{Err: err}
 	}
 	rows := pterm.TableData{{"Property", "Value"}, {"State", string(res.State)}, {"CPU %", fmt.Sprintf("%.2f", res.CPUPct)}, {"Mem Bytes", fmt.Sprintf("%d", res.MemBytes)}, {"Exit Code", fmt.Sprintf("%d", res.ExitCode)}}
-	printTableNoPad(rows, true)
+	PrintTableNoPad(rows, true)
 	return nil
 }
 
@@ -928,7 +928,7 @@ func (b BrowsersCmd) FSFileInfo(ctx context.Context, in BrowsersFSFileInfoInput)
 		return util.CleanedUpSdkError{Err: err}
 	}
 	rows := pterm.TableData{{"Property", "Value"}, {"Path", res.Path}, {"Name", res.Name}, {"Mode", res.Mode}, {"IsDir", fmt.Sprintf("%t", res.IsDir)}, {"SizeBytes", fmt.Sprintf("%d", res.SizeBytes)}, {"ModTime", util.FormatLocal(res.ModTime)}}
-	printTableNoPad(rows, true)
+	PrintTableNoPad(rows, true)
 	return nil
 }
 
@@ -957,7 +957,7 @@ func (b BrowsersCmd) FSListFiles(ctx context.Context, in BrowsersFSListFilesInpu
 	for _, f := range *res {
 		rows = append(rows, []string{f.Mode, fmt.Sprintf("%d", f.SizeBytes), util.FormatLocal(f.ModTime), f.Name, f.Path})
 	}
-	printTableNoPad(rows, true)
+	PrintTableNoPad(rows, true)
 	return nil
 }
 

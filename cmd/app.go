@@ -11,9 +11,10 @@ import (
 )
 
 var appCmd = &cobra.Command{
-	Use:   "app",
-	Short: "Manage deployed applications",
-	Long:  "Commands for managing deployed Kernel applications",
+	Use:     "app",
+	Aliases: []string{"apps"},
+	Short:   "Manage deployed applications",
+	Long:    "Commands for managing deployed Kernel applications",
 }
 
 // --- app list subcommand
@@ -80,9 +81,6 @@ func runAppList(cmd *cobra.Command, args []string) error {
 		envVarsStr := "-"
 		if len(app.EnvVars) > 0 {
 			envVarsStr = strings.Join(lo.Keys(app.EnvVars), ", ")
-			if len(envVarsStr) > 50 {
-				envVarsStr = envVarsStr[:47] + "..."
-			}
 		}
 
 		actionsStr := "-"
@@ -90,9 +88,6 @@ func runAppList(cmd *cobra.Command, args []string) error {
 			actionsStr = strings.Join(lo.Map(app.Actions, func(a kernel.AppAction, _ int) string {
 				return a.Name
 			}), ", ")
-			if len(actionsStr) > 50 {
-				actionsStr = actionsStr[:47] + "..."
-			}
 		}
 
 		tableData = append(tableData, []string{
@@ -105,7 +100,7 @@ func runAppList(cmd *cobra.Command, args []string) error {
 		})
 	}
 
-	printTableNoPad(tableData, true)
+	PrintTableNoPad(tableData, true)
 	return nil
 }
 
@@ -156,6 +151,6 @@ func runAppHistory(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	printTableNoPad(tableData, true)
+	PrintTableNoPad(tableData, true)
 	return nil
 }
