@@ -78,7 +78,7 @@ func (e ExtensionsCmd) List(ctx context.Context, _ ExtensionsListInput) error {
 			util.FormatLocal(it.LastUsedAt),
 		})
 	}
-	printTableNoPad(rows, true)
+	PrintTableNoPad(rows, true)
 	return nil
 }
 
@@ -303,7 +303,7 @@ func (e ExtensionsCmd) Upload(ctx context.Context, in ExtensionsUploadInput) err
 	rows = append(rows, []string{"Name", name})
 	rows = append(rows, []string{"Created At", util.FormatLocal(item.CreatedAt)})
 	rows = append(rows, []string{"Size (bytes)", fmt.Sprintf("%d", item.SizeBytes)})
-	printTableNoPad(rows, true)
+	PrintTableNoPad(rows, true)
 	return nil
 }
 
