@@ -2,12 +2,16 @@ package cmd
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/onkernel/cli/pkg/util"
@@ -26,6 +30,7 @@ type BrowsersService interface {
 	New(ctx context.Context, body kernel.BrowserNewParams, opts ...option.RequestOption) (res *kernel.BrowserNewResponse, err error)
 	Delete(ctx context.Context, body kernel.BrowserDeleteParams, opts ...option.RequestOption) (err error)
 	DeleteByID(ctx context.Context, id string, opts ...option.RequestOption) (err error)
+	UploadExtensions(ctx context.Context, id string, body kernel.BrowserUploadExtensionsParams, opts ...option.RequestOption) (err error)
 }
 
 // BrowserReplaysService defines the subset we use for browser replays.
@@ -73,6 +78,9 @@ type BoolFlag struct {
 	Value bool
 }
 
+// Regular expression to validate CUID2 identifiers (24 lowercase alphanumeric characters).
+var cuidRegex = regexp.MustCompile(`^[a-z0-9]{24}$`)
+
 // Inputs for each command
 type BrowsersCreateInput struct {
 	PersistenceID      string
@@ -83,6 +91,7 @@ type BrowsersCreateInput struct {
 	ProfileName        string
 	ProfileSaveChanges BoolFlag
 	ProxyID            string
+	Extensions         []string
 }
 
 type BrowsersDeleteInput struct {
@@ -103,12 +112,32 @@ type BrowsersCmd struct {
 	logs     BrowserLogService
 }
 
-func (b BrowsersCmd) List(ctx context.Context) error {
-	pterm.Info.Println("Fetching browsers...")
+type BrowsersListInput struct {
+	Output string
+}
+
+func (b BrowsersCmd) List(ctx context.Context, in BrowsersListInput) error {
+	if in.Output != "" && in.Output != "json" {
+		pterm.Error.Println("unsupported --output value: use 'json'")
+		return nil
+	}
 
 	browsers, err := b.browsers.List(ctx)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
+	}
+
+	if in.Output == "json" {
+		if browsers == nil {
+			fmt.Println("[]")
+			return nil
+		}
+		bs, err := json.MarshalIndent(*browsers, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(bs))
+		return nil
 	}
 
 	if browsers == nil || len(*browsers) == 0 {
@@ -182,6 +211,23 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 	// Add proxy if specified
 	if in.ProxyID != "" {
 		params.ProxyID = kernel.Opt(in.ProxyID)
+	}
+
+	// Map extensions (IDs or names) into params.Extensions
+	if len(in.Extensions) > 0 {
+		for _, ext := range in.Extensions {
+			val := strings.TrimSpace(ext)
+			if val == "" {
+				continue
+			}
+			item := kernel.BrowserNewParamsExtension{}
+			if cuidRegex.MatchString(val) {
+				item.ID = kernel.Opt(val)
+			} else {
+				item.Name = kernel.Opt(val)
+			}
+			params.Extensions = append(params.Extensions, item)
+		}
 	}
 
 	browser, err := b.browsers.New(ctx, params)
@@ -809,6 +855,11 @@ type BrowsersFSWriteFileInput struct {
 	SourcePath string
 }
 
+type BrowsersExtensionsUploadInput struct {
+	Identifier     string
+	ExtensionPaths []string
+}
+
 func (b BrowsersCmd) FSNewDirectory(ctx context.Context, in BrowsersFSNewDirInput) error {
 	if b.fs == nil {
 		pterm.Error.Println("fs service not available")
@@ -1169,6 +1220,99 @@ func (b BrowsersCmd) FSWriteFile(ctx context.Context, in BrowsersFSWriteFileInpu
 	return nil
 }
 
+func (b BrowsersCmd) ExtensionsUpload(ctx context.Context, in BrowsersExtensionsUploadInput) error {
+	if b.browsers == nil {
+		pterm.Error.Println("browsers service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		return util.CleanedUpSdkError{Err: err}
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+
+	if len(in.ExtensionPaths) == 0 {
+		pterm.Error.Println("no extension paths provided")
+		return nil
+	}
+
+	var extensions []kernel.BrowserUploadExtensionsParamsExtension
+	var tempZipFiles []string
+	var openFiles []*os.File
+
+	defer func() {
+		for _, f := range openFiles {
+			_ = f.Close()
+		}
+		for _, zipPath := range tempZipFiles {
+			_ = os.Remove(zipPath)
+		}
+	}()
+
+	for _, extPath := range in.ExtensionPaths {
+		info, err := os.Stat(extPath)
+		if err != nil {
+			pterm.Error.Printf("Failed to stat %s: %v\n", extPath, err)
+			return nil
+		}
+		if !info.IsDir() {
+			pterm.Error.Printf("Path %s is not a directory\n", extPath)
+			return nil
+		}
+
+		extName := generateRandomExtensionName()
+		tempZipPath := filepath.Join(os.TempDir(), fmt.Sprintf("kernel-ext-%s.zip", extName))
+
+		pterm.Info.Printf("Zipping %s as %s...\n", extPath, extName)
+		if err := util.ZipDirectory(extPath, tempZipPath); err != nil {
+			pterm.Error.Printf("Failed to zip %s: %v\n", extPath, err)
+			return nil
+		}
+		tempZipFiles = append(tempZipFiles, tempZipPath)
+
+		zipFile, err := os.Open(tempZipPath)
+		if err != nil {
+			pterm.Error.Printf("Failed to open zip %s: %v\n", tempZipPath, err)
+			return nil
+		}
+		openFiles = append(openFiles, zipFile)
+
+		extensions = append(extensions, kernel.BrowserUploadExtensionsParamsExtension{
+			Name:    extName,
+			ZipFile: zipFile,
+		})
+	}
+
+	pterm.Info.Printf("Uploading %d extension(s) to browser %s...\n", len(extensions), br.SessionID)
+	if err := b.browsers.UploadExtensions(ctx, br.SessionID, kernel.BrowserUploadExtensionsParams{
+		Extensions: extensions,
+	}); err != nil {
+		return util.CleanedUpSdkError{Err: err}
+	}
+
+	if len(extensions) == 1 {
+		pterm.Success.Println("Successfully uploaded 1 extension and restarted Chromium")
+	} else {
+		pterm.Success.Printf("Successfully uploaded %d extensions and restarted Chromium\n", len(extensions))
+	}
+	return nil
+}
+
+// generateRandomExtensionName generates a random name matching pattern ^[A-Za-z0-9._-]{1,64}$
+func generateRandomExtensionName() string {
+	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+	const nameLen = 16
+	result := make([]byte, nameLen)
+	for i := range result {
+		n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
+		result[i] = chars[n.Int64()]
+	}
+	return string(result)
+}
+
 var browsersCmd = &cobra.Command{
 	Use:   "browsers",
 	Short: "Manage browsers",
@@ -1188,9 +1332,9 @@ var browsersCreateCmd = &cobra.Command{
 }
 
 var browsersDeleteCmd = &cobra.Command{
-	Use:   "delete <id-or-persistent-id>",
+	Use:   "delete <id-or-persistent-id> [ids...]",
 	Short: "Delete a browser",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MinimumNArgs(1),
 	RunE:  runBrowsersDelete,
 }
 
@@ -1202,6 +1346,9 @@ var browsersViewCmd = &cobra.Command{
 }
 
 func init() {
+	// list flags
+	browsersListCmd.Flags().StringP("output", "o", "", "Output format: json for raw API response")
+
 	browsersCmd.AddCommand(browsersListCmd)
 	browsersCmd.AddCommand(browsersCreateCmd)
 	browsersCmd.AddCommand(browsersDeleteCmd)
@@ -1319,6 +1466,12 @@ func init() {
 	fsRoot.AddCommand(fsNewDir, fsDelDir, fsDelFile, fsDownloadZip, fsFileInfo, fsListFiles, fsMove, fsReadFile, fsSetPerms, fsUpload, fsUploadZip, fsWriteFile)
 	browsersCmd.AddCommand(fsRoot)
 
+	// extensions
+	extensionsRoot := &cobra.Command{Use: "extensions", Short: "Add browser extensions to a running instance"}
+	extensionsUpload := &cobra.Command{Use: "upload <id|persistent-id> <extension-path>...", Short: "Upload one or more unpacked extensions and restart Chromium", Args: cobra.MinimumNArgs(2), RunE: runBrowsersExtensionsUpload}
+	extensionsRoot.AddCommand(extensionsUpload)
+	browsersCmd.AddCommand(extensionsRoot)
+
 	// Add flags for create command
 	browsersCreateCmd.Flags().StringP("persistent-id", "p", "", "Unique identifier for browser session persistence")
 	browsersCreateCmd.Flags().BoolP("stealth", "s", false, "Launch browser in stealth mode to avoid detection")
@@ -1328,6 +1481,7 @@ func init() {
 	browsersCreateCmd.Flags().String("profile-name", "", "Profile name to load into the browser session (mutually exclusive with --profile-id)")
 	browsersCreateCmd.Flags().Bool("save-changes", false, "If set, save changes back to the profile when the session ends")
 	browsersCreateCmd.Flags().String("proxy-id", "", "Proxy ID to use for the browser session")
+	browsersCreateCmd.Flags().StringSlice("extension", []string{}, "Extension IDs or names to load (repeatable; may be passed multiple times or comma-separated)")
 
 	// Add flags for delete command
 	browsersDeleteCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
@@ -1339,7 +1493,8 @@ func runBrowsersList(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	svc := client.Browsers
 	b := BrowsersCmd{browsers: &svc}
-	return b.List(cmd.Context())
+	out, _ := cmd.Flags().GetString("output")
+	return b.List(cmd.Context(), BrowsersListInput{Output: out})
 }
 
 func runBrowsersCreate(cmd *cobra.Command, args []string) error {
@@ -1354,6 +1509,7 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 	profileName, _ := cmd.Flags().GetString("profile-name")
 	saveChanges, _ := cmd.Flags().GetBool("save-changes")
 	proxyID, _ := cmd.Flags().GetString("proxy-id")
+	extensions, _ := cmd.Flags().GetStringSlice("extension")
 
 	in := BrowsersCreateInput{
 		PersistenceID:      persistenceID,
@@ -1364,6 +1520,7 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 		ProfileName:        profileName,
 		ProfileSaveChanges: BoolFlag{Set: cmd.Flags().Changed("save-changes"), Value: saveChanges},
 		ProxyID:            proxyID,
+		Extensions:         extensions,
 	}
 
 	svc := client.Browsers
@@ -1373,14 +1530,17 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 
 func runBrowsersDelete(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
-
-	identifier := args[0]
 	skipConfirm, _ := cmd.Flags().GetBool("yes")
 
-	in := BrowsersDeleteInput{Identifier: identifier, SkipConfirm: skipConfirm}
 	svc := client.Browsers
 	b := BrowsersCmd{browsers: &svc}
-	return b.Delete(cmd.Context(), in)
+	// Iterate all provided identifiers
+	for _, identifier := range args {
+		if err := b.Delete(cmd.Context(), BrowsersDeleteInput{Identifier: identifier, SkipConfirm: skipConfirm}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func runBrowsersView(cmd *cobra.Command, args []string) error {
@@ -1631,6 +1791,13 @@ func runBrowsersFSWriteFile(cmd *cobra.Command, args []string) error {
 	input, _ := cmd.Flags().GetString("source")
 	b := BrowsersCmd{browsers: &svc, fs: &svc.Fs}
 	return b.FSWriteFile(cmd.Context(), BrowsersFSWriteFileInput{Identifier: args[0], DestPath: path, Mode: mode, SourcePath: input})
+}
+
+func runBrowsersExtensionsUpload(cmd *cobra.Command, args []string) error {
+	client := getKernelClient(cmd)
+	svc := client.Browsers
+	b := BrowsersCmd{browsers: &svc}
+	return b.ExtensionsUpload(cmd.Context(), BrowsersExtensionsUploadInput{Identifier: args[0], ExtensionPaths: args[1:]})
 }
 
 func truncateURL(url string, maxLen int) string {
