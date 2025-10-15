@@ -73,6 +73,14 @@ type BrowserLogService interface {
 	StreamStreaming(ctx context.Context, id string, query kernel.BrowserLogStreamParams, opts ...option.RequestOption) (stream *ssestream.Stream[shared.LogEvent])
 }
 
+// BrowserComputerService defines the subset we use for OS-level mouse & screen.
+type BrowserComputerService interface {
+	CaptureScreenshot(ctx context.Context, id string, body kernel.BrowserComputerCaptureScreenshotParams, opts ...option.RequestOption) (res *http.Response, err error)
+	ClickMouse(ctx context.Context, id string, body kernel.BrowserComputerClickMouseParams, opts ...option.RequestOption) (err error)
+	MoveMouse(ctx context.Context, id string, body kernel.BrowserComputerMoveMouseParams, opts ...option.RequestOption) (err error)
+	TypeText(ctx context.Context, id string, body kernel.BrowserComputerTypeTextParams, opts ...option.RequestOption) (err error)
+}
+
 // BoolFlag captures whether a boolean flag was set explicitly and its value.
 type BoolFlag struct {
 	Set   bool
@@ -159,6 +167,7 @@ type BrowsersCmd struct {
 	fs       BrowserFSService
 	process  BrowserProcessService
 	logs     BrowserLogService
+	computer BrowserComputerService
 }
 
 type BrowsersListInput struct {
@@ -480,6 +489,161 @@ func (b BrowsersCmd) LogsStream(ctx context.Context, in BrowsersLogsStreamInput)
 	if err := stream.Err(); err != nil {
 		return util.CleanedUpSdkError{Err: err}
 	}
+	return nil
+}
+
+// Computer (mouse/screen)
+type BrowsersComputerClickMouseInput struct {
+	Identifier string
+	X          int64
+	Y          int64
+	NumClicks  int64
+	Button     string
+	ClickType  string
+	HoldKeys   []string
+}
+
+type BrowsersComputerMoveMouseInput struct {
+	Identifier string
+	X          int64
+	Y          int64
+	HoldKeys   []string
+}
+
+type BrowsersComputerScreenshotInput struct {
+	Identifier string
+	X          int64
+	Y          int64
+	Width      int64
+	Height     int64
+	To         string
+	HasRegion  bool
+}
+
+type BrowsersComputerTypeTextInput struct {
+	Identifier string
+	Text       string
+	Delay      int64
+}
+
+func (b BrowsersCmd) ComputerClickMouse(ctx context.Context, in BrowsersComputerClickMouseInput) error {
+	if b.computer == nil {
+		pterm.Error.Println("computer service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		return util.CleanedUpSdkError{Err: err}
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	body := kernel.BrowserComputerClickMouseParams{X: in.X, Y: in.Y}
+	if in.NumClicks > 0 {
+		body.NumClicks = kernel.Opt(in.NumClicks)
+	}
+	if in.Button != "" {
+		body.Button = kernel.BrowserComputerClickMouseParamsButton(in.Button)
+	}
+	if in.ClickType != "" {
+		body.ClickType = kernel.BrowserComputerClickMouseParamsClickType(in.ClickType)
+	}
+	if len(in.HoldKeys) > 0 {
+		body.HoldKeys = in.HoldKeys
+	}
+	if err := b.computer.ClickMouse(ctx, br.SessionID, body); err != nil {
+		return util.CleanedUpSdkError{Err: err}
+	}
+	pterm.Success.Printf("Clicked mouse at (%d,%d)\n", in.X, in.Y)
+	return nil
+}
+
+func (b BrowsersCmd) ComputerMoveMouse(ctx context.Context, in BrowsersComputerMoveMouseInput) error {
+	if b.computer == nil {
+		pterm.Error.Println("computer service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		return util.CleanedUpSdkError{Err: err}
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	body := kernel.BrowserComputerMoveMouseParams{X: in.X, Y: in.Y}
+	if len(in.HoldKeys) > 0 {
+		body.HoldKeys = in.HoldKeys
+	}
+	if err := b.computer.MoveMouse(ctx, br.SessionID, body); err != nil {
+		return util.CleanedUpSdkError{Err: err}
+	}
+	pterm.Success.Printf("Moved mouse to (%d,%d)\n", in.X, in.Y)
+	return nil
+}
+
+func (b BrowsersCmd) ComputerScreenshot(ctx context.Context, in BrowsersComputerScreenshotInput) error {
+	if b.computer == nil {
+		pterm.Error.Println("computer service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		return util.CleanedUpSdkError{Err: err}
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	var body kernel.BrowserComputerCaptureScreenshotParams
+	if in.HasRegion {
+		body.Region = kernel.BrowserComputerCaptureScreenshotParamsRegion{X: in.X, Y: in.Y, Width: in.Width, Height: in.Height}
+	}
+	res, err := b.computer.CaptureScreenshot(ctx, br.SessionID, body)
+	if err != nil {
+		return util.CleanedUpSdkError{Err: err}
+	}
+	defer res.Body.Close()
+	if in.To == "" {
+		pterm.Error.Println("--to is required to save the screenshot")
+		return nil
+	}
+	f, err := os.Create(in.To)
+	if err != nil {
+		pterm.Error.Printf("Failed to create file: %v\n", err)
+		return nil
+	}
+	defer f.Close()
+	if _, err := io.Copy(f, res.Body); err != nil {
+		pterm.Error.Printf("Failed to write file: %v\n", err)
+		return nil
+	}
+	pterm.Success.Printf("Saved screenshot to %s\n", in.To)
+	return nil
+}
+
+func (b BrowsersCmd) ComputerTypeText(ctx context.Context, in BrowsersComputerTypeTextInput) error {
+	if b.computer == nil {
+		pterm.Error.Println("computer service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		return util.CleanedUpSdkError{Err: err}
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	body := kernel.BrowserComputerTypeTextParams{Text: in.Text}
+	if in.Delay > 0 {
+		body.Delay = kernel.Opt(in.Delay)
+	}
+	if err := b.computer.TypeText(ctx, br.SessionID, body); err != nil {
+		return util.CleanedUpSdkError{Err: err}
+	}
+	pterm.Success.Printf("Typed text: %s\n", in.Text)
 	return nil
 }
 
@@ -1537,6 +1701,41 @@ func init() {
 	extensionsRoot.AddCommand(extensionsUpload)
 	browsersCmd.AddCommand(extensionsRoot)
 
+	// computer
+	computerRoot := &cobra.Command{Use: "computer", Short: "OS-level mouse & screen controls"}
+	computerClick := &cobra.Command{Use: "click-mouse <id|persistent-id>", Short: "Click mouse at coordinates", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerClickMouse}
+	computerClick.Flags().Int64("x", 0, "X coordinate")
+	computerClick.Flags().Int64("y", 0, "Y coordinate")
+	_ = computerClick.MarkFlagRequired("x")
+	_ = computerClick.MarkFlagRequired("y")
+	computerClick.Flags().Int64("num-clicks", 1, "Number of clicks")
+	computerClick.Flags().String("button", "left", "Mouse button: left,right,middle,back,forward")
+	computerClick.Flags().String("click-type", "click", "Click type: down,up,click")
+	computerClick.Flags().StringSlice("hold-key", []string{}, "Modifier keys to hold (repeatable)")
+
+	computerMove := &cobra.Command{Use: "move-mouse <id|persistent-id>", Short: "Move mouse to coordinates", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerMoveMouse}
+	computerMove.Flags().Int64("x", 0, "X coordinate")
+	computerMove.Flags().Int64("y", 0, "Y coordinate")
+	_ = computerMove.MarkFlagRequired("x")
+	_ = computerMove.MarkFlagRequired("y")
+	computerMove.Flags().StringSlice("hold-key", []string{}, "Modifier keys to hold (repeatable)")
+
+	computerScreenshot := &cobra.Command{Use: "screenshot <id|persistent-id>", Short: "Capture a screenshot (optionally of a region)", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerScreenshot}
+	computerScreenshot.Flags().Int64("x", 0, "Top-left X")
+	computerScreenshot.Flags().Int64("y", 0, "Top-left Y")
+	computerScreenshot.Flags().Int64("width", 0, "Region width")
+	computerScreenshot.Flags().Int64("height", 0, "Region height")
+	computerScreenshot.Flags().String("to", "", "Output file path for the PNG image")
+	_ = computerScreenshot.MarkFlagRequired("to")
+
+	computerType := &cobra.Command{Use: "type <id|persistent-id>", Short: "Type text on the browser instance", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerTypeText}
+	computerType.Flags().String("text", "", "Text to type")
+	_ = computerType.MarkFlagRequired("text")
+	computerType.Flags().Int64("delay", 0, "Delay in milliseconds between keystrokes")
+
+	computerRoot.AddCommand(computerClick, computerMove, computerScreenshot, computerType)
+	browsersCmd.AddCommand(computerRoot)
+
 	// Add flags for create command
 	browsersCreateCmd.Flags().StringP("persistent-id", "p", "", "Unique identifier for browser session persistence")
 	browsersCreateCmd.Flags().BoolP("stealth", "s", false, "Launch browser in stealth mode to avoid detection")
@@ -1885,6 +2084,65 @@ func runBrowsersExtensionsUpload(cmd *cobra.Command, args []string) error {
 	svc := client.Browsers
 	b := BrowsersCmd{browsers: &svc}
 	return b.ExtensionsUpload(cmd.Context(), BrowsersExtensionsUploadInput{Identifier: args[0], ExtensionPaths: args[1:]})
+}
+
+func runBrowsersComputerClickMouse(cmd *cobra.Command, args []string) error {
+	client := getKernelClient(cmd)
+	svc := client.Browsers
+	x, _ := cmd.Flags().GetInt64("x")
+	y, _ := cmd.Flags().GetInt64("y")
+	numClicks, _ := cmd.Flags().GetInt64("num-clicks")
+	button, _ := cmd.Flags().GetString("button")
+	clickType, _ := cmd.Flags().GetString("click-type")
+	holdKeys, _ := cmd.Flags().GetStringSlice("hold-key")
+	b := BrowsersCmd{browsers: &svc, computer: &svc.Computer}
+	return b.ComputerClickMouse(cmd.Context(), BrowsersComputerClickMouseInput{Identifier: args[0], X: x, Y: y, NumClicks: numClicks, Button: button, ClickType: clickType, HoldKeys: holdKeys})
+}
+
+func runBrowsersComputerMoveMouse(cmd *cobra.Command, args []string) error {
+	client := getKernelClient(cmd)
+	svc := client.Browsers
+	x, _ := cmd.Flags().GetInt64("x")
+	y, _ := cmd.Flags().GetInt64("y")
+	holdKeys, _ := cmd.Flags().GetStringSlice("hold-key")
+	b := BrowsersCmd{browsers: &svc, computer: &svc.Computer}
+	return b.ComputerMoveMouse(cmd.Context(), BrowsersComputerMoveMouseInput{Identifier: args[0], X: x, Y: y, HoldKeys: holdKeys})
+}
+
+func runBrowsersComputerScreenshot(cmd *cobra.Command, args []string) error {
+	client := getKernelClient(cmd)
+	svc := client.Browsers
+	x, _ := cmd.Flags().GetInt64("x")
+	y, _ := cmd.Flags().GetInt64("y")
+	w, _ := cmd.Flags().GetInt64("width")
+	h, _ := cmd.Flags().GetInt64("height")
+	to, _ := cmd.Flags().GetString("to")
+	bx := cmd.Flags().Changed("x")
+	by := cmd.Flags().Changed("y")
+	bw := cmd.Flags().Changed("width")
+	bh := cmd.Flags().Changed("height")
+	useRegion := bx || by || bw || bh
+	if useRegion {
+		if !(bx && by && bw && bh) {
+			pterm.Error.Println("if specifying region, you must provide --x, --y, --width, and --height")
+			return nil
+		}
+		if w <= 0 || h <= 0 {
+			pterm.Error.Println("--width and --height must be greater than zero")
+			return nil
+		}
+	}
+	b := BrowsersCmd{browsers: &svc, computer: &svc.Computer}
+	return b.ComputerScreenshot(cmd.Context(), BrowsersComputerScreenshotInput{Identifier: args[0], X: x, Y: y, Width: w, Height: h, To: to, HasRegion: useRegion})
+}
+
+func runBrowsersComputerTypeText(cmd *cobra.Command, args []string) error {
+	client := getKernelClient(cmd)
+	svc := client.Browsers
+	text, _ := cmd.Flags().GetString("text")
+	delay, _ := cmd.Flags().GetInt64("delay")
+	b := BrowsersCmd{browsers: &svc, computer: &svc.Computer}
+	return b.ComputerTypeText(cmd.Context(), BrowsersComputerTypeTextInput{Identifier: args[0], Text: text, Delay: delay})
 }
 
 func truncateURL(url string, maxLen int) string {

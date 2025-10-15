@@ -523,6 +523,33 @@ func makeStream[T any](vals []T) *ssestream.Stream[T] {
 	return ssestream.NewStream[T](&testDecoder{data: events}, nil)
 }
 
+// --- Fake for Computer ---
+
+type FakeComputerService struct {
+	ClickMouseFunc        func(ctx context.Context, id string, body kernel.BrowserComputerClickMouseParams, opts ...option.RequestOption) error
+	MoveMouseFunc         func(ctx context.Context, id string, body kernel.BrowserComputerMoveMouseParams, opts ...option.RequestOption) error
+	CaptureScreenshotFunc func(ctx context.Context, id string, body kernel.BrowserComputerCaptureScreenshotParams, opts ...option.RequestOption) (*http.Response, error)
+}
+
+func (f *FakeComputerService) ClickMouse(ctx context.Context, id string, body kernel.BrowserComputerClickMouseParams, opts ...option.RequestOption) error {
+	if f.ClickMouseFunc != nil {
+		return f.ClickMouseFunc(ctx, id, body, opts...)
+	}
+	return nil
+}
+func (f *FakeComputerService) MoveMouse(ctx context.Context, id string, body kernel.BrowserComputerMoveMouseParams, opts ...option.RequestOption) error {
+	if f.MoveMouseFunc != nil {
+		return f.MoveMouseFunc(ctx, id, body, opts...)
+	}
+	return nil
+}
+func (f *FakeComputerService) CaptureScreenshot(ctx context.Context, id string, body kernel.BrowserComputerCaptureScreenshotParams, opts ...option.RequestOption) (*http.Response, error) {
+	if f.CaptureScreenshotFunc != nil {
+		return f.CaptureScreenshotFunc(ctx, id, body, opts...)
+	}
+	return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"image/png"}}, Body: io.NopCloser(strings.NewReader("pngdata"))}, nil
+}
+
 // --- Tests for Logs ---
 
 func TestBrowsersLogsStream_PrintsEvents(t *testing.T) {
@@ -880,6 +907,52 @@ func __writeTempFile(t *testing.T, data string) string {
 	assert.NoError(t, err)
 	_ = f.Close()
 	return f.Name()
+}
+
+// --- Tests for Computer ---
+
+func TestBrowsersComputerClickMouse_PrintsSuccess(t *testing.T) {
+	setupStdoutCapture(t)
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	fakeComp := &FakeComputerService{}
+	b := BrowsersCmd{browsers: fakeBrowsers, computer: fakeComp}
+	_ = b.ComputerClickMouse(context.Background(), BrowsersComputerClickMouseInput{Identifier: "id", X: 10, Y: 20, NumClicks: 2, Button: string(kernel.BrowserComputerClickMouseParamsButtonLeft), ClickType: string(kernel.BrowserComputerClickMouseParamsClickTypeClick), HoldKeys: []string{"shift"}})
+	out := outBuf.String()
+	assert.Contains(t, out, "Clicked mouse at (10,20)")
+}
+
+func TestBrowsersComputerMoveMouse_PrintsSuccess(t *testing.T) {
+	setupStdoutCapture(t)
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	fakeComp := &FakeComputerService{}
+	b := BrowsersCmd{browsers: fakeBrowsers, computer: fakeComp}
+	_ = b.ComputerMoveMouse(context.Background(), BrowsersComputerMoveMouseInput{Identifier: "id", X: 5, Y: 6})
+	out := outBuf.String()
+	assert.Contains(t, out, "Moved mouse to (5,6)")
+}
+
+func TestBrowsersComputerScreenshot_SavesFile(t *testing.T) {
+	setupStdoutCapture(t)
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "shot.png")
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	fakeComp := &FakeComputerService{CaptureScreenshotFunc: func(ctx context.Context, id string, body kernel.BrowserComputerCaptureScreenshotParams, opts ...option.RequestOption) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"image/png"}}, Body: io.NopCloser(strings.NewReader("pngDATA"))}, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, computer: fakeComp}
+	_ = b.ComputerScreenshot(context.Background(), BrowsersComputerScreenshotInput{Identifier: "id", X: 0, Y: 0, Width: 10, Height: 10, To: outPath})
+	data, err := os.ReadFile(outPath)
+	assert.NoError(t, err)
+	assert.Equal(t, "pngDATA", string(data))
 }
 
 func TestParseViewport_ValidFormats(t *testing.T) {
