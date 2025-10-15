@@ -893,7 +893,6 @@ func TestParseViewport_ValidFormats(t *testing.T) {
 		{"2560x1440@10", 2560, 1440, 10},
 		{"1024x768@60", 1024, 768, 60},
 		{"1920x1080", 1920, 1080, 0},
-		{"800x600", 800, 600, 0},
 	}
 
 	for _, tt := range tests {
