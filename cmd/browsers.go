@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/onkernel/cli/pkg/util"
@@ -30,7 +31,7 @@ type BrowsersService interface {
 	New(ctx context.Context, body kernel.BrowserNewParams, opts ...option.RequestOption) (res *kernel.BrowserNewResponse, err error)
 	Delete(ctx context.Context, body kernel.BrowserDeleteParams, opts ...option.RequestOption) (err error)
 	DeleteByID(ctx context.Context, id string, opts ...option.RequestOption) (err error)
-	UploadExtensions(ctx context.Context, id string, body kernel.BrowserUploadExtensionsParams, opts ...option.RequestOption) (err error)
+	LoadExtensions(ctx context.Context, id string, body kernel.BrowserLoadExtensionsParams, opts ...option.RequestOption) (err error)
 }
 
 // BrowserReplaysService defines the subset we use for browser replays.
@@ -81,6 +82,53 @@ type BoolFlag struct {
 // Regular expression to validate CUID2 identifiers (24 lowercase alphanumeric characters).
 var cuidRegex = regexp.MustCompile(`^[a-z0-9]{24}$`)
 
+// getAvailableViewports returns the list of supported viewport configurations.
+func getAvailableViewports() []string {
+	return []string{
+		"2560x1440@10",
+		"1920x1080@25",
+		"1920x1200@25",
+		"1440x900@25",
+		"1024x768@60",
+	}
+}
+
+// parseViewport parses a viewport string (e.g., "1920x1080@25") and returns width, height, and refresh rate.
+// Returns error if the format is invalid.
+func parseViewport(viewport string) (width, height, refreshRate int64, err error) {
+	parts := strings.Split(viewport, "@")
+	var dimStr string
+	if len(parts) == 1 {
+		dimStr = parts[0]
+		refreshRate = 0
+	} else if len(parts) == 2 {
+		dimStr = parts[0]
+		rr, parseErr := strconv.ParseInt(parts[1], 10, 64)
+		if parseErr != nil {
+			return 0, 0, 0, fmt.Errorf("invalid refresh rate: %v", parseErr)
+		}
+		refreshRate = rr
+	} else {
+		return 0, 0, 0, fmt.Errorf("invalid viewport format")
+	}
+
+	dims := strings.Split(dimStr, "x")
+	if len(dims) != 2 {
+		return 0, 0, 0, fmt.Errorf("invalid viewport format, expected WIDTHxHEIGHT[@RATE]")
+	}
+
+	w, err := strconv.ParseInt(dims[0], 10, 64)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("invalid width: %v", err)
+	}
+	h, err := strconv.ParseInt(dims[1], 10, 64)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("invalid height: %v", err)
+	}
+
+	return w, h, refreshRate, nil
+}
+
 // Inputs for each command
 type BrowsersCreateInput struct {
 	PersistenceID      string
@@ -92,6 +140,7 @@ type BrowsersCreateInput struct {
 	ProfileSaveChanges BoolFlag
 	ProxyID            string
 	Extensions         []string
+	Viewport           string
 }
 
 type BrowsersDeleteInput struct {
@@ -227,6 +276,22 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 				item.Name = kernel.Opt(val)
 			}
 			params.Extensions = append(params.Extensions, item)
+		}
+	}
+
+	// Add viewport if specified
+	if in.Viewport != "" {
+		width, height, refreshRate, err := parseViewport(in.Viewport)
+		if err != nil {
+			pterm.Error.Printf("Invalid viewport format: %v\n", err)
+			return nil
+		}
+		params.Viewport = kernel.BrowserNewParamsViewport{
+			Width:  width,
+			Height: height,
+		}
+		if refreshRate > 0 {
+			params.Viewport.RefreshRate = kernel.Opt(refreshRate)
 		}
 	}
 
@@ -1239,7 +1304,7 @@ func (b BrowsersCmd) ExtensionsUpload(ctx context.Context, in BrowsersExtensions
 		return nil
 	}
 
-	var extensions []kernel.BrowserUploadExtensionsParamsExtension
+	var extensions []kernel.BrowserLoadExtensionsParamsExtension
 	var tempZipFiles []string
 	var openFiles []*os.File
 
@@ -1280,14 +1345,14 @@ func (b BrowsersCmd) ExtensionsUpload(ctx context.Context, in BrowsersExtensions
 		}
 		openFiles = append(openFiles, zipFile)
 
-		extensions = append(extensions, kernel.BrowserUploadExtensionsParamsExtension{
+		extensions = append(extensions, kernel.BrowserLoadExtensionsParamsExtension{
 			Name:    extName,
 			ZipFile: zipFile,
 		})
 	}
 
 	pterm.Info.Printf("Uploading %d extension(s) to browser %s...\n", len(extensions), br.SessionID)
-	if err := b.browsers.UploadExtensions(ctx, br.SessionID, kernel.BrowserUploadExtensionsParams{
+	if err := b.browsers.LoadExtensions(ctx, br.SessionID, kernel.BrowserLoadExtensionsParams{
 		Extensions: extensions,
 	}); err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -1482,6 +1547,8 @@ func init() {
 	browsersCreateCmd.Flags().Bool("save-changes", false, "If set, save changes back to the profile when the session ends")
 	browsersCreateCmd.Flags().String("proxy-id", "", "Proxy ID to use for the browser session")
 	browsersCreateCmd.Flags().StringSlice("extension", []string{}, "Extension IDs or names to load (repeatable; may be passed multiple times or comma-separated)")
+	browsersCreateCmd.Flags().String("viewport", "", "Browser viewport size (e.g., 1920x1080@25). Supported: 2560x1440@10, 1920x1080@25, 1920x1200@25, 1440x900@25, 1024x768@60")
+	browsersCreateCmd.Flags().Bool("viewport-interactive", false, "Interactively select viewport size from list")
 
 	// Add flags for delete command
 	browsersDeleteCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
@@ -1510,6 +1577,25 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 	saveChanges, _ := cmd.Flags().GetBool("save-changes")
 	proxyID, _ := cmd.Flags().GetString("proxy-id")
 	extensions, _ := cmd.Flags().GetStringSlice("extension")
+	viewport, _ := cmd.Flags().GetString("viewport")
+	viewportInteractive, _ := cmd.Flags().GetBool("viewport-interactive")
+
+	// Handle interactive viewport selection
+	if viewportInteractive {
+		if viewport != "" {
+			pterm.Warning.Println("Both --viewport and --viewport-interactive specified; using interactive mode")
+		}
+		options := getAvailableViewports()
+		selectedViewport, err := pterm.DefaultInteractiveSelect.
+			WithOptions(options).
+			WithDefaultText("Select a viewport size:").
+			Show()
+		if err != nil {
+			pterm.Error.Printf("Failed to select viewport: %v\n", err)
+			return nil
+		}
+		viewport = selectedViewport
+	}
 
 	in := BrowsersCreateInput{
 		PersistenceID:      persistenceID,
@@ -1521,6 +1607,7 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 		ProfileSaveChanges: BoolFlag{Set: cmd.Flags().Changed("save-changes"), Value: saveChanges},
 		ProxyID:            proxyID,
 		Extensions:         extensions,
+		Viewport:           viewport,
 	}
 
 	svc := client.Browsers

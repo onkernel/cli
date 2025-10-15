@@ -53,10 +53,11 @@ func setupStdoutCapture(t *testing.T) {
 
 // FakeBrowsersService is a configurable fake implementing BrowsersService.
 type FakeBrowsersService struct {
-	ListFunc       func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error)
-	NewFunc        func(ctx context.Context, body kernel.BrowserNewParams, opts ...option.RequestOption) (*kernel.BrowserNewResponse, error)
-	DeleteFunc     func(ctx context.Context, body kernel.BrowserDeleteParams, opts ...option.RequestOption) error
-	DeleteByIDFunc func(ctx context.Context, id string, opts ...option.RequestOption) error
+	ListFunc           func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error)
+	NewFunc            func(ctx context.Context, body kernel.BrowserNewParams, opts ...option.RequestOption) (*kernel.BrowserNewResponse, error)
+	DeleteFunc         func(ctx context.Context, body kernel.BrowserDeleteParams, opts ...option.RequestOption) error
+	DeleteByIDFunc     func(ctx context.Context, id string, opts ...option.RequestOption) error
+	LoadExtensionsFunc func(ctx context.Context, id string, body kernel.BrowserLoadExtensionsParams, opts ...option.RequestOption) error
 }
 
 func (f *FakeBrowsersService) List(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
@@ -83,6 +84,13 @@ func (f *FakeBrowsersService) Delete(ctx context.Context, body kernel.BrowserDel
 func (f *FakeBrowsersService) DeleteByID(ctx context.Context, id string, opts ...option.RequestOption) error {
 	if f.DeleteByIDFunc != nil {
 		return f.DeleteByIDFunc(ctx, id, opts...)
+	}
+	return nil
+}
+
+func (f *FakeBrowsersService) LoadExtensions(ctx context.Context, id string, body kernel.BrowserLoadExtensionsParams, opts ...option.RequestOption) error {
+	if f.LoadExtensionsFunc != nil {
+		return f.LoadExtensionsFunc(ctx, id, body, opts...)
 	}
 	return nil
 }
@@ -872,4 +880,113 @@ func __writeTempFile(t *testing.T, data string) string {
 	assert.NoError(t, err)
 	_ = f.Close()
 	return f.Name()
+}
+
+func TestParseViewport_ValidFormats(t *testing.T) {
+	tests := []struct {
+		input       string
+		wantWidth   int64
+		wantHeight  int64
+		wantRefresh int64
+	}{
+		{"1920x1080@25", 1920, 1080, 25},
+		{"2560x1440@10", 2560, 1440, 10},
+		{"1024x768@60", 1024, 768, 60},
+		{"1920x1080", 1920, 1080, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			w, h, r, err := parseViewport(tt.input)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantWidth, w)
+			assert.Equal(t, tt.wantHeight, h)
+			assert.Equal(t, tt.wantRefresh, r)
+		})
+	}
+}
+
+func TestParseViewport_InvalidFormats(t *testing.T) {
+	tests := []struct {
+		input string
+		desc  string
+	}{
+		{"1920", "missing height"},
+		{"1920x", "incomplete dimension"},
+		{"x1080", "missing width"},
+		{"1920x1080@", "missing refresh rate"},
+		{"1920x1080@abc", "non-numeric refresh rate"},
+		{"abcxdef", "non-numeric dimensions"},
+		{"1920x1080@25@30", "too many @ signs"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			_, _, _, err := parseViewport(tt.input)
+			assert.Error(t, err)
+		})
+	}
+}
+
+func TestGetAvailableViewports_ReturnsExpectedOptions(t *testing.T) {
+	viewports := getAvailableViewports()
+	assert.Len(t, viewports, 5)
+	assert.Contains(t, viewports, "2560x1440@10")
+	assert.Contains(t, viewports, "1920x1080@25")
+	assert.Contains(t, viewports, "1920x1200@25")
+	assert.Contains(t, viewports, "1440x900@25")
+	assert.Contains(t, viewports, "1024x768@60")
+}
+
+func TestBrowsersCreate_WithViewport(t *testing.T) {
+	setupStdoutCapture(t)
+	var captured kernel.BrowserNewParams
+	fake := &FakeBrowsersService{NewFunc: func(ctx context.Context, body kernel.BrowserNewParams, opts ...option.RequestOption) (*kernel.BrowserNewResponse, error) {
+		captured = body
+		return &kernel.BrowserNewResponse{SessionID: "session123", CdpWsURL: "ws://example"}, nil
+	}}
+	b := BrowsersCmd{browsers: fake}
+
+	err := b.Create(context.Background(), BrowsersCreateInput{
+		Viewport: "1920x1080@25",
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1920), captured.Viewport.Width)
+	assert.Equal(t, int64(1080), captured.Viewport.Height)
+	assert.True(t, captured.Viewport.RefreshRate.Valid())
+	assert.Equal(t, int64(25), captured.Viewport.RefreshRate.Value)
+}
+
+func TestBrowsersCreate_WithViewportNoRefreshRate(t *testing.T) {
+	setupStdoutCapture(t)
+	var captured kernel.BrowserNewParams
+	fake := &FakeBrowsersService{NewFunc: func(ctx context.Context, body kernel.BrowserNewParams, opts ...option.RequestOption) (*kernel.BrowserNewResponse, error) {
+		captured = body
+		return &kernel.BrowserNewResponse{SessionID: "session123", CdpWsURL: "ws://example"}, nil
+	}}
+	b := BrowsersCmd{browsers: fake}
+
+	err := b.Create(context.Background(), BrowsersCreateInput{
+		Viewport: "1920x1080",
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1920), captured.Viewport.Width)
+	assert.Equal(t, int64(1080), captured.Viewport.Height)
+	assert.False(t, captured.Viewport.RefreshRate.Valid())
+}
+
+func TestBrowsersCreate_WithInvalidViewport(t *testing.T) {
+	setupStdoutCapture(t)
+	fake := &FakeBrowsersService{}
+	b := BrowsersCmd{browsers: fake}
+
+	err := b.Create(context.Background(), BrowsersCreateInput{
+		Viewport: "invalid",
+	})
+
+	assert.NoError(t, err)
+	out := outBuf.String()
+	assert.Contains(t, out, "Invalid viewport format")
 }
