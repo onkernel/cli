@@ -529,6 +529,10 @@ type FakeComputerService struct {
 	ClickMouseFunc        func(ctx context.Context, id string, body kernel.BrowserComputerClickMouseParams, opts ...option.RequestOption) error
 	MoveMouseFunc         func(ctx context.Context, id string, body kernel.BrowserComputerMoveMouseParams, opts ...option.RequestOption) error
 	CaptureScreenshotFunc func(ctx context.Context, id string, body kernel.BrowserComputerCaptureScreenshotParams, opts ...option.RequestOption) (*http.Response, error)
+	PressKeyFunc          func(ctx context.Context, id string, body kernel.BrowserComputerPressKeyParams, opts ...option.RequestOption) error
+	ScrollFunc            func(ctx context.Context, id string, body kernel.BrowserComputerScrollParams, opts ...option.RequestOption) error
+	DragMouseFunc         func(ctx context.Context, id string, body kernel.BrowserComputerDragMouseParams, opts ...option.RequestOption) error
+	TypeTextFunc          func(ctx context.Context, id string, body kernel.BrowserComputerTypeTextParams, opts ...option.RequestOption) error
 }
 
 func (f *FakeComputerService) ClickMouse(ctx context.Context, id string, body kernel.BrowserComputerClickMouseParams, opts ...option.RequestOption) error {
@@ -548,6 +552,31 @@ func (f *FakeComputerService) CaptureScreenshot(ctx context.Context, id string, 
 		return f.CaptureScreenshotFunc(ctx, id, body, opts...)
 	}
 	return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"image/png"}}, Body: io.NopCloser(strings.NewReader("pngdata"))}, nil
+}
+
+func (f *FakeComputerService) PressKey(ctx context.Context, id string, body kernel.BrowserComputerPressKeyParams, opts ...option.RequestOption) error {
+	if f.PressKeyFunc != nil {
+		return f.PressKeyFunc(ctx, id, body, opts...)
+	}
+	return nil
+}
+func (f *FakeComputerService) Scroll(ctx context.Context, id string, body kernel.BrowserComputerScrollParams, opts ...option.RequestOption) error {
+	if f.ScrollFunc != nil {
+		return f.ScrollFunc(ctx, id, body, opts...)
+	}
+	return nil
+}
+func (f *FakeComputerService) DragMouse(ctx context.Context, id string, body kernel.BrowserComputerDragMouseParams, opts ...option.RequestOption) error {
+	if f.DragMouseFunc != nil {
+		return f.DragMouseFunc(ctx, id, body, opts...)
+	}
+	return nil
+}
+func (f *FakeComputerService) TypeText(ctx context.Context, id string, body kernel.BrowserComputerTypeTextParams, opts ...option.RequestOption) error {
+	if f.TypeTextFunc != nil {
+		return f.TypeTextFunc(ctx, id, body, opts...)
+	}
+	return nil
 }
 
 // --- Tests for Logs ---
@@ -953,6 +982,46 @@ func TestBrowsersComputerScreenshot_SavesFile(t *testing.T) {
 	data, err := os.ReadFile(outPath)
 	assert.NoError(t, err)
 	assert.Equal(t, "pngDATA", string(data))
+}
+
+func TestBrowsersComputerPressKey_PrintsSuccess(t *testing.T) {
+	setupStdoutCapture(t)
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	fakeComp := &FakeComputerService{}
+	b := BrowsersCmd{browsers: fakeBrowsers, computer: fakeComp}
+	_ = b.ComputerPressKey(context.Background(), BrowsersComputerPressKeyInput{Identifier: "id", Keys: []string{"Return", "Shift"}, Duration: 25, HoldKeys: []string{"Ctrl"}})
+	out := outBuf.String()
+	assert.Contains(t, out, "Pressed keys: Return,Shift")
+}
+
+func TestBrowsersComputerScroll_PrintsSuccess(t *testing.T) {
+	setupStdoutCapture(t)
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	fakeComp := &FakeComputerService{}
+	b := BrowsersCmd{browsers: fakeBrowsers, computer: fakeComp}
+	_ = b.ComputerScroll(context.Background(), BrowsersComputerScrollInput{Identifier: "id", X: 100, Y: 200, DeltaY: 120, DeltaYSet: true})
+	out := outBuf.String()
+	assert.Contains(t, out, "Scrolled at (100,200)")
+}
+
+func TestBrowsersComputerDragMouse_PrintsSuccess(t *testing.T) {
+	setupStdoutCapture(t)
+	fakeBrowsers := &FakeBrowsersService{ListFunc: func(ctx context.Context, opts ...option.RequestOption) (*[]kernel.BrowserListResponse, error) {
+		rows := []kernel.BrowserListResponse{{SessionID: "id"}}
+		return &rows, nil
+	}}
+	fakeComp := &FakeComputerService{}
+	b := BrowsersCmd{browsers: fakeBrowsers, computer: fakeComp}
+	path := [][]int64{{0, 0}, {50, 50}, {100, 100}}
+	_ = b.ComputerDragMouse(context.Background(), BrowsersComputerDragMouseInput{Identifier: "id", Path: path, Delay: 50, Button: string(kernel.BrowserComputerDragMouseParamsButtonLeft)})
+	out := outBuf.String()
+	assert.Contains(t, out, "Dragged mouse over 3 points")
 }
 
 func TestParseViewport_ValidFormats(t *testing.T) {
