@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -186,59 +187,11 @@ func runDeployGithub(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("decode deployment response: %w", err)
 	}
 
-	// Follow deployment events via SSE using the same base URL and API key
-	stream := client.Deployments.FollowStreaming(
-		cmd.Context(),
-		depCreated.ID,
-		kernel.DeploymentFollowParams{},
+	return followDeployment(cmd.Context(), client, depCreated.ID, startTime,
 		option.WithBaseURL(baseURL),
 		option.WithHeader("Authorization", "Bearer "+apiKey),
 		option.WithMaxRetries(0),
 	)
-	for stream.Next() {
-		data := stream.Current()
-		switch data.Event {
-		case "log":
-			logEv := data.AsLog()
-			msg := strings.TrimSuffix(logEv.Message, "\n")
-			pterm.Info.Println(pterm.Gray(msg))
-		case "deployment_state":
-			deploymentState := data.AsDeploymentState()
-			status := deploymentState.Deployment.Status
-			if status == string(kernel.DeploymentGetResponseStatusFailed) ||
-				status == string(kernel.DeploymentGetResponseStatusStopped) {
-				pterm.Error.Println("✖ Deployment failed")
-				pterm.Error.Printf("Deployment ID: %s\n", depCreated.ID)
-				pterm.Info.Printf("View logs: kernel deploy logs %s --since 1h\n", depCreated.ID)
-				return fmt.Errorf("deployment %s: %s", status, deploymentState.Deployment.StatusReason)
-			}
-			if status == string(kernel.DeploymentGetResponseStatusRunning) {
-				duration := time.Since(startTime)
-				pterm.Success.Printfln("✔ Deployment complete in %s", duration.Round(time.Millisecond))
-				return nil
-			}
-		case "app_version_summary":
-			appVersionSummary := data.AsDeploymentFollowResponseAppVersionSummaryEvent()
-			pterm.Info.Printf("App \"%s\" deployed (version: %s)\n", appVersionSummary.AppName, appVersionSummary.Version)
-			if len(appVersionSummary.Actions) > 0 {
-				action0Name := appVersionSummary.Actions[0].Name
-				pterm.Info.Printf("Invoke with: kernel invoke %s %s --payload '{...}'\n", quoteIfNeeded(appVersionSummary.AppName), quoteIfNeeded(action0Name))
-			}
-		case "error":
-			errorEv := data.AsErrorEvent()
-			pterm.Error.Printf("Deployment ID: %s\n", depCreated.ID)
-			pterm.Info.Printf("View logs: kernel deploy logs %s --since 1h\n", depCreated.ID)
-			return fmt.Errorf("%s: %s", errorEv.Error.Code, errorEv.Error.Message)
-		}
-	}
-
-	if serr := stream.Err(); serr != nil {
-		pterm.Error.Println("✖ Stream error")
-		pterm.Error.Printf("Deployment ID: %s\n", depCreated.ID)
-		pterm.Info.Printf("View logs: kernel deploy logs %s --since 1h\n", depCreated.ID)
-		return fmt.Errorf("stream error: %w", serr)
-	}
-	return nil
 }
 
 func runDeploy(cmd *cobra.Command, args []string) (err error) {
@@ -316,54 +269,7 @@ func runDeploy(cmd *cobra.Command, args []string) (err error) {
 		return util.CleanedUpSdkError{Err: err}
 	}
 
-	// Follow deployment events via SSE
-	stream := client.Deployments.FollowStreaming(cmd.Context(), resp.ID, kernel.DeploymentFollowParams{}, option.WithMaxRetries(0))
-	for stream.Next() {
-		data := stream.Current()
-		switch data.Event {
-		case "log":
-			logEv := data.AsLog()
-			msg := strings.TrimSuffix(logEv.Message, "\n")
-			pterm.Info.Println(pterm.Gray(msg))
-		case "deployment_state":
-			deploymentState := data.AsDeploymentState()
-			status := deploymentState.Deployment.Status
-			if status == string(kernel.DeploymentGetResponseStatusFailed) ||
-				status == string(kernel.DeploymentGetResponseStatusStopped) {
-				pterm.Error.Println("✖ Deployment failed")
-				pterm.Error.Printf("Deployment ID: %s\n", resp.ID)
-				pterm.Info.Printf("View logs: kernel deploy logs %s --since 1h\n", resp.ID)
-				err = fmt.Errorf("deployment %s: %s", status, deploymentState.Deployment.StatusReason)
-				return err
-			}
-			if status == string(kernel.DeploymentGetResponseStatusRunning) {
-				duration := time.Since(startTime)
-				pterm.Success.Printfln("✔ Deployment complete in %s", duration.Round(time.Millisecond))
-				return nil
-			}
-		case "app_version_summary":
-			appVersionSummary := data.AsDeploymentFollowResponseAppVersionSummaryEvent()
-			pterm.Info.Printf("App \"%s\" deployed (version: %s)\n", appVersionSummary.AppName, appVersionSummary.Version)
-			if len(appVersionSummary.Actions) > 0 {
-				action0Name := appVersionSummary.Actions[0].Name
-				pterm.Info.Printf("Invoke with: kernel invoke %s %s --payload '{...}'\n", quoteIfNeeded(appVersionSummary.AppName), quoteIfNeeded(action0Name))
-			}
-		case "error":
-			errorEv := data.AsErrorEvent()
-			pterm.Error.Printf("Deployment ID: %s\n", resp.ID)
-			pterm.Info.Printf("View logs: kernel deploy logs %s --since 1h\n", resp.ID)
-			err = fmt.Errorf("%s: %s", errorEv.Error.Code, errorEv.Error.Message)
-			return err
-		}
-	}
-
-	if serr := stream.Err(); serr != nil {
-		pterm.Error.Println("✖ Stream error")
-		pterm.Error.Printf("Deployment ID: %s\n", resp.ID)
-		pterm.Info.Printf("View logs: kernel deploy logs %s --since 1h\n", resp.ID)
-		return fmt.Errorf("stream error: %w", serr)
-	}
-	return nil
+	return followDeployment(cmd.Context(), client, resp.ID, startTime, option.WithMaxRetries(0))
 }
 
 func quoteIfNeeded(s string) string {
@@ -507,5 +413,53 @@ AppsLoop:
 		return nil
 	}
 	pterm.DefaultTable.WithHasHeader().WithData(table).Render()
+	return nil
+}
+
+func followDeployment(ctx context.Context, client kernel.Client, deploymentID string, startTime time.Time, opts ...option.RequestOption) error {
+	stream := client.Deployments.FollowStreaming(ctx, deploymentID, kernel.DeploymentFollowParams{}, opts...)
+	for stream.Next() {
+		data := stream.Current()
+		switch data.Event {
+		case "log":
+			logEv := data.AsLog()
+			msg := strings.TrimSuffix(logEv.Message, "\n")
+			pterm.Info.Println(pterm.Gray(msg))
+		case "deployment_state":
+			deploymentState := data.AsDeploymentState()
+			status := deploymentState.Deployment.Status
+			if status == string(kernel.DeploymentGetResponseStatusFailed) ||
+				status == string(kernel.DeploymentGetResponseStatusStopped) {
+				pterm.Error.Println("✖ Deployment failed")
+				pterm.Error.Printf("Deployment ID: %s\n", deploymentID)
+				pterm.Info.Printf("View logs: kernel deploy logs %s --since 1h\n", deploymentID)
+				return fmt.Errorf("deployment %s: %s", status, deploymentState.Deployment.StatusReason)
+			}
+			if status == string(kernel.DeploymentGetResponseStatusRunning) {
+				duration := time.Since(startTime)
+				pterm.Success.Printfln("✔ Deployment complete in %s", duration.Round(time.Millisecond))
+				return nil
+			}
+		case "app_version_summary":
+			appVersionSummary := data.AsDeploymentFollowResponseAppVersionSummaryEvent()
+			pterm.Info.Printf("App \"%s\" deployed (version: %s)\n", appVersionSummary.AppName, appVersionSummary.Version)
+			if len(appVersionSummary.Actions) > 0 {
+				action0Name := appVersionSummary.Actions[0].Name
+				pterm.Info.Printf("Invoke with: kernel invoke %s %s --payload '{...}'\n", quoteIfNeeded(appVersionSummary.AppName), quoteIfNeeded(action0Name))
+			}
+		case "error":
+			errorEv := data.AsErrorEvent()
+			pterm.Error.Printf("Deployment ID: %s\n", deploymentID)
+			pterm.Info.Printf("View logs: kernel deploy logs %s --since 1h\n", deploymentID)
+			return fmt.Errorf("%s: %s", errorEv.Error.Code, errorEv.Error.Message)
+		}
+	}
+
+	if serr := stream.Err(); serr != nil {
+		pterm.Error.Println("✖ Stream error")
+		pterm.Error.Printf("Deployment ID: %s\n", deploymentID)
+		pterm.Info.Printf("View logs: kernel deploy logs %s --since 1h\n", deploymentID)
+		return fmt.Errorf("stream error: %w", serr)
+	}
 	return nil
 }
