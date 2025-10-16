@@ -260,8 +260,29 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
   - `--width <pixels>` - Region width (optional)
   - `--height <pixels>` - Region height (optional)
 - `kernel browsers computer type <id or persistent id>` - Type text on the browser instance
+
   - `--text <text>` - Text to type (required)
   - `--delay <ms>` - Delay in milliseconds between keystrokes (optional)
+
+- `kernel browsers computer press-key <id or persistent id>` - Press one or more keys
+
+  - `--key <key>` - Key symbols to press (repeatable)
+  - `--duration <ms>` - Duration to hold keys down in ms (0=tap)
+  - `--hold-key <key>` - Modifier keys to hold (repeatable)
+
+- `kernel browsers computer scroll <id or persistent id>` - Scroll the mouse wheel
+
+  - `--x <coordinate>` - X coordinate (required)
+  - `--y <coordinate>` - Y coordinate (required)
+  - `--delta-x <pixels>` - Horizontal scroll amount (+right, -left)
+  - `--delta-y <pixels>` - Vertical scroll amount (+down, -up)
+  - `--hold-key <key>` - Modifier keys to hold (repeatable)
+
+- `kernel browsers computer drag-mouse <id or persistent id>` - Drag the mouse along a path
+  - `--point <x,y>` - Add a point as x,y (repeatable)
+  - `--delay <ms>` - Delay before dragging starts in ms
+  - `--button <button>` - Mouse button: left, middle, right (default: left)
+  - `--hold-key <key>` - Modifier keys to hold (repeatable)
 
 ### Extension Management
 
