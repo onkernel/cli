@@ -1876,7 +1876,7 @@ func init() {
 
 	// computer drag-mouse
 	computerDrag := &cobra.Command{Use: "drag-mouse <id|persistent-id>", Short: "Drag the mouse along a path", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerDragMouse}
-	computerDrag.Flags().StringSlice("point", []string{}, "Add a point as x,y (repeatable)")
+	computerDrag.Flags().StringArray("point", []string{}, "Add a point as x,y (repeatable)")
 	computerDrag.Flags().Int64("delay", 0, "Delay before dragging starts in ms")
 	computerDrag.Flags().String("button", "left", "Mouse button: left,middle,right")
 	computerDrag.Flags().StringSlice("hold-key", []string{}, "Modifier keys to hold (repeatable)")
@@ -2320,7 +2320,7 @@ func runBrowsersComputerScroll(cmd *cobra.Command, args []string) error {
 func runBrowsersComputerDragMouse(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	svc := client.Browsers
-	points, _ := cmd.Flags().GetStringSlice("point")
+	points, _ := cmd.Flags().GetStringArray("point")
 	delay, _ := cmd.Flags().GetInt64("delay")
 	button, _ := cmd.Flags().GetString("button")
 	holdKeys, _ := cmd.Flags().GetStringSlice("hold-key")
