@@ -548,11 +548,13 @@ type BrowsersComputerScrollInput struct {
 }
 
 type BrowsersComputerDragMouseInput struct {
-	Identifier string
-	Path       [][]int64
-	Delay      int64
-	Button     string
-	HoldKeys   []string
+	Identifier      string
+	Path            [][]int64
+	Delay           int64
+	StepDelayMs     int64
+	StepsPerSegment int64
+	Button          string
+	HoldKeys        []string
 }
 
 func (b BrowsersCmd) ComputerClickMouse(ctx context.Context, in BrowsersComputerClickMouseInput) error {
@@ -757,6 +759,12 @@ func (b BrowsersCmd) ComputerDragMouse(ctx context.Context, in BrowsersComputerD
 	body := kernel.BrowserComputerDragMouseParams{Path: in.Path}
 	if in.Delay > 0 {
 		body.Delay = kernel.Opt(in.Delay)
+	}
+	if in.StepDelayMs > 0 {
+		body.StepDelayMs = kernel.Opt(in.StepDelayMs)
+	}
+	if in.StepsPerSegment > 0 {
+		body.StepsPerSegment = kernel.Opt(in.StepsPerSegment)
 	}
 	if in.Button != "" {
 		body.Button = kernel.BrowserComputerDragMouseParamsButton(in.Button)
@@ -1878,6 +1886,8 @@ func init() {
 	computerDrag := &cobra.Command{Use: "drag-mouse <id|persistent-id>", Short: "Drag the mouse along a path", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerDragMouse}
 	computerDrag.Flags().StringArray("point", []string{}, "Add a point as x,y (repeatable)")
 	computerDrag.Flags().Int64("delay", 0, "Delay before dragging starts in ms")
+	computerDrag.Flags().Int64("step-delay-ms", 0, "Delay between steps while dragging (ms)")
+	computerDrag.Flags().Int64("steps-per-segment", 0, "Number of move steps per path segment")
 	computerDrag.Flags().String("button", "left", "Mouse button: left,middle,right")
 	computerDrag.Flags().StringSlice("hold-key", []string{}, "Modifier keys to hold (repeatable)")
 
@@ -2322,6 +2332,8 @@ func runBrowsersComputerDragMouse(cmd *cobra.Command, args []string) error {
 	svc := client.Browsers
 	points, _ := cmd.Flags().GetStringArray("point")
 	delay, _ := cmd.Flags().GetInt64("delay")
+	stepDelayMs, _ := cmd.Flags().GetInt64("step-delay-ms")
+	stepsPerSegment, _ := cmd.Flags().GetInt64("steps-per-segment")
 	button, _ := cmd.Flags().GetString("button")
 	holdKeys, _ := cmd.Flags().GetStringSlice("hold-key")
 
@@ -2347,7 +2359,7 @@ func runBrowsersComputerDragMouse(cmd *cobra.Command, args []string) error {
 	}
 
 	b := BrowsersCmd{browsers: &svc, computer: &svc.Computer}
-	return b.ComputerDragMouse(cmd.Context(), BrowsersComputerDragMouseInput{Identifier: args[0], Path: path, Delay: delay, Button: button, HoldKeys: holdKeys})
+	return b.ComputerDragMouse(cmd.Context(), BrowsersComputerDragMouseInput{Identifier: args[0], Path: path, Delay: delay, StepDelayMs: stepDelayMs, StepsPerSegment: stepsPerSegment, Button: button, HoldKeys: holdKeys})
 }
 
 func truncateURL(url string, maxLen int) string {
