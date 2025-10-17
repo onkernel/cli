@@ -152,6 +152,7 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
   - `-p, --persistence-id <id>` - Unique identifier for browser session persistence
   - `-s, --stealth` - Launch browser in stealth mode to avoid detection
   - `-H, --headless` - Launch browser without GUI access
+  - `--kiosk` - Launch browser in kiosk mode
 - `kernel browsers delete <id or persistent id>` - Delete a browser
   - `-y, --yes` - Skip confirmation prompt
 - `kernel browsers view <id or persistent id>` - Get live view URL for a browser
@@ -305,6 +306,9 @@ kernel browsers create --persistence-id my-browser-session
 
 # Create a headless browser in stealth mode
 kernel browsers create --headless --stealth
+
+# Create a browser in kiosk mode
+kernel browsers create --kiosk
 
 # Delete a persistent browser
 kernel browsers delete --by-persistent-id my-browser-session --yes
