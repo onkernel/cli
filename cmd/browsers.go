@@ -146,6 +146,7 @@ type BrowsersCreateInput struct {
 	TimeoutSeconds     int
 	Stealth            BoolFlag
 	Headless           BoolFlag
+	Kiosk              BoolFlag
 	ProfileID          string
 	ProfileName        string
 	ProfileSaveChanges BoolFlag
@@ -252,6 +253,9 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 	}
 	if in.Headless.Set {
 		params.Headless = kernel.Opt(in.Headless.Value)
+	}
+	if in.Kiosk.Set {
+		params.KioskMode = kernel.Opt(in.Kiosk.Value)
 	}
 
 	// Validate profile selection: at most one of profile-id or profile-name must be provided
@@ -1898,6 +1902,7 @@ func init() {
 	browsersCreateCmd.Flags().StringP("persistent-id", "p", "", "Unique identifier for browser session persistence")
 	browsersCreateCmd.Flags().BoolP("stealth", "s", false, "Launch browser in stealth mode to avoid detection")
 	browsersCreateCmd.Flags().BoolP("headless", "H", false, "Launch browser without GUI access")
+	browsersCreateCmd.Flags().Bool("kiosk", false, "Launch browser in kiosk mode")
 	browsersCreateCmd.Flags().IntP("timeout", "t", 60, "Timeout in seconds for the browser session")
 	browsersCreateCmd.Flags().String("profile-id", "", "Profile ID to load into the browser session (mutually exclusive with --profile-name)")
 	browsersCreateCmd.Flags().String("profile-name", "", "Profile name to load into the browser session (mutually exclusive with --profile-id)")
@@ -1928,6 +1933,7 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 	persistenceID, _ := cmd.Flags().GetString("persistent-id")
 	stealthVal, _ := cmd.Flags().GetBool("stealth")
 	headlessVal, _ := cmd.Flags().GetBool("headless")
+	kioskVal, _ := cmd.Flags().GetBool("kiosk")
 	timeout, _ := cmd.Flags().GetInt("timeout")
 	profileID, _ := cmd.Flags().GetString("profile-id")
 	profileName, _ := cmd.Flags().GetString("profile-name")
@@ -1959,6 +1965,7 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 		TimeoutSeconds:     timeout,
 		Stealth:            BoolFlag{Set: cmd.Flags().Changed("stealth"), Value: stealthVal},
 		Headless:           BoolFlag{Set: cmd.Flags().Changed("headless"), Value: headlessVal},
+		Kiosk:              BoolFlag{Set: cmd.Flags().Changed("kiosk"), Value: kioskVal},
 		ProfileID:          profileID,
 		ProfileName:        profileName,
 		ProfileSaveChanges: BoolFlag{Set: cmd.Flags().Changed("save-changes"), Value: saveChanges},
