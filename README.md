@@ -241,6 +241,50 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 
 - `kernel browsers extensions upload <id or persistent id> <extension-path>...` - Ad-hoc upload of one or more unpacked extensions to a running browser instance.
 
+### Browser Computer Controls
+
+- `kernel browsers computer click-mouse <id or persistent id>` - Click mouse at coordinates
+  - `--x <coordinate>` - X coordinate (required)
+  - `--y <coordinate>` - Y coordinate (required)
+  - `--num-clicks <n>` - Number of clicks (default: 1)
+  - `--button <button>` - Mouse button: left, right, middle, back, forward (default: left)
+  - `--click-type <type>` - Click type: down, up, click (default: click)
+  - `--hold-key <key>` - Modifier keys to hold (repeatable)
+- `kernel browsers computer move-mouse <id or persistent id>` - Move mouse to coordinates
+  - `--x <coordinate>` - X coordinate (required)
+  - `--y <coordinate>` - Y coordinate (required)
+  - `--hold-key <key>` - Modifier keys to hold (repeatable)
+- `kernel browsers computer screenshot <id or persistent id>` - Capture a screenshot
+  - `--to <path>` - Output file path for the PNG image (required)
+  - `--x <coordinate>` - Top-left X for region capture (optional)
+  - `--y <coordinate>` - Top-left Y for region capture (optional)
+  - `--width <pixels>` - Region width (optional)
+  - `--height <pixels>` - Region height (optional)
+- `kernel browsers computer type <id or persistent id>` - Type text on the browser instance
+
+  - `--text <text>` - Text to type (required)
+  - `--delay <ms>` - Delay in milliseconds between keystrokes (optional)
+
+- `kernel browsers computer press-key <id or persistent id>` - Press one or more keys
+
+  - `--key <key>` - Key symbols to press (repeatable)
+  - `--duration <ms>` - Duration to hold keys down in ms (0=tap)
+  - `--hold-key <key>` - Modifier keys to hold (repeatable)
+
+- `kernel browsers computer scroll <id or persistent id>` - Scroll the mouse wheel
+
+  - `--x <coordinate>` - X coordinate (required)
+  - `--y <coordinate>` - Y coordinate (required)
+  - `--delta-x <pixels>` - Horizontal scroll amount (+right, -left)
+  - `--delta-y <pixels>` - Vertical scroll amount (+down, -up)
+  - `--hold-key <key>` - Modifier keys to hold (repeatable)
+
+- `kernel browsers computer drag-mouse <id or persistent id>` - Drag the mouse along a path
+  - `--point <x,y>` - Add a point as x,y (repeatable)
+  - `--delay <ms>` - Delay before dragging starts in ms
+  - `--button <button>` - Mouse button: left, middle, right (default: left)
+  - `--hold-key <key>` - Modifier keys to hold (repeatable)
+
 ### Extension Management
 
 - `kernel extensions list` - List all uploaded extensions
@@ -330,6 +374,27 @@ kernel browsers fs upload my-browser --file "local.txt:remote.txt" --dest-dir "/
 
 # List files in a directory
 kernel browsers fs list-files my-browser --path "/tmp"
+
+# Click the mouse at coordinates (100, 200)
+kernel browsers computer click-mouse my-browser --x 100 --y 200
+
+# Double-click the right mouse button
+kernel browsers computer click-mouse my-browser --x 100 --y 200 --num-clicks 2 --button right
+
+# Move the mouse to coordinates (500, 300)
+kernel browsers computer move-mouse my-browser --x 500 --y 300
+
+# Take a full screenshot
+kernel browsers computer screenshot my-browser --to screenshot.png
+
+# Take a screenshot of a specific region
+kernel browsers computer screenshot my-browser --to region.png --x 0 --y 0 --width 800 --height 600
+
+# Type text in the browser
+kernel browsers computer type my-browser --text "Hello, World!"
+
+# Type text with a 100ms delay between keystrokes
+kernel browsers computer type my-browser --text "Slow typing..." --delay 100
 ```
 
 ### Extension management

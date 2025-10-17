@@ -262,7 +262,7 @@ func runDeploy(cmd *cobra.Command, args []string) (err error) {
 		File:              file,
 		Version:           kernel.Opt(version),
 		Force:             kernel.Opt(force),
-		EntrypointRelPath: filepath.Base(resolvedEntrypoint),
+		EntrypointRelPath: kernel.Opt(filepath.Base(resolvedEntrypoint)),
 		EnvVars:           envVars,
 	}, option.WithMaxRetries(0))
 	if err != nil {
