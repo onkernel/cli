@@ -73,6 +73,11 @@ type BrowserLogService interface {
 	StreamStreaming(ctx context.Context, id string, query kernel.BrowserLogStreamParams, opts ...option.RequestOption) (stream *ssestream.Stream[shared.LogEvent])
 }
 
+// BrowserPlaywrightService defines the subset we use for Playwright execution.
+type BrowserPlaywrightService interface {
+	Execute(ctx context.Context, id string, body kernel.BrowserPlaywrightExecuteParams, opts ...option.RequestOption) (res *kernel.BrowserPlaywrightExecuteResponse, err error)
+}
+
 // BrowserComputerService defines the subset we use for OS-level mouse & screen.
 type BrowserComputerService interface {
 	CaptureScreenshot(ctx context.Context, id string, body kernel.BrowserComputerCaptureScreenshotParams, opts ...option.RequestOption) (res *http.Response, err error)
@@ -166,12 +171,13 @@ type BrowsersViewInput struct {
 
 // BrowsersCmd is a cobra-independent command handler for browsers operations.
 type BrowsersCmd struct {
-	browsers BrowsersService
-	replays  BrowserReplaysService
-	fs       BrowserFSService
-	process  BrowserProcessService
-	logs     BrowserLogService
-	computer BrowserComputerService
+	browsers   BrowsersService
+	replays    BrowserReplaysService
+	fs         BrowserFSService
+	process    BrowserProcessService
+	logs       BrowserLogService
+	computer   BrowserComputerService
+	playwright BrowserPlaywrightService
 }
 
 type BrowsersListInput struct {
@@ -938,6 +944,59 @@ type BrowsersProcessStdinInput struct {
 type BrowsersProcessStdoutStreamInput struct {
 	Identifier string
 	ProcessID  string
+}
+
+// Playwright
+type BrowsersPlaywrightExecuteInput struct {
+	Identifier string
+	Code       string
+	Timeout    int64
+}
+
+func (b BrowsersCmd) PlaywrightExecute(ctx context.Context, in BrowsersPlaywrightExecuteInput) error {
+	if b.playwright == nil {
+		pterm.Error.Println("playwright service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		return util.CleanedUpSdkError{Err: err}
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	params := kernel.BrowserPlaywrightExecuteParams{Code: in.Code}
+	if in.Timeout > 0 {
+		params.TimeoutSec = kernel.Opt(in.Timeout)
+	}
+	res, err := b.playwright.Execute(ctx, br.SessionID, params)
+	if err != nil {
+		return util.CleanedUpSdkError{Err: err}
+	}
+
+	rows := pterm.TableData{{"Property", "Value"}, {"Success", fmt.Sprintf("%t", res.Success)}}
+	PrintTableNoPad(rows, true)
+
+	if res.Stdout != "" {
+		pterm.Info.Println("stdout:")
+		fmt.Println(res.Stdout)
+	}
+	if res.Stderr != "" {
+		pterm.Info.Println("stderr:")
+		fmt.Fprintln(os.Stderr, res.Stderr)
+	}
+	if res.Result != nil {
+		bs, err := json.MarshalIndent(res.Result, "", "  ")
+		if err == nil {
+			pterm.Info.Println("result:")
+			fmt.Println(string(bs))
+		}
+	}
+	if !res.Success && res.Error != "" {
+		pterm.Error.Printf("error: %s\n", res.Error)
+	}
+	return nil
 }
 
 func (b BrowsersCmd) ProcessExec(ctx context.Context, in BrowsersProcessExecInput) error {
@@ -1898,6 +1957,13 @@ func init() {
 	computerRoot.AddCommand(computerClick, computerMove, computerScreenshot, computerType, computerPressKey, computerScroll, computerDrag)
 	browsersCmd.AddCommand(computerRoot)
 
+	// playwright
+	playwrightRoot := &cobra.Command{Use: "playwright", Short: "Playwright operations"}
+	playwrightExecute := &cobra.Command{Use: "execute <id|persistent-id> [code]", Short: "Execute Playwright/TypeScript code against the browser", Args: cobra.MinimumNArgs(1), RunE: runBrowsersPlaywrightExecute}
+	playwrightExecute.Flags().Int64("timeout", 0, "Maximum execution time in seconds (default per server)")
+	playwrightRoot.AddCommand(playwrightExecute)
+	browsersCmd.AddCommand(playwrightRoot)
+
 	// Add flags for create command
 	browsersCreateCmd.Flags().StringP("persistent-id", "p", "", "Unique identifier for browser session persistence")
 	browsersCreateCmd.Flags().BoolP("stealth", "s", false, "Launch browser in stealth mode to avoid detection")
@@ -2118,6 +2184,32 @@ func runBrowsersProcessStdoutStream(cmd *cobra.Command, args []string) error {
 	svc := client.Browsers
 	b := BrowsersCmd{browsers: &svc, process: &svc.Process}
 	return b.ProcessStdoutStream(cmd.Context(), BrowsersProcessStdoutStreamInput{Identifier: args[0], ProcessID: args[1]})
+}
+
+func runBrowsersPlaywrightExecute(cmd *cobra.Command, args []string) error {
+	client := getKernelClient(cmd)
+	svc := client.Browsers
+
+	var code string
+	if len(args) >= 2 {
+		code = strings.Join(args[1:], " ")
+	} else {
+		// Read code from stdin
+		stat, _ := os.Stdin.Stat()
+		if (stat.Mode() & os.ModeCharDevice) != 0 {
+			pterm.Error.Println("no code provided. Provide code as an argument or pipe via stdin")
+			return nil
+		}
+		data, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			pterm.Error.Printf("failed to read stdin: %v\n", err)
+			return nil
+		}
+		code = string(data)
+	}
+	timeout, _ := cmd.Flags().GetInt64("timeout")
+	b := BrowsersCmd{browsers: &svc, playwright: &svc.Playwright}
+	return b.PlaywrightExecute(cmd.Context(), BrowsersPlaywrightExecuteInput{Identifier: args[0], Code: strings.TrimSpace(code), Timeout: timeout})
 }
 
 func runBrowsersFSNewDirectory(cmd *cobra.Command, args []string) error {
