@@ -344,7 +344,7 @@ kernel logs my-app --since 1h --with-timestamps
 
 ### Browser management
 
-````bash
+```bash
 # List all browsers
 kernel browsers list
 
@@ -402,23 +402,37 @@ kernel browsers computer type my-browser --text "Hello, World!"
 # Type text with a 100ms delay between keystrokes
 kernel browsers computer type my-browser --text "Slow typing..." --delay 100
 
+```
+
 ### Playwright execution
 
 ```bash
 # Execute inline Playwright (TypeScript) code
-kernel browsers playwright execute my-browser 'const page = await context.newPage(); await page.goto("https://example.com"); const title = await page.title(); return title;'
+kernel browsers playwright execute my-browser 'await page.goto("https://example.com"); const title = await page.title(); return title;'
 
 # Or pipe code from stdin
 cat <<'TS' | kernel browsers playwright execute my-browser
-const page = await context.newPage();
 await page.goto("https://example.com");
 const title = await page.title();
-console.log(JSON.stringify({ title }));
+return { title };
 TS
 
 # With a timeout in seconds
 kernel browsers playwright execute my-browser --timeout 30 'await (await context.newPage()).goto("https://example.com")'
-````
+
+# Mini CDP connection load test (10s)
+cat <<'TS' | kernel browsers playwright execute my-browser
+const start = Date.now();
+let ops = 0;
+while (Date.now() - start < 10_000) {
+  await page.evaluate("new Date();");
+  ops++;
+}
+const durationMs = Date.now() - start;
+const opsPerSec = ops / (durationMs / 1000);
+return { opsPerSec, ops, durationMs };
+TS
+```
 
 ### Extension management
 
