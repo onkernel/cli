@@ -40,23 +40,21 @@ func (p ProxyCmd) Create(ctx context.Context, in ProxyCreateInput) error {
 	// Build config based on type
 	switch proxyType {
 	case kernel.ProxyNewParamsTypeDatacenter:
-		if in.Country == "" {
-			return fmt.Errorf("--country is required for datacenter proxy type")
+		config := kernel.ProxyNewParamsConfigDatacenterProxyConfig{}
+		if in.Country != "" {
+			config.Country = kernel.Opt(in.Country)
 		}
 		params.Config = kernel.ProxyNewParamsConfigUnion{
-			OfProxyNewsConfigDatacenterProxyConfig: &kernel.ProxyNewParamsConfigDatacenterProxyConfig{
-				Country: in.Country,
-			},
+			OfProxyNewsConfigDatacenterProxyConfig: &config,
 		}
 
 	case kernel.ProxyNewParamsTypeIsp:
-		if in.Country == "" {
-			return fmt.Errorf("--country is required for ISP proxy type")
+		config := kernel.ProxyNewParamsConfigIspProxyConfig{}
+		if in.Country != "" {
+			config.Country = kernel.Opt(in.Country)
 		}
 		params.Config = kernel.ProxyNewParamsConfigUnion{
-			OfProxyNewsConfigIspProxyConfig: &kernel.ProxyNewParamsConfigIspProxyConfig{
-				Country: in.Country,
-			},
+			OfProxyNewsConfigIspProxyConfig: &config,
 		}
 
 	case kernel.ProxyNewParamsTypeResidential:
