@@ -22,7 +22,7 @@ func TestProxyCreate_Datacenter_Success(t *testing.T) {
 			// Check config
 			dcConfig := body.Config.OfProxyNewsConfigDatacenterProxyConfig
 			assert.NotNil(t, dcConfig)
-			assert.Equal(t, "US", dcConfig.Country)
+			assert.Equal(t, "US", dcConfig.Country.Value)
 
 			return &kernel.ProxyNewResponse{
 				ID:   "dc-new",
@@ -48,19 +48,38 @@ func TestProxyCreate_Datacenter_Success(t *testing.T) {
 	assert.Contains(t, output, "My DC Proxy")
 }
 
-func TestProxyCreate_Datacenter_MissingCountry(t *testing.T) {
-	_ = captureOutput(t)
-	fake := &FakeProxyService{}
+func TestProxyCreate_Datacenter_WithoutCountry(t *testing.T) {
+	buf := captureOutput(t)
+
+	fake := &FakeProxyService{
+		NewFunc: func(ctx context.Context, body kernel.ProxyNewParams, opts ...option.RequestOption) (*kernel.ProxyNewResponse, error) {
+			// Verify the request
+			assert.Equal(t, kernel.ProxyNewParamsTypeDatacenter, body.Type)
+			assert.Equal(t, "My DC Proxy", body.Name.Value)
+
+			// Check config - country should not be set (it should be zero/nil)
+			dcConfig := body.Config.OfProxyNewsConfigDatacenterProxyConfig
+			assert.NotNil(t, dcConfig)
+
+			return &kernel.ProxyNewResponse{
+				ID:   "dc-new",
+				Name: "My DC Proxy",
+				Type: kernel.ProxyNewResponseTypeDatacenter,
+			}, nil
+		},
+	}
 
 	p := ProxyCmd{proxies: fake}
 	err := p.Create(context.Background(), ProxyCreateInput{
 		Name: "My DC Proxy",
 		Type: "datacenter",
-		// Missing required Country
+		// Country is now optional
 	})
 
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "--country is required for datacenter proxy type")
+	assert.NoError(t, err)
+	output := buf.String()
+	assert.Contains(t, output, "Creating datacenter proxy")
+	assert.Contains(t, output, "Successfully created proxy")
 }
 
 func TestProxyCreate_Residential_Success(t *testing.T) {
@@ -315,7 +334,7 @@ func TestProxyCreate_ISP_Success(t *testing.T) {
 			// Verify ISP config
 			ispConfig := body.Config.OfProxyNewsConfigIspProxyConfig
 			assert.NotNil(t, ispConfig)
-			assert.Equal(t, "EU", ispConfig.Country)
+			assert.Equal(t, "EU", ispConfig.Country.Value)
 
 			return &kernel.ProxyNewResponse{
 				ID:   "isp-new",
@@ -330,6 +349,36 @@ func TestProxyCreate_ISP_Success(t *testing.T) {
 		Name:    "EU ISP",
 		Type:    "isp",
 		Country: "EU",
+	})
+
+	assert.NoError(t, err)
+	output := buf.String()
+	assert.Contains(t, output, "Creating isp proxy")
+	assert.Contains(t, output, "Successfully created proxy")
+}
+
+func TestProxyCreate_ISP_WithoutCountry(t *testing.T) {
+	buf := captureOutput(t)
+
+	fake := &FakeProxyService{
+		NewFunc: func(ctx context.Context, body kernel.ProxyNewParams, opts ...option.RequestOption) (*kernel.ProxyNewResponse, error) {
+			// Verify ISP config
+			ispConfig := body.Config.OfProxyNewsConfigIspProxyConfig
+			assert.NotNil(t, ispConfig)
+
+			return &kernel.ProxyNewResponse{
+				ID:   "isp-new",
+				Name: "ISP Proxy",
+				Type: kernel.ProxyNewResponseTypeIsp,
+			}, nil
+		},
+	}
+
+	p := ProxyCmd{proxies: fake}
+	err := p.Create(context.Background(), ProxyCreateInput{
+		Name: "ISP Proxy",
+		Type: "isp",
+		// Country is now optional
 	})
 
 	assert.NoError(t, err)

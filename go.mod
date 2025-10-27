@@ -8,7 +8,7 @@ require (
 	github.com/charmbracelet/fang v0.2.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/joho/godotenv v1.5.1
-	github.com/onkernel/kernel-go-sdk v0.16.0
+	github.com/onkernel/kernel-go-sdk v0.17.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/pterm/pterm v0.12.80
 	github.com/samber/lo v1.51.0
