@@ -285,6 +285,12 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
   - `--button <button>` - Mouse button: left, middle, right (default: left)
   - `--hold-key <key>` - Modifier keys to hold (repeatable)
 
+### Browser Playwright
+
+- `kernel browsers playwright execute <id or persistent id> [code]` - Execute Playwright/TypeScript code against the browser
+  - `--timeout <seconds>` - Maximum execution time in seconds (defaults server-side)
+  - If `[code]` is omitted, code is read from stdin
+
 ### Extension Management
 
 - `kernel extensions list` - List all uploaded extensions
@@ -338,7 +344,7 @@ kernel logs my-app --since 1h --with-timestamps
 
 ### Browser management
 
-```bash
+````bash
 # List all browsers
 kernel browsers list
 
@@ -395,7 +401,24 @@ kernel browsers computer type my-browser --text "Hello, World!"
 
 # Type text with a 100ms delay between keystrokes
 kernel browsers computer type my-browser --text "Slow typing..." --delay 100
-```
+
+### Playwright execution
+
+```bash
+# Execute inline Playwright (TypeScript) code
+kernel browsers playwright execute my-browser 'const page = await context.newPage(); await page.goto("https://example.com"); const title = await page.title(); return title;'
+
+# Or pipe code from stdin
+cat <<'TS' | kernel browsers playwright execute my-browser
+const page = await context.newPage();
+await page.goto("https://example.com");
+const title = await page.title();
+console.log(JSON.stringify({ title }));
+TS
+
+# With a timeout in seconds
+kernel browsers playwright execute my-browser --timeout 30 'await (await context.newPage()).goto("https://example.com")'
+````
 
 ### Extension management
 
