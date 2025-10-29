@@ -1738,9 +1738,10 @@ func generateRandomExtensionName() string {
 }
 
 var browsersCmd = &cobra.Command{
-	Use:   "browsers",
-	Short: "Manage browsers",
-	Long:  "Commands for managing Kernel browsers",
+	Use:     "browsers",
+	Aliases: []string{"browser"},
+	Short:   "Manage browsers",
+	Long:    "Commands for managing Kernel browsers",
 }
 
 var browsersListCmd = &cobra.Command{

@@ -207,9 +207,10 @@ func (p ProfilesCmd) Download(ctx context.Context, in ProfilesDownloadInput) err
 // --- Cobra wiring ---
 
 var profilesCmd = &cobra.Command{
-	Use:   "profiles",
-	Short: "Manage profiles",
-	Long:  "Commands for managing Kernel browser profiles",
+	Use:     "profiles",
+	Aliases: []string{"profile"},
+	Short:   "Manage profiles",
+	Long:    "Commands for managing Kernel browser profiles",
 }
 
 var profilesListCmd = &cobra.Command{

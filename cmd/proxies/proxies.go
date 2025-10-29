@@ -6,9 +6,10 @@ import (
 
 // ProxiesCmd is the parent command for proxy operations
 var ProxiesCmd = &cobra.Command{
-	Use:   "proxies",
-	Short: "Manage proxy configurations",
-	Long:  "Commands for managing proxy configurations for browser sessions",
+	Use:     "proxies",
+	Aliases: []string{"proxy"},
+	Short:   "Manage proxy configurations",
+	Long:    "Commands for managing proxy configurations for browser sessions",
 	Run: func(cmd *cobra.Command, args []string) {
 		// If called without subcommands, show help
 		_ = cmd.Help()
