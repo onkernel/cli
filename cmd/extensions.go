@@ -310,9 +310,10 @@ func (e ExtensionsCmd) Upload(ctx context.Context, in ExtensionsUploadInput) err
 // --- Cobra wiring ---
 
 var extensionsCmd = &cobra.Command{
-	Use:   "extensions",
-	Short: "Manage browser extensions",
-	Long:  "Commands for managing Kernel browser extensions",
+	Use:     "extensions",
+	Aliases: []string{"extension"},
+	Short:   "Manage browser extensions",
+	Long:    "Commands for managing Kernel browser extensions",
 }
 
 var extensionsListCmd = &cobra.Command{

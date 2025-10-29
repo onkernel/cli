@@ -12,10 +12,11 @@ import (
 )
 
 var logsCmd = &cobra.Command{
-	Use:   "logs <app_name>",
-	Short: "Show logs for a Kernel application",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runLogs,
+	Use:     "logs <app_name>",
+	Aliases: []string{"log"},
+	Short:   "Show logs for a Kernel application",
+	Args:    cobra.ExactArgs(1),
+	RunE:    runLogs,
 }
 
 func init() {
