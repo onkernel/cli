@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/onkernel/cli/pkg/util"
@@ -41,6 +42,8 @@ func init() {
 	appListCmd.Flags().String("name", "", "Filter by application name")
 	appListCmd.Flags().String("version", "", "Filter by version label")
 	appListCmd.Flags().Int("limit", 20, "Max apps to return (default 20)")
+	appListCmd.Flags().Int("per-page", 20, "Items per page (alias of --limit)")
+	appListCmd.Flags().Int("page", 1, "Page number (1-based)")
 
 	// Limit rows returned for app history (0 = all)
 	appHistoryCmd.Flags().Int("limit", 20, "Max deployments to return (default 20)")
@@ -51,6 +54,24 @@ func runAppList(cmd *cobra.Command, args []string) error {
 	appName, _ := cmd.Flags().GetString("name")
 	version, _ := cmd.Flags().GetString("version")
 	lim, _ := cmd.Flags().GetInt("limit")
+	perPage, _ := cmd.Flags().GetInt("per-page")
+	page, _ := cmd.Flags().GetInt("page")
+
+	// Determine pagination inputs: prefer page/per-page if provided; else map legacy --limit
+	usePager := cmd.Flags().Changed("per-page") || cmd.Flags().Changed("page")
+	if !usePager && cmd.Flags().Changed("limit") {
+		if lim < 0 {
+			lim = 0
+		}
+		perPage = lim
+		page = 1
+	}
+	if perPage <= 0 {
+		perPage = 20
+	}
+	if page <= 0 {
+		page = 1
+	}
 
 	pterm.Debug.Println("Fetching deployed applications...")
 
@@ -61,6 +82,9 @@ func runAppList(cmd *cobra.Command, args []string) error {
 	if version != "" {
 		params.Version = kernel.Opt(version)
 	}
+	// Apply server-side pagination (request one extra to detect hasMore)
+	params.Limit = kernel.Opt(int64(perPage + 1))
+	params.Offset = kernel.Opt(int64((page - 1) * perPage))
 
 	apps, err := client.Apps.List(cmd.Context(), params)
 	if err != nil {
@@ -68,10 +92,19 @@ func runAppList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if apps == nil || len(*apps) == 0 {
+	if apps == nil || len(apps.Items) == 0 {
 		pterm.Info.Println("No applications found")
 		return nil
 	}
+
+	// Determine hasMore using +1 item trick and keep only perPage items for display
+	items := apps.Items
+	hasMore := false
+	if len(items) > perPage {
+		hasMore = true
+		items = items[:perPage]
+	}
+	itemsThisPage := len(items)
 
 	// Prepare table data
 	tableData := pterm.TableData{
@@ -79,7 +112,7 @@ func runAppList(cmd *cobra.Command, args []string) error {
 	}
 
 	rows := 0
-	for _, app := range *apps {
+	for _, app := range items {
 		// Format env vars
 		envVarsStr := "-"
 		if len(app.EnvVars) > 0 {
@@ -102,12 +135,57 @@ func runAppList(cmd *cobra.Command, args []string) error {
 			envVarsStr,
 		})
 		rows++
-		if lim > 0 && rows >= lim {
-			break
-		}
 	}
 
 	PrintTableNoPad(tableData, true)
+
+	// Footer with pagination details and next command suggestion
+	fmt.Printf("\nPage: %d  Per-page: %d  Items this page: %d  Has more: %s\n", page, perPage, itemsThisPage, lo.Ternary(hasMore, "yes", "no"))
+	if hasMore {
+		nextPage := page + 1
+		nextCmd := fmt.Sprintf("kernel app list --page %d --per-page %d", nextPage, perPage)
+		if appName != "" {
+			nextCmd += fmt.Sprintf(" --name %s", appName)
+		}
+		if version != "" {
+			nextCmd += fmt.Sprintf(" --version %s", version)
+		}
+		fmt.Printf("Next: %s\n", nextCmd)
+	}
+	// Concise notes when user-specified per-page/limit/page are outside API-allowed range
+	if cmd.Flags().Changed("per-page") {
+		if v, _ := cmd.Flags().GetInt("per-page"); v > 100 {
+			pterm.Warning.Printfln("Requested --per-page %d; capped to 100.", v)
+		} else if v < 1 {
+			if cmd.Flags().Changed("page") {
+				if p, _ := cmd.Flags().GetInt("page"); p < 1 {
+					pterm.Warning.Println("Requested --per-page <1 and --page <1; using per-page=20, page=1.")
+				} else {
+					pterm.Warning.Println("Requested --per-page <1; using per-page=20.")
+				}
+			} else {
+				pterm.Warning.Println("Requested --per-page <1; using per-page=20.")
+			}
+		}
+	} else if !usePager && cmd.Flags().Changed("limit") {
+		if lim > 100 {
+			pterm.Warning.Printfln("Requested --limit %d; capped to 100.", lim)
+		} else if lim < 1 {
+			if cmd.Flags().Changed("page") {
+				if p, _ := cmd.Flags().GetInt("page"); p < 1 {
+					pterm.Warning.Println("Requested --limit <1 and --page <1; using per-page=20, page=1.")
+				} else {
+					pterm.Warning.Println("Requested --limit <1; using per-page=20.")
+				}
+			} else {
+				pterm.Warning.Println("Requested --limit <1; using per-page=20.")
+			}
+		}
+	} else if cmd.Flags().Changed("page") {
+		if p, _ := cmd.Flags().GetInt("page"); p < 1 {
+			pterm.Warning.Println("Requested --page <1; using page=1.")
+		}
+	}
 	return nil
 }
 

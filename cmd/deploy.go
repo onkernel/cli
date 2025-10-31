@@ -19,6 +19,7 @@ import (
 	kernel "github.com/onkernel/kernel-go-sdk"
 	"github.com/onkernel/kernel-go-sdk/option"
 	"github.com/pterm/pterm"
+	"github.com/samber/lo"
 	"github.com/spf13/cobra"
 )
 
@@ -64,6 +65,8 @@ func init() {
 	deployCmd.AddCommand(deployLogsCmd)
 
 	deployHistoryCmd.Flags().Int("limit", 20, "Max deployments to return (default 20)")
+	deployHistoryCmd.Flags().Int("per-page", 20, "Items per page (alias of --limit)")
+	deployHistoryCmd.Flags().Int("page", 1, "Page number (1-based)")
 	deployCmd.AddCommand(deployHistoryCmd)
 
 	// Flags for GitHub deploy
@@ -354,65 +357,116 @@ func runDeployHistory(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 
 	lim, _ := cmd.Flags().GetInt("limit")
+	perPage, _ := cmd.Flags().GetInt("per-page")
+	page, _ := cmd.Flags().GetInt("page")
 
-	var appNames []string
+	// Prefer page/per-page when provided; map legacy --limit otherwise
+	usePager := cmd.Flags().Changed("per-page") || cmd.Flags().Changed("page")
+	if !usePager && cmd.Flags().Changed("limit") {
+		if lim < 0 {
+			lim = 0
+		}
+		perPage = lim
+		page = 1
+	}
+	if perPage <= 0 {
+		perPage = 20
+	}
+	if page <= 0 {
+		page = 1
+	}
+
+	// Build server-side paginated request
+	var appNameFilter string
 	if len(args) == 1 {
-		appNames = []string{args[0]}
-	} else {
-		apps, err := client.Apps.List(cmd.Context(), kernel.AppListParams{})
-		if err != nil {
-			pterm.Error.Printf("Failed to list applications: %v\n", err)
-			return nil
-		}
-		for _, a := range *apps {
-			appNames = append(appNames, a.AppName)
-		}
-		// de-duplicate app names
-		seenApps := map[string]struct{}{}
-		uniq := make([]string, 0, len(appNames))
-		for _, n := range appNames {
-			if _, ok := seenApps[n]; ok {
-				continue
-			}
-			seenApps[n] = struct{}{}
-			uniq = append(uniq, n)
-		}
-		appNames = uniq
+		appNameFilter = strings.TrimSpace(args[0])
 	}
 
-	rows := 0
-	table := pterm.TableData{{"Deployment ID", "Created At", "Region", "Status", "Entrypoint", "Reason"}}
-AppsLoop:
-	for _, appName := range appNames {
-		params := kernel.DeploymentListParams{AppName: kernel.Opt(appName)}
-		pterm.Debug.Printf("Listing deployments for app '%s'...\n", appName)
-		deployments, err := client.Deployments.List(cmd.Context(), params)
-		if err != nil {
-			pterm.Error.Printf("Failed to list deployments for '%s': %v\n", appName, err)
-			continue
-		}
-		for _, dep := range deployments.Items {
-			created := util.FormatLocal(dep.CreatedAt)
-			status := string(dep.Status)
-			table = append(table, []string{
-				dep.ID,
-				created,
-				string(dep.Region),
-				status,
-				dep.EntrypointRelPath,
-				dep.StatusReason,
-			})
-			rows++
-			if lim > 0 && rows >= lim {
-				break AppsLoop
-			}
-		}
+	params := kernel.DeploymentListParams{}
+	if appNameFilter != "" {
+		params.AppName = kernel.Opt(appNameFilter)
 	}
-	if len(table) == 1 {
+	// Request one extra item to detect hasMore
+	params.Limit = kernel.Opt(int64(perPage + 1))
+	params.Offset = kernel.Opt(int64((page - 1) * perPage))
+
+	pterm.Debug.Println("Fetching deployments...")
+	deployments, err := client.Deployments.List(cmd.Context(), params)
+	if err != nil {
+		pterm.Error.Printf("Failed to list deployments: %v\n", err)
+		return nil
+	}
+	if deployments == nil || len(deployments.Items) == 0 {
 		pterm.Info.Println("No deployments found")
 		return nil
 	}
+
+	items := deployments.Items
+	hasMore := false
+	if len(items) > perPage {
+		hasMore = true
+		items = items[:perPage]
+	}
+	itemsThisPage := len(items)
+
+	table := pterm.TableData{{"Deployment ID", "Created At", "Region", "Status", "Entrypoint", "Reason"}}
+	for _, dep := range items {
+		created := util.FormatLocal(dep.CreatedAt)
+		status := string(dep.Status)
+		table = append(table, []string{
+			dep.ID,
+			created,
+			string(dep.Region),
+			status,
+			dep.EntrypointRelPath,
+			dep.StatusReason,
+		})
+	}
 	pterm.DefaultTable.WithHasHeader().WithData(table).Render()
+
+	fmt.Printf("\nPage: %d  Per-page: %d  Items this page: %d  Has more: %s\n", page, perPage, itemsThisPage, lo.Ternary(hasMore, "yes", "no"))
+	if hasMore {
+		nextPage := page + 1
+		nextCmd := fmt.Sprintf("kernel deploy history --page %d --per-page %d", nextPage, perPage)
+		if appNameFilter != "" {
+			nextCmd = fmt.Sprintf("kernel deploy history %s --page %d --per-page %d", appNameFilter, nextPage, perPage)
+		}
+		fmt.Printf("Next: %s\n", nextCmd)
+	}
+	// Concise notes when user-specified per-page/limit/page are outside API-allowed range
+	if cmd.Flags().Changed("per-page") {
+		if v, _ := cmd.Flags().GetInt("per-page"); v > 100 {
+			pterm.Warning.Printfln("Requested --per-page %d; capped to 100.", v)
+		} else if v < 1 {
+			if cmd.Flags().Changed("page") {
+				if p, _ := cmd.Flags().GetInt("page"); p < 1 {
+					pterm.Warning.Println("Requested --per-page <1 and --page <1; using per-page=20, page=1.")
+				} else {
+					pterm.Warning.Println("Requested --per-page <1; using per-page=20.")
+				}
+			} else {
+				pterm.Warning.Println("Requested --per-page <1; using per-page=20.")
+			}
+		}
+	} else if !usePager && cmd.Flags().Changed("limit") {
+		if lim > 100 {
+			pterm.Warning.Printfln("Requested --limit %d; capped to 100.", lim)
+		} else if lim < 1 {
+			if cmd.Flags().Changed("page") {
+				if p, _ := cmd.Flags().GetInt("page"); p < 1 {
+					pterm.Warning.Println("Requested --limit <1 and --page <1; using per-page=20, page=1.")
+				} else {
+					pterm.Warning.Println("Requested --limit <1; using per-page=20.")
+				}
+			} else {
+				pterm.Warning.Println("Requested --limit <1; using per-page=20.")
+			}
+		}
+	} else if cmd.Flags().Changed("page") {
+		if p, _ := cmd.Flags().GetInt("page"); p < 1 {
+			pterm.Warning.Println("Requested --page <1; using page=1.")
+		}
+	}
 	return nil
 }
 
