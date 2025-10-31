@@ -140,13 +140,13 @@ func runLogs(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to list apps: %w", err)
 	}
-	if apps == nil || len(*apps) == 0 {
+	if apps == nil || len(apps.Items) == 0 {
 		return fmt.Errorf("app \"%s\" not found", appName)
 	}
-	if len(*apps) > 1 {
+	if len(apps.Items) > 1 {
 		return fmt.Errorf("multiple apps found for \"%s\", please specify a version", appName)
 	}
-	app := (*apps)[0]
+	app := apps.Items[0]
 
 	pterm.Info.Printf("Streaming logs for app \"%s\" (version: %s, id: %s)...\n", appName, version, app.ID)
 	if follow {
