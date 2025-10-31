@@ -304,6 +304,30 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 - `kernel extensions delete <id-or-name>` - Delete an extension by ID or name
   - `-y, --yes` - Skip confirmation prompt
 
+### Proxy Management
+
+- `kernel proxies list` - List proxy configurations
+- `kernel proxies get <id>` - Get a proxy configuration by ID
+- `kernel proxies create` - Create a new proxy configuration
+
+  - `--name <name>` - Proxy configuration name
+  - `--type <type>` - Proxy type: datacenter, isp, residential, mobile, custom (required)
+  - `--protocol <http|https>` - Protocol to use (default: https)
+  - `--country <code>` - ISO 3166 country code or "EU" (location-based types)
+  - `--city <name>` - City name (no spaces, e.g. sanfrancisco) (residential, mobile; requires `--country`)
+  - `--state <code>` - Two-letter state code (residential, mobile)
+  - `--zip <zip>` - US ZIP code (residential, mobile)
+  - `--asn <asn>` - Autonomous system number (e.g., AS15169) (residential, mobile)
+  - `--os <os>` - Operating system: windows, macos, android (residential)
+  - `--carrier <carrier>` - Mobile carrier (mobile)
+  - `--host <host>` - Proxy host (custom; required)
+  - `--port <port>` - Proxy port (custom; required)
+  - `--username <username>` - Username for proxy authentication (custom)
+  - `--password <password>` - Password for proxy authentication (custom)
+
+- `kernel proxies delete <id>` - Delete a proxy configuration
+  - `-y, --yes` - Skip confirmation prompt
+
 ## Examples
 
 ### Deploy with environment variables
@@ -454,6 +478,34 @@ kernel extensions delete my-extension-name --yes
 
 # Upload extensions to a running browser instance
 kernel browsers extensions upload my-browser ./extension1 ./extension2
+```
+
+### Proxy management
+
+```bash
+# List proxy configurations
+kernel proxies list
+
+# Create a datacenter proxy
+kernel proxies create --type datacenter --country US --name "US Datacenter"
+
+# Create a datacenter proxy using HTTP protocol
+kernel proxies create --type datacenter --country US --protocol http --name "US DC (HTTP)"
+
+# Create a custom proxy
+kernel proxies create --type custom --host proxy.example.com --port 8080 --username myuser --password mypass --name "My Custom Proxy"
+
+# Create a residential proxy with location and OS
+kernel proxies create --type residential --country US --city sanfrancisco --state CA --zip 94107 --asn AS15169 --os windows --name "SF Residential"
+
+# Create a mobile proxy with carrier
+kernel proxies create --type mobile --country US --carrier verizon --name "US Mobile"
+
+# Get proxy details
+kernel proxies get prx_123
+
+# Delete a proxy (skip confirmation)
+kernel proxies delete prx_123 --yes
 ```
 
 ## Getting Help
