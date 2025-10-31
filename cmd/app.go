@@ -40,15 +40,17 @@ func init() {
 	// Add optional filters for list
 	appListCmd.Flags().String("name", "", "Filter by application name")
 	appListCmd.Flags().String("version", "", "Filter by version label")
+	appListCmd.Flags().Int("limit", 20, "Max apps to return (default 20)")
 
 	// Limit rows returned for app history (0 = all)
-	appHistoryCmd.Flags().Int("limit", 100, "Max deployments to return (default 100)")
+	appHistoryCmd.Flags().Int("limit", 20, "Max deployments to return (default 20)")
 }
 
 func runAppList(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	appName, _ := cmd.Flags().GetString("name")
 	version, _ := cmd.Flags().GetString("version")
+	lim, _ := cmd.Flags().GetInt("limit")
 
 	pterm.Debug.Println("Fetching deployed applications...")
 
@@ -76,6 +78,7 @@ func runAppList(cmd *cobra.Command, args []string) error {
 		{"App Name", "Version", "App Version ID", "Region", "Actions", "Env Vars"},
 	}
 
+	rows := 0
 	for _, app := range *apps {
 		// Format env vars
 		envVarsStr := "-"
@@ -98,6 +101,10 @@ func runAppList(cmd *cobra.Command, args []string) error {
 			actionsStr,
 			envVarsStr,
 		})
+		rows++
+		if lim > 0 && rows >= lim {
+			break
+		}
 	}
 
 	PrintTableNoPad(tableData, true)

@@ -63,7 +63,7 @@ func init() {
 	deployLogsCmd.Flags().BoolP("with-timestamps", "t", false, "Include timestamps in each log line")
 	deployCmd.AddCommand(deployLogsCmd)
 
-	deployHistoryCmd.Flags().Int("limit", 100, "Max deployments to return (default 100)")
+	deployHistoryCmd.Flags().Int("limit", 20, "Max deployments to return (default 20)")
 	deployCmd.AddCommand(deployHistoryCmd)
 
 	// Flags for GitHub deploy
