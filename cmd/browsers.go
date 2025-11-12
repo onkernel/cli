@@ -1989,7 +1989,7 @@ func init() {
 
 	// computer set-cursor
 	computerSetCursor := &cobra.Command{Use: "set-cursor <id|persistent-id>", Short: "Hide or show the cursor", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerSetCursor}
-	computerSetCursor.Flags().Bool("hidden", false, "Whether to hide the cursor (true) or show it (false)")
+	computerSetCursor.Flags().String("hidden", "", "Whether to hide the cursor: true or false")
 	_ = computerSetCursor.MarkFlagRequired("hidden")
 
 	computerRoot.AddCommand(computerClick, computerMove, computerScreenshot, computerType, computerPressKey, computerScroll, computerDrag, computerSetCursor)
@@ -2502,7 +2502,19 @@ func runBrowsersComputerDragMouse(cmd *cobra.Command, args []string) error {
 func runBrowsersComputerSetCursor(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	svc := client.Browsers
-	hidden, _ := cmd.Flags().GetBool("hidden")
+	hiddenStr, _ := cmd.Flags().GetString("hidden")
+	
+	var hidden bool
+	switch strings.ToLower(hiddenStr) {
+	case "true", "1", "yes":
+		hidden = true
+	case "false", "0", "no":
+		hidden = false
+	default:
+		pterm.Error.Printf("Invalid value for --hidden: %s (expected true or false)\n", hiddenStr)
+		return nil
+	}
+	
 	b := BrowsersCmd{browsers: &svc, computer: &svc.Computer}
 	return b.ComputerSetCursor(cmd.Context(), BrowsersComputerSetCursorInput{Identifier: args[0], Hidden: hidden})
 }
