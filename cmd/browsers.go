@@ -86,6 +86,7 @@ type BrowserComputerService interface {
 	MoveMouse(ctx context.Context, id string, body kernel.BrowserComputerMoveMouseParams, opts ...option.RequestOption) (err error)
 	PressKey(ctx context.Context, id string, body kernel.BrowserComputerPressKeyParams, opts ...option.RequestOption) (err error)
 	Scroll(ctx context.Context, id string, body kernel.BrowserComputerScrollParams, opts ...option.RequestOption) (err error)
+	SetCursorVisibility(ctx context.Context, id string, body kernel.BrowserComputerSetCursorVisibilityParams, opts ...option.RequestOption) (res *kernel.BrowserComputerSetCursorVisibilityResponse, err error)
 	TypeText(ctx context.Context, id string, body kernel.BrowserComputerTypeTextParams, opts ...option.RequestOption) (err error)
 }
 
@@ -567,6 +568,11 @@ type BrowsersComputerDragMouseInput struct {
 	HoldKeys        []string
 }
 
+type BrowsersComputerSetCursorInput struct {
+	Identifier string
+	Hidden     bool
+}
+
 func (b BrowsersCmd) ComputerClickMouse(ctx context.Context, in BrowsersComputerClickMouseInput) error {
 	if b.computer == nil {
 		pterm.Error.Println("computer service not available")
@@ -786,6 +792,32 @@ func (b BrowsersCmd) ComputerDragMouse(ctx context.Context, in BrowsersComputerD
 		return util.CleanedUpSdkError{Err: err}
 	}
 	pterm.Success.Printf("Dragged mouse over %d points\n", len(in.Path))
+	return nil
+}
+
+func (b BrowsersCmd) ComputerSetCursor(ctx context.Context, in BrowsersComputerSetCursorInput) error {
+	if b.computer == nil {
+		pterm.Error.Println("computer service not available")
+		return nil
+	}
+	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	if err != nil {
+		return util.CleanedUpSdkError{Err: err}
+	}
+	if br == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	body := kernel.BrowserComputerSetCursorVisibilityParams{Hidden: in.Hidden}
+	_, err = b.computer.SetCursorVisibility(ctx, br.SessionID, body)
+	if err != nil {
+		return util.CleanedUpSdkError{Err: err}
+	}
+	if in.Hidden {
+		pterm.Success.Println("Cursor hidden")
+	} else {
+		pterm.Success.Println("Cursor shown")
+	}
 	return nil
 }
 
@@ -1955,7 +1987,12 @@ func init() {
 	computerDrag.Flags().String("button", "left", "Mouse button: left,middle,right")
 	computerDrag.Flags().StringSlice("hold-key", []string{}, "Modifier keys to hold (repeatable)")
 
-	computerRoot.AddCommand(computerClick, computerMove, computerScreenshot, computerType, computerPressKey, computerScroll, computerDrag)
+	// computer set-cursor
+	computerSetCursor := &cobra.Command{Use: "set-cursor <id|persistent-id>", Short: "Hide or show the cursor", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerSetCursor}
+	computerSetCursor.Flags().Bool("hidden", false, "Whether to hide the cursor (true) or show it (false)")
+	_ = computerSetCursor.MarkFlagRequired("hidden")
+
+	computerRoot.AddCommand(computerClick, computerMove, computerScreenshot, computerType, computerPressKey, computerScroll, computerDrag, computerSetCursor)
 	browsersCmd.AddCommand(computerRoot)
 
 	// playwright
@@ -2460,6 +2497,14 @@ func runBrowsersComputerDragMouse(cmd *cobra.Command, args []string) error {
 
 	b := BrowsersCmd{browsers: &svc, computer: &svc.Computer}
 	return b.ComputerDragMouse(cmd.Context(), BrowsersComputerDragMouseInput{Identifier: args[0], Path: path, Delay: delay, StepDelayMs: stepDelayMs, StepsPerSegment: stepsPerSegment, Button: button, HoldKeys: holdKeys})
+}
+
+func runBrowsersComputerSetCursor(cmd *cobra.Command, args []string) error {
+	client := getKernelClient(cmd)
+	svc := client.Browsers
+	hidden, _ := cmd.Flags().GetBool("hidden")
+	b := BrowsersCmd{browsers: &svc, computer: &svc.Computer}
+	return b.ComputerSetCursor(cmd.Context(), BrowsersComputerSetCursorInput{Identifier: args[0], Hidden: hidden})
 }
 
 func truncateURL(url string, maxLen int) string {
