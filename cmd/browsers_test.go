@@ -533,6 +533,7 @@ type FakeComputerService struct {
 	ScrollFunc            func(ctx context.Context, id string, body kernel.BrowserComputerScrollParams, opts ...option.RequestOption) error
 	DragMouseFunc         func(ctx context.Context, id string, body kernel.BrowserComputerDragMouseParams, opts ...option.RequestOption) error
 	TypeTextFunc          func(ctx context.Context, id string, body kernel.BrowserComputerTypeTextParams, opts ...option.RequestOption) error
+	SetCursorVisibilityFunc func(ctx context.Context, id string, body kernel.BrowserComputerSetCursorVisibilityParams, opts ...option.RequestOption) (*kernel.BrowserComputerSetCursorVisibilityResponse, error)
 }
 
 func (f *FakeComputerService) ClickMouse(ctx context.Context, id string, body kernel.BrowserComputerClickMouseParams, opts ...option.RequestOption) error {
@@ -577,6 +578,12 @@ func (f *FakeComputerService) TypeText(ctx context.Context, id string, body kern
 		return f.TypeTextFunc(ctx, id, body, opts...)
 	}
 	return nil
+}
+func (f *FakeComputerService) SetCursorVisibility(ctx context.Context, id string, body kernel.BrowserComputerSetCursorVisibilityParams, opts ...option.RequestOption) (*kernel.BrowserComputerSetCursorVisibilityResponse, error) {
+	if f.SetCursorVisibilityFunc != nil {
+		return f.SetCursorVisibilityFunc(ctx, id, body, opts...)
+	}
+	return &kernel.BrowserComputerSetCursorVisibilityResponse{}, nil
 }
 
 // --- Tests for Logs ---
