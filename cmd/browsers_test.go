@@ -1084,8 +1084,8 @@ func TestGetAvailableViewports_ReturnsExpectedOptions(t *testing.T) {
 	assert.Contains(t, viewports, "1920x1080@25")
 	assert.Contains(t, viewports, "1920x1200@25")
 	assert.Contains(t, viewports, "1440x900@25")
-	assert.Contains(t, viewports, "1024x768@60")
 	assert.Contains(t, viewports, "1200x800@60")
+	assert.Contains(t, viewports, "1024x768@60")
 }
 
 func TestBrowsersCreate_WithViewport(t *testing.T) {
