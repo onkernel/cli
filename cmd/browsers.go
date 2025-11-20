@@ -18,6 +18,7 @@ import (
 	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/onkernel/kernel-go-sdk/option"
+	"github.com/onkernel/kernel-go-sdk/packages/pagination"
 	"github.com/onkernel/kernel-go-sdk/packages/ssestream"
 	"github.com/onkernel/kernel-go-sdk/shared"
 	"github.com/pterm/pterm"
@@ -27,7 +28,7 @@ import (
 // BrowsersService defines the subset of the Kernel SDK browser client that we use.
 // See https://github.com/onkernel/kernel-go-sdk/blob/main/browser.go
 type BrowsersService interface {
-	List(ctx context.Context, opts ...option.RequestOption) (res *[]kernel.BrowserListResponse, err error)
+	List(ctx context.Context, query kernel.BrowserListParams, opts ...option.RequestOption) (res *pagination.OffsetPagination[kernel.BrowserListResponse], err error)
 	New(ctx context.Context, body kernel.BrowserNewParams, opts ...option.RequestOption) (res *kernel.BrowserNewResponse, err error)
 	Delete(ctx context.Context, body kernel.BrowserDeleteParams, opts ...option.RequestOption) (err error)
 	DeleteByID(ctx context.Context, id string, opts ...option.RequestOption) (err error)
@@ -183,7 +184,10 @@ type BrowsersCmd struct {
 }
 
 type BrowsersListInput struct {
-	Output string
+	Output         string
+	IncludeDeleted bool
+	Limit          int
+	Offset         int
 }
 
 func (b BrowsersCmd) List(ctx context.Context, in BrowsersListInput) error {
@@ -192,17 +196,30 @@ func (b BrowsersCmd) List(ctx context.Context, in BrowsersListInput) error {
 		return nil
 	}
 
-	browsers, err := b.browsers.List(ctx)
+	params := kernel.BrowserListParams{}
+	if in.IncludeDeleted {
+		params.IncludeDeleted = kernel.Opt(true)
+	}
+	if in.Limit > 0 {
+		params.Limit = kernel.Opt(int64(in.Limit))
+	}
+	if in.Offset > 0 {
+		params.Offset = kernel.Opt(int64(in.Offset))
+	}
+
+	page, err := b.browsers.List(ctx, params)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
 	}
+
+	browsers := page.Items
 
 	if in.Output == "json" {
 		if browsers == nil {
 			fmt.Println("[]")
 			return nil
 		}
-		bs, err := json.MarshalIndent(*browsers, "", "  ")
+		bs, err := json.MarshalIndent(browsers, "", "  ")
 		if err != nil {
 			return err
 		}
@@ -210,17 +227,19 @@ func (b BrowsersCmd) List(ctx context.Context, in BrowsersListInput) error {
 		return nil
 	}
 
-	if browsers == nil || len(*browsers) == 0 {
+	if browsers == nil || len(browsers) == 0 {
 		pterm.Info.Println("No running or persistent browsers found")
 		return nil
 	}
 
 	// Prepare table data
-	tableData := pterm.TableData{
-		{"Browser ID", "Created At", "Persistent ID", "Profile", "CDP WS URL", "Live View URL"},
+	headers := []string{"Browser ID", "Created At", "Persistent ID", "Profile", "CDP WS URL", "Live View URL"}
+	if in.IncludeDeleted {
+		headers = append(headers, "Deleted At")
 	}
+	tableData := pterm.TableData{headers}
 
-	for _, browser := range *browsers {
+	for _, browser := range browsers {
 		persistentID := "-"
 		if browser.Persistence.ID != "" {
 			persistentID = browser.Persistence.ID
@@ -233,14 +252,24 @@ func (b BrowsersCmd) List(ctx context.Context, in BrowsersListInput) error {
 			profile = browser.Profile.ID
 		}
 
-		tableData = append(tableData, []string{
+		row := []string{
 			browser.SessionID,
 			util.FormatLocal(browser.CreatedAt),
 			persistentID,
 			profile,
 			truncateURL(browser.CdpWsURL, 50),
 			truncateURL(browser.BrowserLiveViewURL, 50),
-		})
+		}
+
+		if in.IncludeDeleted {
+			deletedAt := "-"
+			if !browser.DeletedAt.IsZero() {
+				deletedAt = util.FormatLocal(browser.DeletedAt)
+			}
+			row = append(row, deletedAt)
+		}
+
+		tableData = append(tableData, row)
 	}
 
 	PrintTableNoPad(tableData, true)
@@ -349,17 +378,17 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 
 func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 	if !in.SkipConfirm {
-		browsers, err := b.browsers.List(ctx)
+		page, err := b.browsers.List(ctx, kernel.BrowserListParams{})
 		if err != nil {
 			return util.CleanedUpSdkError{Err: err}
 		}
-		if browsers == nil || len(*browsers) == 0 {
+		if page == nil || page.Items == nil || len(page.Items) == 0 {
 			pterm.Error.Println("No browsers found")
 			return nil
 		}
 
 		var found *kernel.BrowserListResponse
-		for _, br := range *browsers {
+		for _, br := range page.Items {
 			if br.SessionID == in.Identifier || br.Persistence.ID == in.Identifier {
 				bCopy := br
 				found = &bCopy
@@ -431,18 +460,18 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 }
 
 func (b BrowsersCmd) View(ctx context.Context, in BrowsersViewInput) error {
-	browsers, err := b.browsers.List(ctx)
+	page, err := b.browsers.List(ctx, kernel.BrowserListParams{})
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
 	}
 
-	if browsers == nil || len(*browsers) == 0 {
+	if page == nil || page.Items == nil || len(page.Items) == 0 {
 		pterm.Error.Println("No browsers found")
 		return nil
 	}
 
 	var foundBrowser *kernel.BrowserListResponse
-	for _, browser := range *browsers {
+	for _, browser := range page.Items {
 		if browser.Persistence.ID == in.Identifier || browser.SessionID == in.Identifier {
 			foundBrowser = &browser
 			break
@@ -1806,6 +1835,9 @@ var browsersViewCmd = &cobra.Command{
 func init() {
 	// list flags
 	browsersListCmd.Flags().StringP("output", "o", "", "Output format: json for raw API response")
+	browsersListCmd.Flags().Bool("include-deleted", false, "Include soft-deleted browser sessions in the results")
+	browsersListCmd.Flags().Int("limit", 0, "Maximum number of results to return (default 20, max 100)")
+	browsersListCmd.Flags().Int("offset", 0, "Number of results to skip (for pagination)")
 
 	browsersCmd.AddCommand(browsersListCmd)
 	browsersCmd.AddCommand(browsersCreateCmd)
@@ -2028,7 +2060,15 @@ func runBrowsersList(cmd *cobra.Command, args []string) error {
 	svc := client.Browsers
 	b := BrowsersCmd{browsers: &svc}
 	out, _ := cmd.Flags().GetString("output")
-	return b.List(cmd.Context(), BrowsersListInput{Output: out})
+	includeDeleted, _ := cmd.Flags().GetBool("include-deleted")
+	limit, _ := cmd.Flags().GetInt("limit")
+	offset, _ := cmd.Flags().GetInt("offset")
+	return b.List(cmd.Context(), BrowsersListInput{
+		Output:         out,
+		IncludeDeleted: includeDeleted,
+		Limit:          limit,
+		Offset:         offset,
+	})
 }
 
 func runBrowsersCreate(cmd *cobra.Command, args []string) error {
@@ -2529,14 +2569,14 @@ func truncateURL(url string, maxLen int) string {
 
 // resolveBrowserByIdentifier finds a browser by session ID or persistent ID.
 func (b BrowsersCmd) resolveBrowserByIdentifier(ctx context.Context, identifier string) (*kernel.BrowserListResponse, error) {
-	browsers, err := b.browsers.List(ctx)
+	page, err := b.browsers.List(ctx, kernel.BrowserListParams{})
 	if err != nil {
 		return nil, err
 	}
-	if browsers == nil {
+	if page == nil || page.Items == nil {
 		return nil, nil
 	}
-	for _, br := range *browsers {
+	for _, br := range page.Items {
 		if br.SessionID == identifier || br.Persistence.ID == identifier {
 			bCopy := br
 			return &bCopy, nil
