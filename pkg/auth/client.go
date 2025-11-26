@@ -12,7 +12,17 @@ import (
 
 // GetAuthenticatedClient returns a Kernel client with appropriate authentication
 func GetAuthenticatedClient(opts ...option.RequestOption) (*kernel.Client, error) {
-	// Try to use stored OAuth tokens first
+	// Try to use API key first if available
+	apiKey := os.Getenv("KERNEL_API_KEY")
+	if apiKey != "" {
+		pterm.Debug.Println("Using API key authentication")
+
+		authOpts := append(opts, option.WithHeader("Authorization", "Bearer "+apiKey))
+		client := kernel.NewClient(authOpts...)
+		return &client, nil
+	}
+
+	// Fallback to OAuth tokens if no API key is available
 	tokens, err := LoadTokens()
 	if err == nil {
 		// Check if access token is expired and refresh if needed
@@ -41,15 +51,6 @@ func GetAuthenticatedClient(opts ...option.RequestOption) (*kernel.Client, error
 		return &client, nil
 	}
 
-	// Fallback to API key if no OAuth tokens are available
-	apiKey := os.Getenv("KERNEL_API_KEY")
-	if apiKey == "" {
-		return nil, fmt.Errorf("no authentication available. Please run 'kernel login' or set KERNEL_API_KEY environment variable")
-	}
-
-	pterm.Debug.Println("Using API key authentication (fallback)")
-
-	authOpts := append(opts, option.WithHeader("Authorization", "Bearer "+apiKey))
-	client := kernel.NewClient(authOpts...)
-	return &client, nil
+	// No authentication available
+	return nil, fmt.Errorf("no authentication available. Please run 'kernel login' or set KERNEL_API_KEY environment variable")
 }
