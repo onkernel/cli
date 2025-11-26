@@ -25,11 +25,22 @@ var successHTML string
 
 const (
 	// MCP Server OAuth endpoints (which proxy to Clerk)
+	// Production
 	AuthURL  = "https://auth.onkernel.com/authorize"
 	TokenURL = "https://auth.onkernel.com/token"
+	
+	// Staging
+	// AuthURL  = "https://auth.dev.onkernel.com/authorize"
+	// TokenURL = "https://auth.dev.onkernel.com/token"
+	
+	// Local
+	// AuthURL  = "http://localhost:3002/authorize"
+	// TokenURL = "http://localhost:3002/token"
 
 	// OAuth client configuration
 	ClientID    = "hmFrJn9hKDV2N02M" // Prod Kernel CLI OAuth Client ID
+	// ClientID    = "gkUVbm11p6EqKd7r" // Staging Kernel CLI OAuth Client ID
+	// ClientID    = "J7i8BKwyFBoyPQN3" // Local Kernel CLI OAuth Client ID
 	RedirectURI = "http://localhost"
 
 	// OAuth scopes - openid for the MCP server flow
