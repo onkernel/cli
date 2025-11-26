@@ -227,7 +227,7 @@ func (b BrowsersCmd) List(ctx context.Context, in BrowsersListInput) error {
 		return nil
 	}
 
-	if browsers == nil || len(browsers) == 0 {
+	if len(browsers) == 0 {
 		pterm.Info.Println("No running or persistent browsers found")
 		return nil
 	}
@@ -353,27 +353,31 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 		return util.CleanedUpSdkError{Err: err}
 	}
 
+	printBrowserSessionResult(browser.SessionID, browser.CdpWsURL, browser.BrowserLiveViewURL, browser.Persistence, browser.Profile)
+	return nil
+}
+
+func printBrowserSessionResult(sessionID, cdpURL, liveViewURL string, persistence kernel.BrowserPersistence, profile kernel.Profile) {
 	tableData := pterm.TableData{
 		{"Property", "Value"},
-		{"Session ID", browser.SessionID},
-		{"CDP WebSocket URL", browser.CdpWsURL},
+		{"Session ID", sessionID},
+		{"CDP WebSocket URL", cdpURL},
 	}
-	if browser.BrowserLiveViewURL != "" {
-		tableData = append(tableData, []string{"Live View URL", browser.BrowserLiveViewURL})
+	if liveViewURL != "" {
+		tableData = append(tableData, []string{"Live View URL", liveViewURL})
 	}
-	if browser.Persistence.ID != "" {
-		tableData = append(tableData, []string{"Persistent ID", browser.Persistence.ID})
+	if persistence.ID != "" {
+		tableData = append(tableData, []string{"Persistent ID", persistence.ID})
 	}
-	if browser.Profile.ID != "" || browser.Profile.Name != "" {
-		profVal := browser.Profile.Name
+	if profile.ID != "" || profile.Name != "" {
+		profVal := profile.Name
 		if profVal == "" {
-			profVal = browser.Profile.ID
+			profVal = profile.ID
 		}
 		tableData = append(tableData, []string{"Profile", profVal})
 	}
 
 	PrintTableNoPad(tableData, true)
-	return nil
 }
 
 func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
@@ -2048,6 +2052,8 @@ func init() {
 	browsersCreateCmd.Flags().StringSlice("extension", []string{}, "Extension IDs or names to load (repeatable; may be passed multiple times or comma-separated)")
 	browsersCreateCmd.Flags().String("viewport", "", "Browser viewport size (e.g., 1920x1080@25). Supported: 2560x1440@10, 1920x1080@25, 1920x1200@25, 1440x900@25, 1024x768@60, 1200x800@60")
 	browsersCreateCmd.Flags().Bool("viewport-interactive", false, "Interactively select viewport size from list")
+	browsersCreateCmd.Flags().String("pool-id", "", "Browser pool ID to acquire from (mutually exclusive with --pool-name)")
+	browsersCreateCmd.Flags().String("pool-name", "", "Browser pool name to acquire from (mutually exclusive with --pool-id)")
 
 	// Add flags for delete command
 	browsersDeleteCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
@@ -2087,6 +2093,62 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 	extensions, _ := cmd.Flags().GetStringSlice("extension")
 	viewport, _ := cmd.Flags().GetString("viewport")
 	viewportInteractive, _ := cmd.Flags().GetBool("viewport-interactive")
+	poolID, _ := cmd.Flags().GetString("pool-id")
+	poolName, _ := cmd.Flags().GetString("pool-name")
+
+	if poolID != "" && poolName != "" {
+		pterm.Error.Println("must specify at most one of --pool-id or --pool-name")
+		return nil
+	}
+
+	if poolID != "" || poolName != "" {
+		conflictFlags := []string{
+			"persistent-id",
+			"stealth",
+			"headless",
+			"kiosk",
+			"timeout",
+			"profile-id",
+			"profile-name",
+			"save-changes",
+			"proxy-id",
+			"extension",
+			"viewport",
+			"viewport-interactive",
+		}
+		var conflicts []string
+		for _, name := range conflictFlags {
+			if cmd.Flags().Changed(name) {
+				conflicts = append(conflicts, "--"+name)
+			}
+		}
+		if len(conflicts) > 0 {
+			flagLabel := "--pool-id"
+			if poolName != "" {
+				flagLabel = "--pool-name"
+			}
+			pterm.Error.Printf("%s cannot be combined with %s\n", flagLabel, strings.Join(conflicts, ", "))
+			return nil
+		}
+
+		pool := poolID
+		if pool == "" {
+			pool = poolName
+		}
+
+		pterm.Info.Printf("Acquiring browser from pool %s...\n", pool)
+		poolSvc := client.BrowserPools
+		resp, err := (&poolSvc).Acquire(cmd.Context(), pool, kernel.BrowserPoolAcquireParams{})
+		if err != nil {
+			return util.CleanedUpSdkError{Err: err}
+		}
+		if resp == nil {
+			pterm.Error.Println("Acquire request timed out (no browser available). Retry to continue waiting.")
+			return nil
+		}
+		printBrowserSessionResult(resp.SessionID, resp.CdpWsURL, resp.BrowserLiveViewURL, resp.Persistence, resp.Profile)
+		return nil
+	}
 
 	// Handle interactive viewport selection
 	if viewportInteractive {
@@ -2544,7 +2606,7 @@ func runBrowsersComputerSetCursor(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	svc := client.Browsers
 	hiddenStr, _ := cmd.Flags().GetString("hidden")
-	
+
 	var hidden bool
 	switch strings.ToLower(hiddenStr) {
 	case "true", "1", "yes":
@@ -2555,7 +2617,7 @@ func runBrowsersComputerSetCursor(cmd *cobra.Command, args []string) error {
 		pterm.Error.Printf("Invalid value for --hidden: %s (expected true or false)\n", hiddenStr)
 		return nil
 	}
-	
+
 	b := BrowsersCmd{browsers: &svc, computer: &svc.Computer}
 	return b.ComputerSetCursor(cmd.Context(), BrowsersComputerSetCursorInput{Identifier: args[0], Hidden: hidden})
 }

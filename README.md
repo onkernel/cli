@@ -153,9 +153,32 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
   - `-s, --stealth` - Launch browser in stealth mode to avoid detection
   - `-H, --headless` - Launch browser without GUI access
   - `--kiosk` - Launch browser in kiosk mode
+  - `--pool-id <id>` - Acquire a browser from the specified pool (mutually exclusive with --pool-name; ignores other session flags)
+  - `--pool-name <name>` - Acquire a browser from the pool name (mutually exclusive with --pool-id; ignores other session flags)
+  - _Note: When a pool is specified, omit other session configuration flags—pool settings determine profile, proxy, viewport, etc._
 - `kernel browsers delete <id or persistent id>` - Delete a browser
   - `-y, --yes` - Skip confirmation prompt
 - `kernel browsers view <id or persistent id>` - Get live view URL for a browser
+
+### Browser Pools
+
+- `kernel browser-pools list` - List browser pools
+- `kernel browser-pools create` - Create a browser pool
+  - `--size <n>` - Number of browsers in the pool (required)
+  - `--fill-rate <percent>` - Percentage of the pool to fill per minute
+  - `--timeout <seconds>` - Idle timeout for browsers acquired from the pool
+  - `--stealth`, `--headless`, `--kiosk` - Default pool configuration
+  - `--profile-id`, `--profile-name`, `--save-changes`, `--proxy-id`, `--extension`, `--viewport` - Same semantics as `kernel browsers create`
+- `kernel browser-pools get <id-or-name>` - Get pool details
+- `kernel browser-pools update <id-or-name>` - Update pool configuration (same flags as create plus `--discard-all-idle`)
+- `kernel browser-pools delete <id-or-name>` - Delete a pool
+  - `--force` - Force delete even if browsers are leased
+- `kernel browser-pools acquire <id-or-name>` - Acquire a browser from the pool
+  - `--timeout <seconds>` - Acquire timeout before returning 204
+- `kernel browser-pools release <id-or-name>` - Release a browser back to the pool
+  - `--session-id <id>` - Browser session ID to release (required)
+  - `--reuse` - Reuse the browser instance (default: true)
+- `kernel browser-pools flush <id-or-name>` - Destroy all idle browsers in the pool
 
 ### Browser Logs
 
