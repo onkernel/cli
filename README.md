@@ -149,16 +149,15 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 
 - `kernel browsers list` - List running browsers
 - `kernel browsers create` - Create a new browser session
-  - `-p, --persistence-id <id>` - Unique identifier for browser session persistence
   - `-s, --stealth` - Launch browser in stealth mode to avoid detection
   - `-H, --headless` - Launch browser without GUI access
   - `--kiosk` - Launch browser in kiosk mode
   - `--pool-id <id>` - Acquire a browser from the specified pool (mutually exclusive with --pool-name; ignores other session flags)
   - `--pool-name <name>` - Acquire a browser from the pool name (mutually exclusive with --pool-id; ignores other session flags)
   - _Note: When a pool is specified, omit other session configuration flags—pool settings determine profile, proxy, viewport, etc._
-- `kernel browsers delete <id or persistent id>` - Delete a browser
+- `kernel browsers delete <id>` - Delete a browser
   - `-y, --yes` - Skip confirmation prompt
-- `kernel browsers view <id or persistent id>` - Get live view URL for a browser
+- `kernel browsers view <id>` - Get live view URL for a browser
 
 ### Browser Pools
 
@@ -182,7 +181,7 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 
 ### Browser Logs
 
-- `kernel browsers logs stream <id or persistent id>` - Stream browser logs
+- `kernel browsers logs stream <id>` - Stream browser logs
   - `--source <source>` - Log source: "path" or "supervisor" (required)
   - `--follow` - Follow the log stream (default: true)
   - `--path <path>` - File path when source=path
@@ -190,111 +189,111 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 
 ### Browser Replays
 
-- `kernel browsers replays list <id or persistent id>` - List replays for a browser
-- `kernel browsers replays start <id or persistent id>` - Start a replay recording
+- `kernel browsers replays list <id>` - List replays for a browser
+- `kernel browsers replays start <id>` - Start a replay recording
   - `--framerate <fps>` - Recording framerate (fps)
   - `--max-duration <seconds>` - Maximum duration in seconds
-- `kernel browsers replays stop <id or persistent id> <replay-id>` - Stop a replay recording
-- `kernel browsers replays download <id or persistent id> <replay-id>` - Download a replay video
+- `kernel browsers replays stop <id> <replay-id>` - Stop a replay recording
+- `kernel browsers replays download <id> <replay-id>` - Download a replay video
   - `-o, --output <path>` - Output file path for the replay video
 
 ### Browser Process Control
 
-- `kernel browsers process exec <id or persistent id> [--] [command...]` - Execute a command synchronously
+- `kernel browsers process exec <id> [--] [command...]` - Execute a command synchronously
   - `--command <cmd>` - Command to execute (optional; if omitted, trailing args are executed via /bin/bash -c)
   - `--args <args>` - Command arguments
   - `--cwd <path>` - Working directory
   - `--timeout <seconds>` - Timeout in seconds
   - `--as-user <user>` - Run as user
   - `--as-root` - Run as root
-- `kernel browsers process spawn <id or persistent id> [--] [command...]` - Execute a command asynchronously
+- `kernel browsers process spawn <id> [--] [command...]` - Execute a command asynchronously
   - `--command <cmd>` - Command to execute (optional; if omitted, trailing args are executed via /bin/bash -c)
   - `--args <args>` - Command arguments
   - `--cwd <path>` - Working directory
   - `--timeout <seconds>` - Timeout in seconds
   - `--as-user <user>` - Run as user
   - `--as-root` - Run as root
-- `kernel browsers process kill <id or persistent id> <process-id>` - Send a signal to a process
+- `kernel browsers process kill <id> <process-id>` - Send a signal to a process
   - `--signal <signal>` - Signal to send: TERM, KILL, INT, HUP (default: TERM)
-- `kernel browsers process status <id or persistent id> <process-id>` - Get process status
-- `kernel browsers process stdin <id or persistent id> <process-id>` - Write to process stdin (base64)
+- `kernel browsers process status <id> <process-id>` - Get process status
+- `kernel browsers process stdin <id> <process-id>` - Write to process stdin (base64)
   - `--data-b64 <data>` - Base64-encoded data to write to stdin (required)
-- `kernel browsers process stdout-stream <id or persistent id> <process-id>` - Stream process stdout/stderr
+- `kernel browsers process stdout-stream <id> <process-id>` - Stream process stdout/stderr
 
 ### Browser Filesystem
 
-- `kernel browsers fs new-directory <id or persistent id>` - Create a new directory
+- `kernel browsers fs new-directory <id>` - Create a new directory
   - `--path <path>` - Absolute directory path to create (required)
   - `--mode <mode>` - Directory mode (octal string)
-- `kernel browsers fs delete-directory <id or persistent id>` - Delete a directory
+- `kernel browsers fs delete-directory <id>` - Delete a directory
   - `--path <path>` - Absolute directory path to delete (required)
-- `kernel browsers fs delete-file <id or persistent id>` - Delete a file
+- `kernel browsers fs delete-file <id>` - Delete a file
   - `--path <path>` - Absolute file path to delete (required)
-- `kernel browsers fs download-dir-zip <id or persistent id>` - Download a directory as zip
+- `kernel browsers fs download-dir-zip <id>` - Download a directory as zip
   - `--path <path>` - Absolute directory path to download (required)
   - `-o, --output <path>` - Output zip file path
-- `kernel browsers fs file-info <id or persistent id>` - Get file or directory info
+- `kernel browsers fs file-info <id>` - Get file or directory info
   - `--path <path>` - Absolute file or directory path (required)
-- `kernel browsers fs list-files <id or persistent id>` - List files in a directory
+- `kernel browsers fs list-files <id>` - List files in a directory
   - `--path <path>` - Absolute directory path (required)
-- `kernel browsers fs move <id or persistent id>` - Move or rename a file or directory
+- `kernel browsers fs move <id>` - Move or rename a file or directory
   - `--src <path>` - Absolute source path (required)
   - `--dest <path>` - Absolute destination path (required)
-- `kernel browsers fs read-file <id or persistent id>` - Read a file
+- `kernel browsers fs read-file <id>` - Read a file
   - `--path <path>` - Absolute file path (required)
   - `-o, --output <path>` - Output file path (optional)
-- `kernel browsers fs set-permissions <id or persistent id>` - Set file permissions or ownership
+- `kernel browsers fs set-permissions <id>` - Set file permissions or ownership
   - `--path <path>` - Absolute path (required)
   - `--mode <mode>` - File mode bits (octal string) (required)
   - `--owner <user>` - New owner username or UID
   - `--group <group>` - New group name or GID
-- `kernel browsers fs upload <id or persistent id>` - Upload one or more files
+- `kernel browsers fs upload <id>` - Upload one or more files
   - `--file <local:remote>` - Mapping local:remote (repeatable)
   - `--dest-dir <path>` - Destination directory for uploads
   - `--paths <paths>` - Local file paths to upload
-- `kernel browsers fs upload-zip <id or persistent id>` - Upload a zip and extract it
+- `kernel browsers fs upload-zip <id>` - Upload a zip and extract it
   - `--zip <path>` - Local zip file path (required)
   - `--dest-dir <path>` - Destination directory to extract to (required)
-- `kernel browsers fs write-file <id or persistent id>` - Write a file from local data
+- `kernel browsers fs write-file <id>` - Write a file from local data
   - `--path <path>` - Destination absolute file path (required)
   - `--mode <mode>` - File mode (octal string)
   - `--source <path>` - Local source file path (required)
 
 ### Browser Extensions
 
-- `kernel browsers extensions upload <id or persistent id> <extension-path>...` - Ad-hoc upload of one or more unpacked extensions to a running browser instance.
+- `kernel browsers extensions upload <id> <extension-path>...` - Ad-hoc upload of one or more unpacked extensions to a running browser instance.
 
 ### Browser Computer Controls
 
-- `kernel browsers computer click-mouse <id or persistent id>` - Click mouse at coordinates
+- `kernel browsers computer click-mouse <id>` - Click mouse at coordinates
   - `--x <coordinate>` - X coordinate (required)
   - `--y <coordinate>` - Y coordinate (required)
   - `--num-clicks <n>` - Number of clicks (default: 1)
   - `--button <button>` - Mouse button: left, right, middle, back, forward (default: left)
   - `--click-type <type>` - Click type: down, up, click (default: click)
   - `--hold-key <key>` - Modifier keys to hold (repeatable)
-- `kernel browsers computer move-mouse <id or persistent id>` - Move mouse to coordinates
+- `kernel browsers computer move-mouse <id>` - Move mouse to coordinates
   - `--x <coordinate>` - X coordinate (required)
   - `--y <coordinate>` - Y coordinate (required)
   - `--hold-key <key>` - Modifier keys to hold (repeatable)
-- `kernel browsers computer screenshot <id or persistent id>` - Capture a screenshot
+- `kernel browsers computer screenshot <id>` - Capture a screenshot
   - `--to <path>` - Output file path for the PNG image (required)
   - `--x <coordinate>` - Top-left X for region capture (optional)
   - `--y <coordinate>` - Top-left Y for region capture (optional)
   - `--width <pixels>` - Region width (optional)
   - `--height <pixels>` - Region height (optional)
-- `kernel browsers computer type <id or persistent id>` - Type text on the browser instance
+- `kernel browsers computer type <id>` - Type text on the browser instance
 
   - `--text <text>` - Text to type (required)
   - `--delay <ms>` - Delay in milliseconds between keystrokes (optional)
 
-- `kernel browsers computer press-key <id or persistent id>` - Press one or more keys
+- `kernel browsers computer press-key <id>` - Press one or more keys
 
   - `--key <key>` - Key symbols to press (repeatable)
   - `--duration <ms>` - Duration to hold keys down in ms (0=tap)
   - `--hold-key <key>` - Modifier keys to hold (repeatable)
 
-- `kernel browsers computer scroll <id or persistent id>` - Scroll the mouse wheel
+- `kernel browsers computer scroll <id>` - Scroll the mouse wheel
 
   - `--x <coordinate>` - X coordinate (required)
   - `--y <coordinate>` - Y coordinate (required)
@@ -302,7 +301,7 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
   - `--delta-y <pixels>` - Vertical scroll amount (+down, -up)
   - `--hold-key <key>` - Modifier keys to hold (repeatable)
 
-- `kernel browsers computer drag-mouse <id or persistent id>` - Drag the mouse along a path
+- `kernel browsers computer drag-mouse <id>` - Drag the mouse along a path
   - `--point <x,y>` - Add a point as x,y (repeatable)
   - `--delay <ms>` - Delay before dragging starts in ms
   - `--button <button>` - Mouse button: left, middle, right (default: left)
@@ -310,7 +309,7 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 
 ### Browser Playwright
 
-- `kernel browsers playwright execute <id or persistent id> [code]` - Execute Playwright/TypeScript code against the browser
+- `kernel browsers playwright execute <id> [code]` - Execute Playwright/TypeScript code against the browser
   - `--timeout <seconds>` - Maximum execution time in seconds (defaults server-side)
   - If `[code]` is omitted, code is read from stdin
 
@@ -398,8 +397,8 @@ kernel browsers list
 # Create a new browser session
 kernel browsers create
 
-# Create a persistent browser session
-kernel browsers create --persistence-id my-browser-session
+# Create a browser with a longer timeout (up to 72 hours)
+kernel browsers create --timeout 3600
 
 # Create a headless browser in stealth mode
 kernel browsers create --headless --stealth
@@ -407,11 +406,14 @@ kernel browsers create --headless --stealth
 # Create a browser in kiosk mode
 kernel browsers create --kiosk
 
-# Delete a persistent browser
-kernel browsers delete --by-persistent-id my-browser-session --yes
+# Create a browser with a profile for session state
+kernel browsers create --profile-name my-profile
+
+# Delete a browser
+kernel browsers delete browser123 --yes
 
 # Get live view URL
-kernel browsers view --by-id browser123
+kernel browsers view browser123
 
 # Stream browser logs
 kernel browsers logs stream my-browser --source supervisor --follow --supervisor-process chromium
