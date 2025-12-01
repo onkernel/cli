@@ -228,7 +228,7 @@ func (b BrowsersCmd) List(ctx context.Context, in BrowsersListInput) error {
 	}
 
 	if browsers == nil || len(browsers) == 0 {
-		pterm.Info.Println("No running or persistent browsers found")
+		pterm.Info.Println("No running browsers found")
 		return nil
 	}
 
@@ -400,12 +400,7 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 			return nil
 		}
 
-		var confirmMsg string
-		if found.Persistence.ID == in.Identifier {
-			confirmMsg = fmt.Sprintf("Are you sure you want to delete browser with persistent ID \"%s\"?", in.Identifier)
-		} else {
-			confirmMsg = fmt.Sprintf("Are you sure you want to delete browser with ID \"%s\"?", in.Identifier)
-		}
+		confirmMsg := fmt.Sprintf("Are you sure you want to delete browser \"%s\"?", in.Identifier)
 		pterm.DefaultInteractiveConfirm.DefaultText = confirmMsg
 		result, _ := pterm.DefaultInteractiveConfirm.Show()
 		if !result {
@@ -414,21 +409,20 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 		}
 
 		if found.Persistence.ID == in.Identifier {
-			pterm.Info.Printf("Deleting browser with persistent ID: %s\n", in.Identifier)
 			err = b.browsers.Delete(ctx, kernel.BrowserDeleteParams{PersistentID: in.Identifier})
 			if err != nil && !util.IsNotFound(err) {
 				return util.CleanedUpSdkError{Err: err}
 			}
-			pterm.Success.Printf("Successfully deleted browser with persistent ID: %s\n", in.Identifier)
+			pterm.Success.Printf("Successfully deleted browser: %s\n", in.Identifier)
 			return nil
 		}
 
-		pterm.Info.Printf("Deleting browser with ID: %s\n", in.Identifier)
+		pterm.Info.Printf("Deleting browser: %s\n", in.Identifier)
 		err = b.browsers.DeleteByID(ctx, in.Identifier)
 		if err != nil && !util.IsNotFound(err) {
 			return util.CleanedUpSdkError{Err: err}
 		}
-		pterm.Success.Printf("Successfully deleted browser with ID: %s\n", in.Identifier)
+		pterm.Success.Printf("Successfully deleted browser: %s\n", in.Identifier)
 		return nil
 	}
 
@@ -443,7 +437,7 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 		}
 	}
 
-	// Attempt by persistent ID
+	// Attempt by persistent ID (backward compatibility)
 	if err := b.browsers.Delete(ctx, kernel.BrowserDeleteParams{PersistentID: in.Identifier}); err != nil {
 		if !util.IsNotFound(err) {
 			nonNotFoundErrors = append(nonNotFoundErrors, err)
@@ -1808,7 +1802,7 @@ var browsersCmd = &cobra.Command{
 
 var browsersListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List running or persistent browsers",
+	Short: "List running browsers",
 	RunE:  runBrowsersList,
 }
 
@@ -1819,14 +1813,14 @@ var browsersCreateCmd = &cobra.Command{
 }
 
 var browsersDeleteCmd = &cobra.Command{
-	Use:   "delete <id-or-persistent-id> [ids...]",
+	Use:   "delete <id> [ids...]",
 	Short: "Delete a browser",
 	Args:  cobra.MinimumNArgs(1),
 	RunE:  runBrowsersDelete,
 }
 
 var browsersViewCmd = &cobra.Command{
-	Use:   "view <id|persistent-id>",
+	Use:   "view <id>",
 	Short: "Get the live view URL for a browser",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runBrowsersView,
@@ -1846,7 +1840,7 @@ func init() {
 
 	// logs
 	logsRoot := &cobra.Command{Use: "logs", Short: "Browser logs operations"}
-	logsStream := &cobra.Command{Use: "stream <id|persistent-id>", Short: "Stream browser logs", Args: cobra.ExactArgs(1), RunE: runBrowsersLogsStream}
+	logsStream := &cobra.Command{Use: "stream <id>", Short: "Stream browser logs", Args: cobra.ExactArgs(1), RunE: runBrowsersLogsStream}
 	logsStream.Flags().String("source", "", "Log source: path or supervisor")
 	logsStream.Flags().Bool("follow", true, "Follow the log stream")
 	logsStream.Flags().String("path", "", "File path when source=path")
@@ -1857,74 +1851,74 @@ func init() {
 
 	// replays
 	replaysRoot := &cobra.Command{Use: "replays", Short: "Manage browser replays"}
-	replaysList := &cobra.Command{Use: "list <id|persistent-id>", Short: "List replays for a browser", Args: cobra.ExactArgs(1), RunE: runBrowsersReplaysList}
-	replaysStart := &cobra.Command{Use: "start <id|persistent-id>", Short: "Start a replay recording", Args: cobra.ExactArgs(1), RunE: runBrowsersReplaysStart}
+	replaysList := &cobra.Command{Use: "list <id>", Short: "List replays for a browser", Args: cobra.ExactArgs(1), RunE: runBrowsersReplaysList}
+	replaysStart := &cobra.Command{Use: "start <id>", Short: "Start a replay recording", Args: cobra.ExactArgs(1), RunE: runBrowsersReplaysStart}
 	replaysStart.Flags().Int("framerate", 0, "Recording framerate (fps)")
 	replaysStart.Flags().Int("max-duration", 0, "Maximum duration in seconds")
-	replaysStop := &cobra.Command{Use: "stop <id|persistent-id> <replay-id>", Short: "Stop a replay recording", Args: cobra.ExactArgs(2), RunE: runBrowsersReplaysStop}
-	replaysDownload := &cobra.Command{Use: "download <id|persistent-id> <replay-id>", Short: "Download a replay video", Args: cobra.ExactArgs(2), RunE: runBrowsersReplaysDownload}
+	replaysStop := &cobra.Command{Use: "stop <id> <replay-id>", Short: "Stop a replay recording", Args: cobra.ExactArgs(2), RunE: runBrowsersReplaysStop}
+	replaysDownload := &cobra.Command{Use: "download <id> <replay-id>", Short: "Download a replay video", Args: cobra.ExactArgs(2), RunE: runBrowsersReplaysDownload}
 	replaysDownload.Flags().StringP("output", "o", "", "Output file path for the replay video")
 	replaysRoot.AddCommand(replaysList, replaysStart, replaysStop, replaysDownload)
 	browsersCmd.AddCommand(replaysRoot)
 
 	// process
 	procRoot := &cobra.Command{Use: "process", Short: "Manage processes inside the browser VM"}
-	procExec := &cobra.Command{Use: "exec <id|persistent-id> [--] [command...]", Short: "Execute a command synchronously", Args: cobra.MinimumNArgs(1), RunE: runBrowsersProcessExec}
+	procExec := &cobra.Command{Use: "exec <id> [--] [command...]", Short: "Execute a command synchronously", Args: cobra.MinimumNArgs(1), RunE: runBrowsersProcessExec}
 	procExec.Flags().String("command", "", "Command to execute (optional; if omitted, trailing args are executed via /bin/bash -c)")
 	procExec.Flags().StringSlice("args", []string{}, "Command arguments")
 	procExec.Flags().String("cwd", "", "Working directory")
 	procExec.Flags().Int("timeout", 0, "Timeout in seconds")
 	procExec.Flags().String("as-user", "", "Run as user")
 	procExec.Flags().Bool("as-root", false, "Run as root")
-	procSpawn := &cobra.Command{Use: "spawn <id|persistent-id> [--] [command...]", Short: "Execute a command asynchronously", Args: cobra.MinimumNArgs(1), RunE: runBrowsersProcessSpawn}
+	procSpawn := &cobra.Command{Use: "spawn <id> [--] [command...]", Short: "Execute a command asynchronously", Args: cobra.MinimumNArgs(1), RunE: runBrowsersProcessSpawn}
 	procSpawn.Flags().String("command", "", "Command to execute (optional; if omitted, trailing args are executed via /bin/bash -c)")
 	procSpawn.Flags().StringSlice("args", []string{}, "Command arguments")
 	procSpawn.Flags().String("cwd", "", "Working directory")
 	procSpawn.Flags().Int("timeout", 0, "Timeout in seconds")
 	procSpawn.Flags().String("as-user", "", "Run as user")
 	procSpawn.Flags().Bool("as-root", false, "Run as root")
-	procKill := &cobra.Command{Use: "kill <id|persistent-id> <process-id>", Short: "Send a signal to a process", Args: cobra.ExactArgs(2), RunE: runBrowsersProcessKill}
+	procKill := &cobra.Command{Use: "kill <id> <process-id>", Short: "Send a signal to a process", Args: cobra.ExactArgs(2), RunE: runBrowsersProcessKill}
 	procKill.Flags().String("signal", "TERM", "Signal to send (TERM, KILL, INT, HUP)")
-	procStatus := &cobra.Command{Use: "status <id|persistent-id> <process-id>", Short: "Get process status", Args: cobra.ExactArgs(2), RunE: runBrowsersProcessStatus}
-	procStdin := &cobra.Command{Use: "stdin <id|persistent-id> <process-id>", Short: "Write to process stdin (base64)", Args: cobra.ExactArgs(2), RunE: runBrowsersProcessStdin}
+	procStatus := &cobra.Command{Use: "status <id> <process-id>", Short: "Get process status", Args: cobra.ExactArgs(2), RunE: runBrowsersProcessStatus}
+	procStdin := &cobra.Command{Use: "stdin <id> <process-id>", Short: "Write to process stdin (base64)", Args: cobra.ExactArgs(2), RunE: runBrowsersProcessStdin}
 	procStdin.Flags().String("data-b64", "", "Base64-encoded data to write to stdin")
 	_ = procStdin.MarkFlagRequired("data-b64")
-	procStdoutStream := &cobra.Command{Use: "stdout-stream <id|persistent-id> <process-id>", Short: "Stream process stdout/stderr", Args: cobra.ExactArgs(2), RunE: runBrowsersProcessStdoutStream}
+	procStdoutStream := &cobra.Command{Use: "stdout-stream <id> <process-id>", Short: "Stream process stdout/stderr", Args: cobra.ExactArgs(2), RunE: runBrowsersProcessStdoutStream}
 	procRoot.AddCommand(procExec, procSpawn, procKill, procStatus, procStdin, procStdoutStream)
 	browsersCmd.AddCommand(procRoot)
 
 	// fs
 	fsRoot := &cobra.Command{Use: "fs", Short: "Browser filesystem operations"}
-	fsNewDir := &cobra.Command{Use: "new-directory <id|persistent-id>", Short: "Create a new directory", Args: cobra.ExactArgs(1), RunE: runBrowsersFSNewDirectory}
+	fsNewDir := &cobra.Command{Use: "new-directory <id>", Short: "Create a new directory", Args: cobra.ExactArgs(1), RunE: runBrowsersFSNewDirectory}
 	fsNewDir.Flags().String("path", "", "Absolute directory path to create")
 	_ = fsNewDir.MarkFlagRequired("path")
 	fsNewDir.Flags().String("mode", "", "Directory mode (octal string)")
-	fsDelDir := &cobra.Command{Use: "delete-directory <id|persistent-id>", Short: "Delete a directory", Args: cobra.ExactArgs(1), RunE: runBrowsersFSDeleteDirectory}
+	fsDelDir := &cobra.Command{Use: "delete-directory <id>", Short: "Delete a directory", Args: cobra.ExactArgs(1), RunE: runBrowsersFSDeleteDirectory}
 	fsDelDir.Flags().String("path", "", "Absolute directory path to delete")
 	_ = fsDelDir.MarkFlagRequired("path")
-	fsDelFile := &cobra.Command{Use: "delete-file <id|persistent-id>", Short: "Delete a file", Args: cobra.ExactArgs(1), RunE: runBrowsersFSDeleteFile}
+	fsDelFile := &cobra.Command{Use: "delete-file <id>", Short: "Delete a file", Args: cobra.ExactArgs(1), RunE: runBrowsersFSDeleteFile}
 	fsDelFile.Flags().String("path", "", "Absolute file path to delete")
 	_ = fsDelFile.MarkFlagRequired("path")
-	fsDownloadZip := &cobra.Command{Use: "download-dir-zip <id|persistent-id>", Short: "Download a directory as zip", Args: cobra.ExactArgs(1), RunE: runBrowsersFSDownloadDirZip}
+	fsDownloadZip := &cobra.Command{Use: "download-dir-zip <id>", Short: "Download a directory as zip", Args: cobra.ExactArgs(1), RunE: runBrowsersFSDownloadDirZip}
 	fsDownloadZip.Flags().String("path", "", "Absolute directory path to download")
 	_ = fsDownloadZip.MarkFlagRequired("path")
 	fsDownloadZip.Flags().StringP("output", "o", "", "Output zip file path")
-	fsFileInfo := &cobra.Command{Use: "file-info <id|persistent-id>", Short: "Get file or directory info", Args: cobra.ExactArgs(1), RunE: runBrowsersFSFileInfo}
+	fsFileInfo := &cobra.Command{Use: "file-info <id>", Short: "Get file or directory info", Args: cobra.ExactArgs(1), RunE: runBrowsersFSFileInfo}
 	fsFileInfo.Flags().String("path", "", "Absolute file or directory path")
 	_ = fsFileInfo.MarkFlagRequired("path")
-	fsListFiles := &cobra.Command{Use: "list-files <id|persistent-id>", Short: "List files in a directory", Args: cobra.ExactArgs(1), RunE: runBrowsersFSListFiles}
+	fsListFiles := &cobra.Command{Use: "list-files <id>", Short: "List files in a directory", Args: cobra.ExactArgs(1), RunE: runBrowsersFSListFiles}
 	fsListFiles.Flags().String("path", "", "Absolute directory path")
 	_ = fsListFiles.MarkFlagRequired("path")
-	fsMove := &cobra.Command{Use: "move <id|persistent-id>", Short: "Move or rename a file or directory", Args: cobra.ExactArgs(1), RunE: runBrowsersFSMove}
+	fsMove := &cobra.Command{Use: "move <id>", Short: "Move or rename a file or directory", Args: cobra.ExactArgs(1), RunE: runBrowsersFSMove}
 	fsMove.Flags().String("src", "", "Absolute source path")
 	fsMove.Flags().String("dest", "", "Absolute destination path")
 	_ = fsMove.MarkFlagRequired("src")
 	_ = fsMove.MarkFlagRequired("dest")
-	fsReadFile := &cobra.Command{Use: "read-file <id|persistent-id>", Short: "Read a file", Args: cobra.ExactArgs(1), RunE: runBrowsersFSReadFile}
+	fsReadFile := &cobra.Command{Use: "read-file <id>", Short: "Read a file", Args: cobra.ExactArgs(1), RunE: runBrowsersFSReadFile}
 	fsReadFile.Flags().String("path", "", "Absolute file path")
 	_ = fsReadFile.MarkFlagRequired("path")
 	fsReadFile.Flags().StringP("output", "o", "", "Output file path (optional)")
-	fsSetPerms := &cobra.Command{Use: "set-permissions <id|persistent-id>", Short: "Set file permissions or ownership", Args: cobra.ExactArgs(1), RunE: runBrowsersFSSetPermissions}
+	fsSetPerms := &cobra.Command{Use: "set-permissions <id>", Short: "Set file permissions or ownership", Args: cobra.ExactArgs(1), RunE: runBrowsersFSSetPermissions}
 	fsSetPerms.Flags().String("path", "", "Absolute path")
 	fsSetPerms.Flags().String("mode", "", "File mode bits (octal string)")
 	_ = fsSetPerms.MarkFlagRequired("path")
@@ -1933,20 +1927,20 @@ func init() {
 	fsSetPerms.Flags().String("group", "", "New group name or GID")
 
 	// fs upload
-	fsUpload := &cobra.Command{Use: "upload <id|persistent-id>", Short: "Upload one or more files", Args: cobra.ExactArgs(1), RunE: runBrowsersFSUpload}
+	fsUpload := &cobra.Command{Use: "upload <id>", Short: "Upload one or more files", Args: cobra.ExactArgs(1), RunE: runBrowsersFSUpload}
 	fsUpload.Flags().StringSlice("file", []string{}, "Mapping local:remote (repeatable)")
 	fsUpload.Flags().String("dest-dir", "", "Destination directory for uploads")
 	fsUpload.Flags().StringSlice("paths", []string{}, "Local file paths to upload")
 
 	// fs upload-zip
-	fsUploadZip := &cobra.Command{Use: "upload-zip <id|persistent-id>", Short: "Upload a zip and extract it", Args: cobra.ExactArgs(1), RunE: runBrowsersFSUploadZip}
+	fsUploadZip := &cobra.Command{Use: "upload-zip <id>", Short: "Upload a zip and extract it", Args: cobra.ExactArgs(1), RunE: runBrowsersFSUploadZip}
 	fsUploadZip.Flags().String("zip", "", "Local zip file path")
 	_ = fsUploadZip.MarkFlagRequired("zip")
 	fsUploadZip.Flags().String("dest-dir", "", "Destination directory to extract to")
 	_ = fsUploadZip.MarkFlagRequired("dest-dir")
 
 	// fs write-file
-	fsWriteFile := &cobra.Command{Use: "write-file <id|persistent-id>", Short: "Write a file from local data", Args: cobra.ExactArgs(1), RunE: runBrowsersFSWriteFile}
+	fsWriteFile := &cobra.Command{Use: "write-file <id>", Short: "Write a file from local data", Args: cobra.ExactArgs(1), RunE: runBrowsersFSWriteFile}
 	fsWriteFile.Flags().String("path", "", "Destination absolute file path")
 	_ = fsWriteFile.MarkFlagRequired("path")
 	fsWriteFile.Flags().String("mode", "", "File mode (octal string)")
@@ -1958,13 +1952,13 @@ func init() {
 
 	// extensions
 	extensionsRoot := &cobra.Command{Use: "extensions", Short: "Add browser extensions to a running instance"}
-	extensionsUpload := &cobra.Command{Use: "upload <id|persistent-id> <extension-path>...", Short: "Upload one or more unpacked extensions and restart Chromium", Args: cobra.MinimumNArgs(2), RunE: runBrowsersExtensionsUpload}
+	extensionsUpload := &cobra.Command{Use: "upload <id> <extension-path>...", Short: "Upload one or more unpacked extensions and restart Chromium", Args: cobra.MinimumNArgs(2), RunE: runBrowsersExtensionsUpload}
 	extensionsRoot.AddCommand(extensionsUpload)
 	browsersCmd.AddCommand(extensionsRoot)
 
 	// computer
 	computerRoot := &cobra.Command{Use: "computer", Short: "OS-level mouse & screen controls"}
-	computerClick := &cobra.Command{Use: "click-mouse <id|persistent-id>", Short: "Click mouse at coordinates", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerClickMouse}
+	computerClick := &cobra.Command{Use: "click-mouse <id>", Short: "Click mouse at coordinates", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerClickMouse}
 	computerClick.Flags().Int64("x", 0, "X coordinate")
 	computerClick.Flags().Int64("y", 0, "Y coordinate")
 	_ = computerClick.MarkFlagRequired("x")
@@ -1974,14 +1968,14 @@ func init() {
 	computerClick.Flags().String("click-type", "click", "Click type: down,up,click")
 	computerClick.Flags().StringSlice("hold-key", []string{}, "Modifier keys to hold (repeatable)")
 
-	computerMove := &cobra.Command{Use: "move-mouse <id|persistent-id>", Short: "Move mouse to coordinates", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerMoveMouse}
+	computerMove := &cobra.Command{Use: "move-mouse <id>", Short: "Move mouse to coordinates", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerMoveMouse}
 	computerMove.Flags().Int64("x", 0, "X coordinate")
 	computerMove.Flags().Int64("y", 0, "Y coordinate")
 	_ = computerMove.MarkFlagRequired("x")
 	_ = computerMove.MarkFlagRequired("y")
 	computerMove.Flags().StringSlice("hold-key", []string{}, "Modifier keys to hold (repeatable)")
 
-	computerScreenshot := &cobra.Command{Use: "screenshot <id|persistent-id>", Short: "Capture a screenshot (optionally of a region)", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerScreenshot}
+	computerScreenshot := &cobra.Command{Use: "screenshot <id>", Short: "Capture a screenshot (optionally of a region)", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerScreenshot}
 	computerScreenshot.Flags().Int64("x", 0, "Top-left X")
 	computerScreenshot.Flags().Int64("y", 0, "Top-left Y")
 	computerScreenshot.Flags().Int64("width", 0, "Region width")
@@ -1989,20 +1983,20 @@ func init() {
 	computerScreenshot.Flags().String("to", "", "Output file path for the PNG image")
 	_ = computerScreenshot.MarkFlagRequired("to")
 
-	computerType := &cobra.Command{Use: "type <id|persistent-id>", Short: "Type text on the browser instance", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerTypeText}
+	computerType := &cobra.Command{Use: "type <id>", Short: "Type text on the browser instance", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerTypeText}
 	computerType.Flags().String("text", "", "Text to type")
 	_ = computerType.MarkFlagRequired("text")
 	computerType.Flags().Int64("delay", 0, "Delay in milliseconds between keystrokes")
 
 	// computer press-key
-	computerPressKey := &cobra.Command{Use: "press-key <id|persistent-id>", Short: "Press one or more keys", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerPressKey}
+	computerPressKey := &cobra.Command{Use: "press-key <id>", Short: "Press one or more keys", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerPressKey}
 	computerPressKey.Flags().StringSlice("key", []string{}, "Key symbols to press (repeatable)")
 	_ = computerPressKey.MarkFlagRequired("key")
 	computerPressKey.Flags().Int64("duration", 0, "Duration to hold keys down in ms (0=tap)")
 	computerPressKey.Flags().StringSlice("hold-key", []string{}, "Modifier keys to hold (repeatable)")
 
 	// computer scroll
-	computerScroll := &cobra.Command{Use: "scroll <id|persistent-id>", Short: "Scroll the mouse wheel", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerScroll}
+	computerScroll := &cobra.Command{Use: "scroll <id>", Short: "Scroll the mouse wheel", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerScroll}
 	computerScroll.Flags().Int64("x", 0, "X coordinate")
 	computerScroll.Flags().Int64("y", 0, "Y coordinate")
 	_ = computerScroll.MarkFlagRequired("x")
@@ -2012,7 +2006,7 @@ func init() {
 	computerScroll.Flags().StringSlice("hold-key", []string{}, "Modifier keys to hold (repeatable)")
 
 	// computer drag-mouse
-	computerDrag := &cobra.Command{Use: "drag-mouse <id|persistent-id>", Short: "Drag the mouse along a path", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerDragMouse}
+	computerDrag := &cobra.Command{Use: "drag-mouse <id>", Short: "Drag the mouse along a path", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerDragMouse}
 	computerDrag.Flags().StringArray("point", []string{}, "Add a point as x,y (repeatable)")
 	computerDrag.Flags().Int64("delay", 0, "Delay before dragging starts in ms")
 	computerDrag.Flags().Int64("step-delay-ms", 0, "Delay between steps while dragging (ms)")
@@ -2021,7 +2015,7 @@ func init() {
 	computerDrag.Flags().StringSlice("hold-key", []string{}, "Modifier keys to hold (repeatable)")
 
 	// computer set-cursor
-	computerSetCursor := &cobra.Command{Use: "set-cursor <id|persistent-id>", Short: "Hide or show the cursor", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerSetCursor}
+	computerSetCursor := &cobra.Command{Use: "set-cursor <id>", Short: "Hide or show the cursor", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerSetCursor}
 	computerSetCursor.Flags().String("hidden", "", "Whether to hide the cursor: true or false")
 	_ = computerSetCursor.MarkFlagRequired("hidden")
 
@@ -2030,13 +2024,14 @@ func init() {
 
 	// playwright
 	playwrightRoot := &cobra.Command{Use: "playwright", Short: "Playwright operations"}
-	playwrightExecute := &cobra.Command{Use: "execute <id|persistent-id> [code]", Short: "Execute Playwright/TypeScript code against the browser", Args: cobra.MinimumNArgs(1), RunE: runBrowsersPlaywrightExecute}
+	playwrightExecute := &cobra.Command{Use: "execute <id> [code]", Short: "Execute Playwright/TypeScript code against the browser", Args: cobra.MinimumNArgs(1), RunE: runBrowsersPlaywrightExecute}
 	playwrightExecute.Flags().Int64("timeout", 0, "Maximum execution time in seconds (default per server)")
 	playwrightRoot.AddCommand(playwrightExecute)
 	browsersCmd.AddCommand(playwrightRoot)
 
 	// Add flags for create command
-	browsersCreateCmd.Flags().StringP("persistent-id", "p", "", "Unique identifier for browser session persistence")
+	browsersCreateCmd.Flags().StringP("persistent-id", "p", "", "[DEPRECATED] Use --timeout and profiles instead. Unique identifier for browser session persistence")
+	_ = browsersCreateCmd.Flags().MarkDeprecated("persistent-id", "use --timeout (up to 72 hours) and profiles instead")
 	browsersCreateCmd.Flags().BoolP("stealth", "s", false, "Launch browser in stealth mode to avoid detection")
 	browsersCreateCmd.Flags().BoolP("headless", "H", false, "Launch browser without GUI access")
 	browsersCreateCmd.Flags().Bool("kiosk", false, "Launch browser in kiosk mode")
@@ -2076,6 +2071,9 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 
 	// Get flag values
 	persistenceID, _ := cmd.Flags().GetString("persistent-id")
+	if persistenceID != "" {
+		pterm.Warning.Println("--persistent-id is deprecated. Use --timeout (up to 72 hours) and profiles instead.")
+	}
 	stealthVal, _ := cmd.Flags().GetBool("stealth")
 	headlessVal, _ := cmd.Flags().GetBool("headless")
 	kioskVal, _ := cmd.Flags().GetBool("kiosk")
@@ -2544,7 +2542,7 @@ func runBrowsersComputerSetCursor(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	svc := client.Browsers
 	hiddenStr, _ := cmd.Flags().GetString("hidden")
-	
+
 	var hidden bool
 	switch strings.ToLower(hiddenStr) {
 	case "true", "1", "yes":
@@ -2555,7 +2553,7 @@ func runBrowsersComputerSetCursor(cmd *cobra.Command, args []string) error {
 		pterm.Error.Printf("Invalid value for --hidden: %s (expected true or false)\n", hiddenStr)
 		return nil
 	}
-	
+
 	b := BrowsersCmd{browsers: &svc, computer: &svc.Computer}
 	return b.ComputerSetCursor(cmd.Context(), BrowsersComputerSetCursorInput{Identifier: args[0], Hidden: hidden})
 }
@@ -2567,7 +2565,7 @@ func truncateURL(url string, maxLen int) string {
 	return url[:maxLen-3] + "..."
 }
 
-// resolveBrowserByIdentifier finds a browser by session ID or persistent ID.
+// resolveBrowserByIdentifier finds a browser by session ID or persistent ID (backward compatibility).
 func (b BrowsersCmd) resolveBrowserByIdentifier(ctx context.Context, identifier string) (*kernel.BrowserListResponse, error) {
 	page, err := b.browsers.List(ctx, kernel.BrowserListParams{})
 	if err != nil {

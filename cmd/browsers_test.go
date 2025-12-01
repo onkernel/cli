@@ -109,7 +109,7 @@ func TestBrowsersList_PrintsEmptyMessage(t *testing.T) {
 	_ = b.List(context.Background(), BrowsersListInput{})
 
 	out := outBuf.String()
-	assert.Contains(t, out, "No running or persistent browsers found")
+	assert.Contains(t, out, "No running browsers found")
 }
 
 func TestBrowsersList_PrintsTableWithRows(t *testing.T) {
@@ -527,13 +527,13 @@ func makeStream[T any](vals []T) *ssestream.Stream[T] {
 // --- Fake for Computer ---
 
 type FakeComputerService struct {
-	ClickMouseFunc        func(ctx context.Context, id string, body kernel.BrowserComputerClickMouseParams, opts ...option.RequestOption) error
-	MoveMouseFunc         func(ctx context.Context, id string, body kernel.BrowserComputerMoveMouseParams, opts ...option.RequestOption) error
-	CaptureScreenshotFunc func(ctx context.Context, id string, body kernel.BrowserComputerCaptureScreenshotParams, opts ...option.RequestOption) (*http.Response, error)
-	PressKeyFunc          func(ctx context.Context, id string, body kernel.BrowserComputerPressKeyParams, opts ...option.RequestOption) error
-	ScrollFunc            func(ctx context.Context, id string, body kernel.BrowserComputerScrollParams, opts ...option.RequestOption) error
-	DragMouseFunc         func(ctx context.Context, id string, body kernel.BrowserComputerDragMouseParams, opts ...option.RequestOption) error
-	TypeTextFunc          func(ctx context.Context, id string, body kernel.BrowserComputerTypeTextParams, opts ...option.RequestOption) error
+	ClickMouseFunc          func(ctx context.Context, id string, body kernel.BrowserComputerClickMouseParams, opts ...option.RequestOption) error
+	MoveMouseFunc           func(ctx context.Context, id string, body kernel.BrowserComputerMoveMouseParams, opts ...option.RequestOption) error
+	CaptureScreenshotFunc   func(ctx context.Context, id string, body kernel.BrowserComputerCaptureScreenshotParams, opts ...option.RequestOption) (*http.Response, error)
+	PressKeyFunc            func(ctx context.Context, id string, body kernel.BrowserComputerPressKeyParams, opts ...option.RequestOption) error
+	ScrollFunc              func(ctx context.Context, id string, body kernel.BrowserComputerScrollParams, opts ...option.RequestOption) error
+	DragMouseFunc           func(ctx context.Context, id string, body kernel.BrowserComputerDragMouseParams, opts ...option.RequestOption) error
+	TypeTextFunc            func(ctx context.Context, id string, body kernel.BrowserComputerTypeTextParams, opts ...option.RequestOption) error
 	SetCursorVisibilityFunc func(ctx context.Context, id string, body kernel.BrowserComputerSetCursorVisibilityParams, opts ...option.RequestOption) (*kernel.BrowserComputerSetCursorVisibilityResponse, error)
 }
 
