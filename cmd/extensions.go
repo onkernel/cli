@@ -1,13 +1,18 @@
 package cmd
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/onkernel/cli/pkg/util"
@@ -47,6 +52,13 @@ type ExtensionsDownloadWebStoreInput struct {
 type ExtensionsUploadInput struct {
 	Dir  string
 	Name string
+}
+
+type ExtensionsBuildWebBotAuthInput struct {
+	Output  string
+	KeyFile string
+	Upload  bool
+	Name    string
 }
 
 // ExtensionsCmd handles extension operations independent of cobra.
@@ -307,6 +319,246 @@ func (e ExtensionsCmd) Upload(ctx context.Context, in ExtensionsUploadInput) err
 	return nil
 }
 
+// RFC9421 test key for Cloudflare's test site
+const defaultWebBotAuthKey = `{"kty":"OKP","crv":"Ed25519","d":"n4Ni-HpISpVObnQMW0wOhCKROaIKqKtW_2ZYb2p9KcU","x":"JrQLj5P_89iXES9-vFgrIy29clF9CC_oPPsw3c5D0bs"}`
+
+func (e ExtensionsCmd) BuildWebBotAuth(ctx context.Context, in ExtensionsBuildWebBotAuthInput) error {
+	if in.Output == "" {
+		return fmt.Errorf("missing --to output directory")
+	}
+
+	// Check npm is available
+	if _, err := exec.LookPath("npm"); err != nil {
+		return fmt.Errorf("npm is required but not found in PATH. Please install Node.js and npm")
+	}
+
+	// Resolve output directory
+	outDir, err := filepath.Abs(in.Output)
+	if err != nil {
+		return fmt.Errorf("failed to resolve output path: %w", err)
+	}
+
+	// Ensure output directory exists and is empty
+	if st, err := os.Stat(outDir); err == nil {
+		if !st.IsDir() {
+			return fmt.Errorf("output path exists and is not a directory: %s", outDir)
+		}
+		entries, _ := os.ReadDir(outDir)
+		if len(entries) > 0 {
+			return fmt.Errorf("output directory must be empty: %s", outDir)
+		}
+	} else {
+		if err := os.MkdirAll(outDir, 0o755); err != nil {
+			return fmt.Errorf("failed to create output directory: %w", err)
+		}
+	}
+
+	// Determine the signing key to use
+	var keyJSON string
+	if in.KeyFile != "" {
+		keyData, err := os.ReadFile(in.KeyFile)
+		if err != nil {
+			return fmt.Errorf("failed to read key file: %w", err)
+		}
+		// Validate it's valid JSON
+		var keyObj map[string]interface{}
+		if err := json.Unmarshal(keyData, &keyObj); err != nil {
+			return fmt.Errorf("key file is not valid JSON: %w", err)
+		}
+		keyJSON = string(keyData)
+		pterm.Info.Printf("Using signing key from: %s\n", in.KeyFile)
+	} else {
+		keyJSON = defaultWebBotAuthKey
+		pterm.Info.Println("Using default RFC9421 test key (for Cloudflare's test site)")
+	}
+
+	// Create temp directory for building
+	tmpDir, err := os.MkdirTemp("", "kernel-web-bot-auth-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Download web-bot-auth repo tarball
+	pterm.Info.Println("Downloading web-bot-auth from GitHub...")
+	tarballURL := "https://github.com/cloudflare/web-bot-auth/archive/refs/heads/main.tar.gz"
+	resp, err := http.Get(tarballURL)
+	if err != nil {
+		return fmt.Errorf("failed to download web-bot-auth: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to download web-bot-auth: HTTP %d", resp.StatusCode)
+	}
+
+	// Extract tarball
+	pterm.Info.Println("Extracting...")
+	if err := extractTarGz(resp.Body, tmpDir); err != nil {
+		return fmt.Errorf("failed to extract tarball: %w", err)
+	}
+
+	// Find the extracted directory (it will be named web-bot-auth-main)
+	repoDir := filepath.Join(tmpDir, "web-bot-auth-main")
+	if _, err := os.Stat(repoDir); err != nil {
+		return fmt.Errorf("extracted directory not found: %w", err)
+	}
+
+	// Write the signing key
+	keyDir := filepath.Join(repoDir, "examples", "rfc9421-keys")
+	if err := os.MkdirAll(keyDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create key directory: %w", err)
+	}
+	keyPath := filepath.Join(keyDir, "ed25519.json")
+	if err := os.WriteFile(keyPath, []byte(keyJSON), 0o644); err != nil {
+		return fmt.Errorf("failed to write signing key: %w", err)
+	}
+
+	// Remove package-lock.json to work around npm optional dependencies bug
+	// See: https://github.com/npm/cli/issues/4828
+	_ = os.Remove(filepath.Join(repoDir, "package-lock.json"))
+
+	// Run npm install at the repo root (workspace root) to install all dependencies including tsup
+	pterm.Info.Println("Installing dependencies (npm install)...")
+	npmInstall := exec.CommandContext(ctx, "npm", "install")
+	npmInstall.Dir = repoDir
+	npmInstall.Stdout = os.Stdout
+	npmInstall.Stderr = os.Stderr
+	if err := npmInstall.Run(); err != nil {
+		return fmt.Errorf("npm install failed: %w", err)
+	}
+
+	// Build the web-bot-auth package first (the browser extension depends on it)
+	pterm.Info.Println("Building web-bot-auth package...")
+	npmBuildPkg := exec.CommandContext(ctx, "npm", "run", "build")
+	npmBuildPkg.Dir = repoDir
+	npmBuildPkg.Stdout = os.Stdout
+	npmBuildPkg.Stderr = os.Stderr
+	if err := npmBuildPkg.Run(); err != nil {
+		return fmt.Errorf("npm run build failed: %w", err)
+	}
+
+	// Run npm run build:chrome in the browser-extension directory
+	extDir := filepath.Join(repoDir, "examples", "browser-extension")
+	pterm.Info.Println("Building extension (npm run build:chrome)...")
+	npmBuild := exec.CommandContext(ctx, "npm", "run", "build:chrome")
+	npmBuild.Dir = extDir
+	npmBuild.Stdout = os.Stdout
+	npmBuild.Stderr = os.Stderr
+	if err := npmBuild.Run(); err != nil {
+		return fmt.Errorf("npm run build:chrome failed: %w", err)
+	}
+
+	// Copy built extension to output directory
+	builtDir := filepath.Join(extDir, "dist", "mv3", "chromium")
+	manifestSrc := filepath.Join(extDir, "platform", "mv3", "chromium", "manifest.json")
+
+	// Copy background.mjs
+	bgSrc := filepath.Join(builtDir, "background.mjs")
+	if err := copyFile(bgSrc, filepath.Join(outDir, "background.mjs")); err != nil {
+		return fmt.Errorf("failed to copy background.mjs: %w", err)
+	}
+
+	// Read manifest and add version (the build script doesn't add it, only bundle does)
+	manifestData, err := os.ReadFile(manifestSrc)
+	if err != nil {
+		return fmt.Errorf("failed to read manifest.json: %w", err)
+	}
+	var manifest map[string]interface{}
+	if err := json.Unmarshal(manifestData, &manifest); err != nil {
+		return fmt.Errorf("failed to parse manifest.json: %w", err)
+	}
+	manifest["version"] = "1.0.0"
+	manifestOut, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal manifest.json: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "manifest.json"), manifestOut, 0o644); err != nil {
+		return fmt.Errorf("failed to write manifest.json: %w", err)
+	}
+
+	pterm.Success.Printf("Built extension to: %s\n", outDir)
+
+	// Optionally upload
+	if in.Upload {
+		name := in.Name
+		if name == "" {
+			name = "web-bot-auth"
+		}
+		pterm.Info.Printf("Uploading extension as '%s'...\n", name)
+		if err := e.Upload(ctx, ExtensionsUploadInput{Dir: outDir, Name: name}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// extractTarGz extracts a tar.gz stream to the destination directory
+func extractTarGz(r io.Reader, destDir string) error {
+	gzr, err := gzip.NewReader(r)
+	if err != nil {
+		return err
+	}
+	defer gzr.Close()
+
+	tr := tar.NewReader(gzr)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		target := filepath.Join(destDir, header.Name)
+
+		// Protect against directory traversal
+		if !strings.HasPrefix(target, filepath.Clean(destDir)+string(os.PathSeparator)) {
+			return fmt.Errorf("illegal file path: %s", header.Name)
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.FileMode(header.Mode))
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(f, tr); err != nil {
+				f.Close()
+				return err
+			}
+			f.Close()
+		}
+	}
+	return nil
+}
+
+// copyFile copies a file from src to dst
+func copyFile(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	_, err = io.Copy(dstFile, srcFile)
+	return err
+}
+
 // --- Cobra wiring ---
 
 var extensionsCmd = &cobra.Command{
@@ -381,16 +633,63 @@ var extensionsUploadCmd = &cobra.Command{
 	},
 }
 
+var extensionsBuildWebBotAuthCmd = &cobra.Command{
+	Use:   "build-web-bot-auth",
+	Short: "Build Cloudflare's Web Bot Auth browser extension",
+	Long: `Build the Web Bot Auth browser extension for signing HTTP requests.
+
+This command downloads and builds Cloudflare's web-bot-auth browser extension,
+which adds RFC 9421 HTTP Message Signatures to all outgoing requests.
+
+By default, it uses the RFC9421 test key that works with Cloudflare's test site
+at https://http-message-signatures-example.research.cloudflare.com/
+
+To use your own signing key, provide a JWK file with --key.
+
+Examples:
+  # Build with default test key
+  kernel extensions build-web-bot-auth --to ./web-bot-auth-ext
+
+  # Build with custom key
+  kernel extensions build-web-bot-auth --to ./web-bot-auth-ext --key ./my-key.jwk
+
+  # Build and upload to Kernel
+  kernel extensions build-web-bot-auth --to ./web-bot-auth-ext --upload --name my-web-bot-auth`,
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		client := getKernelClient(cmd)
+		output, _ := cmd.Flags().GetString("to")
+		keyFile, _ := cmd.Flags().GetString("key")
+		upload, _ := cmd.Flags().GetBool("upload")
+		name, _ := cmd.Flags().GetString("name")
+		svc := client.Extensions
+		e := ExtensionsCmd{extensions: &svc}
+		return e.BuildWebBotAuth(cmd.Context(), ExtensionsBuildWebBotAuthInput{
+			Output:  output,
+			KeyFile: keyFile,
+			Upload:  upload,
+			Name:    name,
+		})
+	},
+}
+
 func init() {
 	extensionsCmd.AddCommand(extensionsListCmd)
 	extensionsCmd.AddCommand(extensionsDeleteCmd)
 	extensionsCmd.AddCommand(extensionsDownloadCmd)
 	extensionsCmd.AddCommand(extensionsDownloadWebStoreCmd)
 	extensionsCmd.AddCommand(extensionsUploadCmd)
+	extensionsCmd.AddCommand(extensionsBuildWebBotAuthCmd)
 
 	extensionsDeleteCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
 	extensionsDownloadCmd.Flags().String("to", "", "Output zip file path")
 	extensionsDownloadWebStoreCmd.Flags().String("to", "", "Output zip file path for the downloaded archive")
 	extensionsDownloadWebStoreCmd.Flags().String("os", "", "Target OS: mac, win, or linux (default linux)")
 	extensionsUploadCmd.Flags().String("name", "", "Optional unique extension name")
+
+	extensionsBuildWebBotAuthCmd.Flags().String("to", "", "Output directory for the built extension (required)")
+	extensionsBuildWebBotAuthCmd.Flags().String("key", "", "Path to JWK file with Ed25519 signing key (defaults to RFC9421 test key)")
+	extensionsBuildWebBotAuthCmd.Flags().Bool("upload", false, "Upload the extension to Kernel after building")
+	extensionsBuildWebBotAuthCmd.Flags().String("name", "web-bot-auth", "Extension name when uploading")
+	_ = extensionsBuildWebBotAuthCmd.MarkFlagRequired("to")
 }
