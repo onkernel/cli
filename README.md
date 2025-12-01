@@ -149,7 +149,6 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 
 - `kernel browsers list` - List running browsers
 - `kernel browsers create` - Create a new browser session
-  - `-p, --persistence-id <id>` - Unique identifier for browser session persistence
   - `-s, --stealth` - Launch browser in stealth mode to avoid detection
   - `-H, --headless` - Launch browser without GUI access
   - `--kiosk` - Launch browser in kiosk mode

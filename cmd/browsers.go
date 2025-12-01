@@ -400,12 +400,7 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 			return nil
 		}
 
-		var confirmMsg string
-		if found.Persistence.ID == in.Identifier {
-			confirmMsg = fmt.Sprintf("Are you sure you want to delete browser with persistent ID \"%s\"?", in.Identifier)
-		} else {
-			confirmMsg = fmt.Sprintf("Are you sure you want to delete browser with ID \"%s\"?", in.Identifier)
-		}
+		confirmMsg := fmt.Sprintf("Are you sure you want to delete browser \"%s\"?", in.Identifier)
 		pterm.DefaultInteractiveConfirm.DefaultText = confirmMsg
 		result, _ := pterm.DefaultInteractiveConfirm.Show()
 		if !result {
@@ -414,21 +409,20 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 		}
 
 		if found.Persistence.ID == in.Identifier {
-			pterm.Info.Printf("Deleting browser with persistent ID: %s\n", in.Identifier)
 			err = b.browsers.Delete(ctx, kernel.BrowserDeleteParams{PersistentID: in.Identifier})
 			if err != nil && !util.IsNotFound(err) {
 				return util.CleanedUpSdkError{Err: err}
 			}
-			pterm.Success.Printf("Successfully deleted browser with persistent ID: %s\n", in.Identifier)
+			pterm.Success.Printf("Successfully deleted browser: %s\n", in.Identifier)
 			return nil
 		}
 
-		pterm.Info.Printf("Deleting browser with ID: %s\n", in.Identifier)
+		pterm.Info.Printf("Deleting browser: %s\n", in.Identifier)
 		err = b.browsers.DeleteByID(ctx, in.Identifier)
 		if err != nil && !util.IsNotFound(err) {
 			return util.CleanedUpSdkError{Err: err}
 		}
-		pterm.Success.Printf("Successfully deleted browser with ID: %s\n", in.Identifier)
+		pterm.Success.Printf("Successfully deleted browser: %s\n", in.Identifier)
 		return nil
 	}
 
@@ -443,7 +437,7 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 		}
 	}
 
-	// Attempt by persistent ID
+	// Attempt by persistent ID (backward compatibility)
 	if err := b.browsers.Delete(ctx, kernel.BrowserDeleteParams{PersistentID: in.Identifier}); err != nil {
 		if !util.IsNotFound(err) {
 			nonNotFoundErrors = append(nonNotFoundErrors, err)
@@ -2571,7 +2565,7 @@ func truncateURL(url string, maxLen int) string {
 	return url[:maxLen-3] + "..."
 }
 
-// resolveBrowserByIdentifier finds a browser by session ID or persistent ID.
+// resolveBrowserByIdentifier finds a browser by session ID or persistent ID (backward compatibility).
 func (b BrowsersCmd) resolveBrowserByIdentifier(ctx context.Context, identifier string) (*kernel.BrowserListResponse, error) {
 	page, err := b.browsers.List(ctx, kernel.BrowserListParams{})
 	if err != nil {
