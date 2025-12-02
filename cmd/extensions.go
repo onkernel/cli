@@ -437,46 +437,93 @@ func (e ExtensionsCmd) BuildWebBotAuth(ctx context.Context, in ExtensionsBuildWe
 		return fmt.Errorf("npm run build failed: %w", err)
 	}
 
-	// Run npm run build:chrome in the browser-extension directory
+	// Run npm run bundle:chrome in the browser-extension directory (builds and packs as CRX)
 	extDir := filepath.Join(repoDir, "examples", "browser-extension")
-	pterm.Info.Println("Building extension (npm run build:chrome)...")
-	npmBuild := exec.CommandContext(ctx, "npm", "run", "build:chrome")
-	npmBuild.Dir = extDir
-	npmBuild.Stdout = os.Stdout
-	npmBuild.Stderr = os.Stderr
-	if err := npmBuild.Run(); err != nil {
-		return fmt.Errorf("npm run build:chrome failed: %w", err)
+	pterm.Info.Println("Building and bundling extension (npm run bundle:chrome)...")
+	npmBundle := exec.CommandContext(ctx, "npm", "run", "bundle:chrome")
+	npmBundle.Dir = extDir
+	npmBundle.Stdout = os.Stdout
+	npmBundle.Stderr = os.Stderr
+	if err := npmBundle.Run(); err != nil {
+		return fmt.Errorf("npm run bundle:chrome failed: %w", err)
 	}
 
-	// Copy built extension to output directory
+	// Create unpacked subdirectory for the extension files (used for upload)
+	unpackedDir := filepath.Join(outDir, "unpacked")
+	if err := os.MkdirAll(unpackedDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create unpacked directory: %w", err)
+	}
+
+	// Copy built extension files to unpacked/
 	builtDir := filepath.Join(extDir, "dist", "mv3", "chromium")
-	manifestSrc := filepath.Join(extDir, "platform", "mv3", "chromium", "manifest.json")
 
 	// Copy background.mjs
 	bgSrc := filepath.Join(builtDir, "background.mjs")
-	if err := copyFile(bgSrc, filepath.Join(outDir, "background.mjs")); err != nil {
+	if err := copyFile(bgSrc, filepath.Join(unpackedDir, "background.mjs")); err != nil {
 		return fmt.Errorf("failed to copy background.mjs: %w", err)
 	}
 
-	// Read manifest and add version (the build script doesn't add it, only bundle does)
-	manifestData, err := os.ReadFile(manifestSrc)
-	if err != nil {
-		return fmt.Errorf("failed to read manifest.json: %w", err)
-	}
-	var manifest map[string]interface{}
-	if err := json.Unmarshal(manifestData, &manifest); err != nil {
-		return fmt.Errorf("failed to parse manifest.json: %w", err)
-	}
-	manifest["version"] = "1.0.0"
-	manifestOut, err := json.MarshalIndent(manifest, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal manifest.json: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join(outDir, "manifest.json"), manifestOut, 0o644); err != nil {
-		return fmt.Errorf("failed to write manifest.json: %w", err)
+	// Copy manifest.json (bundle:chrome already adds version)
+	manifestSrc := filepath.Join(builtDir, "manifest.json")
+	if err := copyFile(manifestSrc, filepath.Join(unpackedDir, "manifest.json")); err != nil {
+		return fmt.Errorf("failed to copy manifest.json: %w", err)
 	}
 
-	pterm.Success.Printf("Built extension to: %s\n", outDir)
+	// Copy CRX bundle artifacts
+	artifactsDir := filepath.Join(extDir, "dist", "web-ext-artifacts")
+	crxSrc := filepath.Join(artifactsDir, "http-message-signatures-extension.crx")
+	if err := copyFile(crxSrc, filepath.Join(outDir, "extension.crx")); err != nil {
+		return fmt.Errorf("failed to copy extension.crx: %w", err)
+	}
+
+	updateXMLSrc := filepath.Join(artifactsDir, "update.xml")
+	if err := copyFile(updateXMLSrc, filepath.Join(outDir, "update.xml")); err != nil {
+		return fmt.Errorf("failed to copy update.xml: %w", err)
+	}
+
+	// Copy policy files
+	policyDir := filepath.Join(extDir, "policy")
+	policyJSONSrc := filepath.Join(policyDir, "policy.json")
+	if err := copyFile(policyJSONSrc, filepath.Join(outDir, "policy.json")); err != nil {
+		return fmt.Errorf("failed to copy policy.json: %w", err)
+	}
+
+	plistSrc := filepath.Join(policyDir, "com.google.Chrome.managed.plist")
+	if err := copyFile(plistSrc, filepath.Join(outDir, "com.google.Chrome.managed.plist")); err != nil {
+		return fmt.Errorf("failed to copy plist: %w", err)
+	}
+
+	// Copy RSA private key (useful for re-signing later)
+	privateKeySrc := filepath.Join(extDir, "private_key.pem")
+	if err := copyFile(privateKeySrc, filepath.Join(outDir, "private_key.pem")); err != nil {
+		return fmt.Errorf("failed to copy private_key.pem: %w", err)
+	}
+
+	// Extract extension ID from update.xml and save it
+	updateXMLData, err := os.ReadFile(updateXMLSrc)
+	if err == nil {
+		// Parse extension ID from update.xml (it's in the appid attribute)
+		xmlStr := string(updateXMLData)
+		if idx := strings.Index(xmlStr, `appid="`); idx != -1 {
+			start := idx + 7
+			if end := strings.Index(xmlStr[start:], `"`); end != -1 {
+				extID := xmlStr[start : start+end]
+				if err := os.WriteFile(filepath.Join(outDir, "extension-id.txt"), []byte(extID), 0o644); err != nil {
+					pterm.Warning.Printf("Failed to write extension-id.txt: %v\n", err)
+				}
+			}
+		}
+	}
+
+	pterm.Success.Printf("Built extension bundle to: %s\n", outDir)
+	pterm.Info.Println("Bundle contents:")
+	pterm.Info.Println("  - extension.crx      (packed extension for policy installation)")
+	pterm.Info.Println("  - update.xml         (Chrome update manifest)")
+	pterm.Info.Println("  - policy.json        (Linux/Chrome OS policy file)")
+	pterm.Info.Println("  - com.google.Chrome.managed.plist (macOS policy file)")
+	pterm.Info.Println("  - private_key.pem    (RSA key for re-signing)")
+	pterm.Info.Println("  - extension-id.txt   (Chrome extension ID)")
+	pterm.Info.Println("  - unpacked/          (unpacked extension files)")
 
 	// Optionally upload
 	if in.Upload {
@@ -485,7 +532,7 @@ func (e ExtensionsCmd) BuildWebBotAuth(ctx context.Context, in ExtensionsBuildWe
 			name = "web-bot-auth"
 		}
 		pterm.Info.Printf("Uploading extension as '%s'...\n", name)
-		if err := e.Upload(ctx, ExtensionsUploadInput{Dir: outDir, Name: name}); err != nil {
+		if err := e.Upload(ctx, ExtensionsUploadInput{Dir: unpackedDir, Name: name}); err != nil {
 			return err
 		}
 	}
@@ -640,6 +687,15 @@ var extensionsBuildWebBotAuthCmd = &cobra.Command{
 
 This command downloads and builds Cloudflare's web-bot-auth browser extension,
 which adds RFC 9421 HTTP Message Signatures to all outgoing requests.
+
+The output includes:
+  - extension.crx      (packed extension for policy installation)
+  - update.xml         (Chrome update manifest)
+  - policy.json        (Linux/Chrome OS policy file)
+  - com.google.Chrome.managed.plist (macOS policy file)
+  - private_key.pem    (RSA key for re-signing)
+  - extension-id.txt   (Chrome extension ID)
+  - unpacked/          (unpacked extension files for Kernel upload)
 
 By default, it uses the RFC9421 test key that works with Cloudflare's test site
 at https://http-message-signatures-example.research.cloudflare.com/
