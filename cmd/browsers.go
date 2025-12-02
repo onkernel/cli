@@ -23,6 +23,7 @@ import (
 	"github.com/onkernel/kernel-go-sdk/shared"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // BrowsersService defines the subset of the Kernel SDK browser client that we use.
@@ -227,7 +228,7 @@ func (b BrowsersCmd) List(ctx context.Context, in BrowsersListInput) error {
 		return nil
 	}
 
-	if browsers == nil || len(browsers) == 0 {
+	if len(browsers) == 0 {
 		pterm.Info.Println("No running browsers found")
 		return nil
 	}
@@ -2100,33 +2101,39 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	if poolID != "" || poolName != "" {
-		conflictFlags := []string{
-			"persistent-id",
-			"stealth",
-			"headless",
-			"kiosk",
-			"timeout",
-			"profile-id",
-			"profile-name",
-			"save-changes",
-			"proxy-id",
-			"extension",
-			"viewport",
-			"viewport-interactive",
+		// When using a pool, configuration comes from the pool itself.
+		allowedFlags := map[string]bool{
+			"pool-id":   true,
+			"pool-name": true,
+			"timeout":   true,
+			// Global persistent flags that don't configure browsers
+			"no-color":  true,
+			"log-level": true,
 		}
+
+		// Check if any browser configuration flags were set (which would conflict).
 		var conflicts []string
-		for _, name := range conflictFlags {
-			if cmd.Flags().Changed(name) {
-				conflicts = append(conflicts, "--"+name)
+		cmd.Flags().Visit(func(f *pflag.Flag) {
+			if !allowedFlags[f.Name] {
+				conflicts = append(conflicts, "--"+f.Name)
 			}
-		}
+		})
+
 		if len(conflicts) > 0 {
 			flagLabel := "--pool-id"
 			if poolName != "" {
 				flagLabel = "--pool-name"
 			}
-			pterm.Error.Printf("%s cannot be combined with %s\n", flagLabel, strings.Join(conflicts, ", "))
-			return nil
+			pterm.Warning.Printf("You specified %s, but also provided browser configuration flags: %s\n", flagLabel, strings.Join(conflicts, ", "))
+			pterm.Info.Println("When using a pool, all browser configuration comes from the pool itself.")
+			pterm.Info.Println("The conflicting flags will be ignored.")
+
+			result, _ := pterm.DefaultInteractiveConfirm.Show("Continue with pool configuration?")
+			if !result {
+				pterm.Info.Println("Cancelled. Remove conflicting flags or omit the pool flag.")
+				return nil
+			}
+			pterm.Success.Println("Proceeding with pool configuration...")
 		}
 
 		pool := poolID
@@ -2136,7 +2143,16 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 
 		pterm.Info.Printf("Acquiring browser from pool %s...\n", pool)
 		poolSvc := client.BrowserPools
-		resp, err := (&poolSvc).Acquire(cmd.Context(), pool, kernel.BrowserPoolAcquireParams{})
+
+		req := kernel.BrowserPoolAcquireRequestParam{}
+		if cmd.Flags().Changed("timeout") && timeout > 0 {
+			req.AcquireTimeoutSeconds = kernel.Int(int64(timeout))
+		}
+		acquireParams := kernel.BrowserPoolAcquireParams{
+			BrowserPoolAcquireRequest: req,
+		}
+
+		resp, err := (&poolSvc).Acquire(cmd.Context(), pool, acquireParams)
 		if err != nil {
 			return util.CleanedUpSdkError{Err: err}
 		}
