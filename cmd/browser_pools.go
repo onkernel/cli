@@ -63,12 +63,17 @@ func (c BrowserPoolsCmd) List(ctx context.Context, in BrowserPoolsListInput) err
 	}
 
 	tableData := pterm.TableData{
-		{"ID", "Available", "Acquired", "Created At", "Size"},
+		{"ID", "Name", "Available", "Acquired", "Created At", "Size"},
 	}
 
 	for _, p := range *pools {
+		name := p.Name
+		if name == "" {
+			name = "-"
+		}
 		tableData = append(tableData, []string{
 			p.ID,
+			name,
 			fmt.Sprintf("%d", p.AvailableCount),
 			fmt.Sprintf("%d", p.AcquiredCount),
 			util.FormatLocal(p.CreatedAt),
@@ -81,6 +86,7 @@ func (c BrowserPoolsCmd) List(ctx context.Context, in BrowserPoolsListInput) err
 }
 
 type BrowserPoolsCreateInput struct {
+	Name               string
 	Size               int64
 	FillRate           int64
 	TimeoutSeconds     int64
@@ -100,6 +106,9 @@ func (c BrowserPoolsCmd) Create(ctx context.Context, in BrowserPoolsCreateInput)
 		Size: in.Size,
 	}
 
+	if in.Name != "" {
+		params.Name = kernel.String(in.Name)
+	}
 	if in.FillRate > 0 {
 		params.FillRatePerMinute = kernel.Int(in.FillRate)
 	}
@@ -173,7 +182,11 @@ func (c BrowserPoolsCmd) Create(ctx context.Context, in BrowserPoolsCreateInput)
 		return util.CleanedUpSdkError{Err: err}
 	}
 
-	pterm.Success.Printf("Created browser pool %s\n", pool.ID)
+	if pool.Name != "" {
+		pterm.Success.Printf("Created browser pool %s (%s)\n", pool.Name, pool.ID)
+	} else {
+		pterm.Success.Printf("Created browser pool %s\n", pool.ID)
+	}
 	return nil
 }
 
@@ -202,9 +215,14 @@ func (c BrowserPoolsCmd) Get(ctx context.Context, in BrowserPoolsGetInput) error
 		return nil
 	}
 
+	name := pool.Name
+	if name == "" {
+		name = "-"
+	}
 	tableData := pterm.TableData{
 		{"Property", "Value"},
 		{"ID", pool.ID},
+		{"Name", name},
 		{"Size", fmt.Sprintf("%d", pool.BrowserPoolConfig.Size)},
 		{"Available", fmt.Sprintf("%d", pool.AvailableCount)},
 		{"Acquired", fmt.Sprintf("%d", pool.AcquiredCount)},
@@ -217,6 +235,7 @@ func (c BrowserPoolsCmd) Get(ctx context.Context, in BrowserPoolsGetInput) error
 
 type BrowserPoolsUpdateInput struct {
 	IDOrName           string
+	Name               string
 	Size               int64
 	FillRate           int64
 	TimeoutSeconds     int64
@@ -235,6 +254,9 @@ type BrowserPoolsUpdateInput struct {
 func (c BrowserPoolsCmd) Update(ctx context.Context, in BrowserPoolsUpdateInput) error {
 	params := kernel.BrowserPoolUpdateParams{}
 
+	if in.Name != "" {
+		params.Name = kernel.String(in.Name)
+	}
 	if in.Size > 0 {
 		params.Size = in.Size
 	}
@@ -313,7 +335,11 @@ func (c BrowserPoolsCmd) Update(ctx context.Context, in BrowserPoolsUpdateInput)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
 	}
-	pterm.Success.Printf("Updated browser pool %s\n", pool.ID)
+	if pool.Name != "" {
+		pterm.Success.Printf("Updated browser pool %s (%s)\n", pool.Name, pool.ID)
+	} else {
+		pterm.Success.Printf("Updated browser pool %s\n", pool.ID)
+	}
 	return nil
 }
 
@@ -398,9 +424,6 @@ func (c BrowserPoolsCmd) Flush(ctx context.Context, in BrowserPoolsFlushInput) e
 	return nil
 }
 
-// Cobra commands (same as before)
-// ...
-
 var browserPoolsCmd = &cobra.Command{
 	Use:     "browser-pools",
 	Aliases: []string{"browser-pool", "pool", "pools"},
@@ -467,6 +490,7 @@ func init() {
 	browserPoolsListCmd.Flags().StringP("output", "o", "", "Output format: json for raw API response")
 
 	// create flags
+	browserPoolsCreateCmd.Flags().String("name", "", "Optional unique name for the pool")
 	browserPoolsCreateCmd.Flags().Int64("size", 0, "Number of browsers in the pool")
 	_ = browserPoolsCreateCmd.MarkFlagRequired("size")
 	browserPoolsCreateCmd.Flags().Int64("fill-rate", 0, "Fill rate per minute")
@@ -485,6 +509,7 @@ func init() {
 	browserPoolsGetCmd.Flags().StringP("output", "o", "", "Output format: json for raw API response")
 
 	// update flags
+	browserPoolsUpdateCmd.Flags().String("name", "", "Update the pool name")
 	browserPoolsUpdateCmd.Flags().Int64("size", 0, "Number of browsers in the pool")
 	browserPoolsUpdateCmd.Flags().Int64("fill-rate", 0, "Fill rate per minute")
 	browserPoolsUpdateCmd.Flags().Int64("timeout", 0, "Idle timeout in seconds")
@@ -530,6 +555,7 @@ func runBrowserPoolsList(cmd *cobra.Command, args []string) error {
 func runBrowserPoolsCreate(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 
+	name, _ := cmd.Flags().GetString("name")
 	size, _ := cmd.Flags().GetInt64("size")
 	fillRate, _ := cmd.Flags().GetInt64("fill-rate")
 	timeout, _ := cmd.Flags().GetInt64("timeout")
@@ -544,6 +570,7 @@ func runBrowserPoolsCreate(cmd *cobra.Command, args []string) error {
 	viewport, _ := cmd.Flags().GetString("viewport")
 
 	in := BrowserPoolsCreateInput{
+		Name:               name,
 		Size:               size,
 		FillRate:           fillRate,
 		TimeoutSeconds:     timeout,
@@ -572,6 +599,7 @@ func runBrowserPoolsGet(cmd *cobra.Command, args []string) error {
 func runBrowserPoolsUpdate(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 
+	name, _ := cmd.Flags().GetString("name")
 	size, _ := cmd.Flags().GetInt64("size")
 	fillRate, _ := cmd.Flags().GetInt64("fill-rate")
 	timeout, _ := cmd.Flags().GetInt64("timeout")
@@ -588,6 +616,7 @@ func runBrowserPoolsUpdate(cmd *cobra.Command, args []string) error {
 
 	in := BrowserPoolsUpdateInput{
 		IDOrName:           args[0],
+		Name:               name,
 		Size:               size,
 		FillRate:           fillRate,
 		TimeoutSeconds:     timeout,
