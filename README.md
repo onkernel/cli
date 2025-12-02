@@ -162,14 +162,18 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 ### Browser Pools
 
 - `kernel browser-pools list` - List browser pools
+  - `-o, --output json` - Output raw JSON response
 - `kernel browser-pools create` - Create a browser pool
+  - `--name <name>` - Optional unique name for the pool
   - `--size <n>` - Number of browsers in the pool (required)
-  - `--fill-rate <percent>` - Percentage of the pool to fill per minute
+  - `--fill-rate <n>` - Percentage of the pool to fill per minute
   - `--timeout <seconds>` - Idle timeout for browsers acquired from the pool
   - `--stealth`, `--headless`, `--kiosk` - Default pool configuration
   - `--profile-id`, `--profile-name`, `--save-changes`, `--proxy-id`, `--extension`, `--viewport` - Same semantics as `kernel browsers create`
 - `kernel browser-pools get <id-or-name>` - Get pool details
-- `kernel browser-pools update <id-or-name>` - Update pool configuration (same flags as create plus `--discard-all-idle`)
+  - `-o, --output json` - Output raw JSON response
+- `kernel browser-pools update <id-or-name>` - Update pool configuration
+  - Same flags as create plus `--discard-all-idle` to discard all idle browsers in the pool and refill at the specified fill rate
 - `kernel browser-pools delete <id-or-name>` - Delete a pool
   - `--force` - Force delete even if browsers are leased
 - `kernel browser-pools acquire <id-or-name>` - Acquire a browser from the pool
