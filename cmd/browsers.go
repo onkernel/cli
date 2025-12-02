@@ -300,7 +300,7 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 		pterm.Error.Println("must specify at most one of --profile-id or --profile-name")
 		return nil
 	} else if in.ProfileID != "" || in.ProfileName != "" {
-		params.Profile = kernel.BrowserNewParamsProfile{
+		params.Profile = kernel.BrowserProfileParam{
 			SaveChanges: kernel.Opt(in.ProfileSaveChanges.Value),
 		}
 		if in.ProfileID != "" {
@@ -322,7 +322,7 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 			if val == "" {
 				continue
 			}
-			item := kernel.BrowserNewParamsExtension{}
+			item := kernel.BrowserExtensionParam{}
 			if cuidRegex.MatchString(val) {
 				item.ID = kernel.Opt(val)
 			} else {
@@ -339,7 +339,7 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 			pterm.Error.Printf("Invalid viewport format: %v\n", err)
 			return nil
 		}
-		params.Viewport = kernel.BrowserNewParamsViewport{
+		params.Viewport = kernel.BrowserViewportParam{
 			Width:  width,
 			Height: height,
 		}

@@ -102,27 +102,27 @@ type BrowserPoolsCreateInput struct {
 }
 
 func (c BrowserPoolsCmd) Create(ctx context.Context, in BrowserPoolsCreateInput) error {
-	params := kernel.BrowserPoolNewParams{
+	req := kernel.BrowserPoolRequestParam{
 		Size: in.Size,
 	}
 
 	if in.Name != "" {
-		params.Name = kernel.String(in.Name)
+		req.Name = kernel.String(in.Name)
 	}
 	if in.FillRate > 0 {
-		params.FillRatePerMinute = kernel.Int(in.FillRate)
+		req.FillRatePerMinute = kernel.Int(in.FillRate)
 	}
 	if in.TimeoutSeconds > 0 {
-		params.TimeoutSeconds = kernel.Int(in.TimeoutSeconds)
+		req.TimeoutSeconds = kernel.Int(in.TimeoutSeconds)
 	}
 	if in.Stealth.Set {
-		params.Stealth = kernel.Bool(in.Stealth.Value)
+		req.Stealth = kernel.Bool(in.Stealth.Value)
 	}
 	if in.Headless.Set {
-		params.Headless = kernel.Bool(in.Headless.Value)
+		req.Headless = kernel.Bool(in.Headless.Value)
 	}
 	if in.Kiosk.Set {
-		params.KioskMode = kernel.Bool(in.Kiosk.Value)
+		req.KioskMode = kernel.Bool(in.Kiosk.Value)
 	}
 
 	// Profile
@@ -130,18 +130,18 @@ func (c BrowserPoolsCmd) Create(ctx context.Context, in BrowserPoolsCreateInput)
 		pterm.Error.Println("must specify at most one of --profile-id or --profile-name")
 		return nil
 	} else if in.ProfileID != "" || in.ProfileName != "" {
-		params.Profile = kernel.BrowserPoolNewParamsProfile{
+		req.Profile = kernel.BrowserProfileParam{
 			SaveChanges: kernel.Bool(in.ProfileSaveChanges.Value),
 		}
 		if in.ProfileID != "" {
-			params.Profile.ID = kernel.String(in.ProfileID)
+			req.Profile.ID = kernel.String(in.ProfileID)
 		} else if in.ProfileName != "" {
-			params.Profile.Name = kernel.String(in.ProfileName)
+			req.Profile.Name = kernel.String(in.ProfileName)
 		}
 	}
 
 	if in.ProxyID != "" {
-		params.ProxyID = kernel.String(in.ProxyID)
+		req.ProxyID = kernel.String(in.ProxyID)
 	}
 
 	// Extensions
@@ -151,13 +151,13 @@ func (c BrowserPoolsCmd) Create(ctx context.Context, in BrowserPoolsCreateInput)
 			if val == "" {
 				continue
 			}
-			item := kernel.BrowserPoolNewParamsExtension{}
+			item := kernel.BrowserExtensionParam{}
 			if cuidRegex.MatchString(val) {
 				item.ID = kernel.String(val)
 			} else {
 				item.Name = kernel.String(val)
 			}
-			params.Extensions = append(params.Extensions, item)
+			req.Extensions = append(req.Extensions, item)
 		}
 	}
 
@@ -168,13 +168,17 @@ func (c BrowserPoolsCmd) Create(ctx context.Context, in BrowserPoolsCreateInput)
 			pterm.Error.Printf("Invalid viewport format: %v\n", err)
 			return nil
 		}
-		params.Viewport = kernel.BrowserPoolNewParamsViewport{
+		req.Viewport = kernel.BrowserViewportParam{
 			Width:  width,
 			Height: height,
 		}
 		if refreshRate > 0 {
-			params.Viewport.RefreshRate = kernel.Int(refreshRate)
+			req.Viewport.RefreshRate = kernel.Int(refreshRate)
 		}
+	}
+
+	params := kernel.BrowserPoolNewParams{
+		BrowserPoolRequest: req,
 	}
 
 	pool, err := c.client.New(ctx, params)
@@ -252,31 +256,31 @@ type BrowserPoolsUpdateInput struct {
 }
 
 func (c BrowserPoolsCmd) Update(ctx context.Context, in BrowserPoolsUpdateInput) error {
-	params := kernel.BrowserPoolUpdateParams{}
+	req := kernel.BrowserPoolUpdateRequestParam{}
 
 	if in.Name != "" {
-		params.Name = kernel.String(in.Name)
+		req.Name = kernel.String(in.Name)
 	}
 	if in.Size > 0 {
-		params.Size = in.Size
+		req.Size = in.Size
 	}
 	if in.FillRate > 0 {
-		params.FillRatePerMinute = kernel.Int(in.FillRate)
+		req.FillRatePerMinute = kernel.Int(in.FillRate)
 	}
 	if in.TimeoutSeconds > 0 {
-		params.TimeoutSeconds = kernel.Int(in.TimeoutSeconds)
+		req.TimeoutSeconds = kernel.Int(in.TimeoutSeconds)
 	}
 	if in.Stealth.Set {
-		params.Stealth = kernel.Bool(in.Stealth.Value)
+		req.Stealth = kernel.Bool(in.Stealth.Value)
 	}
 	if in.Headless.Set {
-		params.Headless = kernel.Bool(in.Headless.Value)
+		req.Headless = kernel.Bool(in.Headless.Value)
 	}
 	if in.Kiosk.Set {
-		params.KioskMode = kernel.Bool(in.Kiosk.Value)
+		req.KioskMode = kernel.Bool(in.Kiosk.Value)
 	}
 	if in.DiscardAllIdle.Set {
-		params.DiscardAllIdle = kernel.Bool(in.DiscardAllIdle.Value)
+		req.DiscardAllIdle = kernel.Bool(in.DiscardAllIdle.Value)
 	}
 
 	// Profile
@@ -284,18 +288,18 @@ func (c BrowserPoolsCmd) Update(ctx context.Context, in BrowserPoolsUpdateInput)
 		pterm.Error.Println("must specify at most one of --profile-id or --profile-name")
 		return nil
 	} else if in.ProfileID != "" || in.ProfileName != "" {
-		params.Profile = kernel.BrowserPoolUpdateParamsProfile{
+		req.Profile = kernel.BrowserProfileParam{
 			SaveChanges: kernel.Bool(in.ProfileSaveChanges.Value),
 		}
 		if in.ProfileID != "" {
-			params.Profile.ID = kernel.String(in.ProfileID)
+			req.Profile.ID = kernel.String(in.ProfileID)
 		} else if in.ProfileName != "" {
-			params.Profile.Name = kernel.String(in.ProfileName)
+			req.Profile.Name = kernel.String(in.ProfileName)
 		}
 	}
 
 	if in.ProxyID != "" {
-		params.ProxyID = kernel.String(in.ProxyID)
+		req.ProxyID = kernel.String(in.ProxyID)
 	}
 
 	// Extensions
@@ -305,13 +309,13 @@ func (c BrowserPoolsCmd) Update(ctx context.Context, in BrowserPoolsUpdateInput)
 			if val == "" {
 				continue
 			}
-			item := kernel.BrowserPoolUpdateParamsExtension{}
+			item := kernel.BrowserExtensionParam{}
 			if cuidRegex.MatchString(val) {
 				item.ID = kernel.String(val)
 			} else {
 				item.Name = kernel.String(val)
 			}
-			params.Extensions = append(params.Extensions, item)
+			req.Extensions = append(req.Extensions, item)
 		}
 	}
 
@@ -322,13 +326,17 @@ func (c BrowserPoolsCmd) Update(ctx context.Context, in BrowserPoolsUpdateInput)
 			pterm.Error.Printf("Invalid viewport format: %v\n", err)
 			return nil
 		}
-		params.Viewport = kernel.BrowserPoolUpdateParamsViewport{
+		req.Viewport = kernel.BrowserViewportParam{
 			Width:  width,
 			Height: height,
 		}
 		if refreshRate > 0 {
-			params.Viewport.RefreshRate = kernel.Int(refreshRate)
+			req.Viewport.RefreshRate = kernel.Int(refreshRate)
 		}
+	}
+
+	params := kernel.BrowserPoolUpdateParams{
+		BrowserPoolUpdateRequest: req,
 	}
 
 	pool, err := c.client.Update(ctx, in.IDOrName, params)
@@ -367,9 +375,12 @@ type BrowserPoolsAcquireInput struct {
 }
 
 func (c BrowserPoolsCmd) Acquire(ctx context.Context, in BrowserPoolsAcquireInput) error {
-	params := kernel.BrowserPoolAcquireParams{}
+	req := kernel.BrowserPoolAcquireRequestParam{}
 	if in.TimeoutSeconds > 0 {
-		params.AcquireTimeoutSeconds = kernel.Int(in.TimeoutSeconds)
+		req.AcquireTimeoutSeconds = kernel.Int(in.TimeoutSeconds)
+	}
+	params := kernel.BrowserPoolAcquireParams{
+		BrowserPoolAcquireRequest: req,
 	}
 	resp, err := c.client.Acquire(ctx, in.IDOrName, params)
 	if err != nil {
@@ -397,11 +408,14 @@ type BrowserPoolsReleaseInput struct {
 }
 
 func (c BrowserPoolsCmd) Release(ctx context.Context, in BrowserPoolsReleaseInput) error {
-	params := kernel.BrowserPoolReleaseParams{
-		SessionID: kernel.String(in.SessionID),
+	req := kernel.BrowserPoolReleaseRequestParam{
+		SessionID: in.SessionID,
 	}
 	if in.Reuse.Set {
-		params.Reuse = kernel.Bool(in.Reuse.Value)
+		req.Reuse = kernel.Bool(in.Reuse.Value)
+	}
+	params := kernel.BrowserPoolReleaseParams{
+		BrowserPoolReleaseRequest: req,
 	}
 	err := c.client.Release(ctx, in.IDOrName, params)
 	if err != nil {
