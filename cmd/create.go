@@ -2,8 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/onkernel/cli/pkg/create"
+	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
 
@@ -40,28 +43,46 @@ func runCreateApp(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get template: %w", err)
 	}
 
-	fmt.Printf("Creating application '%s' with language '%s' and template '%s'...\n", appName, language, template)
+	// Get absolute path for the app directory
+	appPath, err := filepath.Abs(appName)
+	if err != nil {
+		return fmt.Errorf("failed to resolve app path: %w", err)
+	}
 
-	// TODO: create the project structure
+	// Check if directory already exists
+	if _, err := os.Stat(appPath); err == nil {
+		return fmt.Errorf("directory %s already exists", appName)
+	}
 
-	// print "Creating a new TypeScript Sample App" or similar. Essentially the language and template name combined.
+	// Create the app directory
+	if err := os.MkdirAll(appPath, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
 
-	/*
-		Print the following:
-				✔ TypeScript environment set up successfully
+	fmt.Printf("\nCreating a new %s %s\n\n", language, template)
 
-				🎉 Kernel app created successfully!
+	spinner, _ := pterm.DefaultSpinner.Start("Copying template files...")
 
-				Next steps:
-				  brew install onkernel/tap/kernel
-				  cd my-kernel-app
-				  kernel login  # or: export KERNEL_API_KEY=<YOUR_API_KEY>
-				  kernel deploy index.ts
-				  kernel invoke ts-basic get-page-title --payload '{"url": "https://www.google.com"}'
-				  # Do this in a separate tab
-				  kernel login  # or: export KERNEL_API_KEY=<YOUR_API_KEY>
-				  kernel logs ts-basic --follow
-	*/
+	if err := create.CopyTemplateFiles(appPath, language, template); err != nil {
+		spinner.Fail("Failed to copy template files")
+		return fmt.Errorf("failed to copy template files: %w", err)
+	}
+	spinner.Success("✔ TypeScript environment set up successfully")
+
+	nextSteps := fmt.Sprintf(`Next steps:
+  brew install onkernel/tap/kernel
+  cd %s
+  kernel login  # or: export KERNEL_API_KEY=<YOUR_API_KEY>
+  kernel deploy index.ts
+  kernel invoke ts-basic get-page-title --payload '{"url": "https://www.google.com"}'
+  # Do this in a separate tab
+  kernel login  # or: export KERNEL_API_KEY=<YOUR_API_KEY>
+  kernel logs ts-basic --follow
+`, appName)
+
+	pterm.Success.Println("🎉 Kernel app created successfully!")
+	pterm.Println()
+	pterm.FgYellow.Println(nextSteps)
 
 	return nil
 }
