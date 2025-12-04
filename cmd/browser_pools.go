@@ -126,18 +126,13 @@ func (c BrowserPoolsCmd) Create(ctx context.Context, in BrowserPoolsCreateInput)
 	}
 
 	// Profile
-	if in.ProfileID != "" && in.ProfileName != "" {
-		pterm.Error.Println("must specify at most one of --profile-id or --profile-name")
+	profile, err := buildProfileParam(in.ProfileID, in.ProfileName, in.ProfileSaveChanges)
+	if err != nil {
+		pterm.Error.Println(err.Error())
 		return nil
-	} else if in.ProfileID != "" || in.ProfileName != "" {
-		req.Profile = kernel.BrowserProfileParam{
-			SaveChanges: kernel.Bool(in.ProfileSaveChanges.Value),
-		}
-		if in.ProfileID != "" {
-			req.Profile.ID = kernel.String(in.ProfileID)
-		} else if in.ProfileName != "" {
-			req.Profile.Name = kernel.String(in.ProfileName)
-		}
+	}
+	if profile != nil {
+		req.Profile = *profile
 	}
 
 	if in.ProxyID != "" {
@@ -145,36 +140,16 @@ func (c BrowserPoolsCmd) Create(ctx context.Context, in BrowserPoolsCreateInput)
 	}
 
 	// Extensions
-	if len(in.Extensions) > 0 {
-		for _, ext := range in.Extensions {
-			val := strings.TrimSpace(ext)
-			if val == "" {
-				continue
-			}
-			item := kernel.BrowserExtensionParam{}
-			if cuidRegex.MatchString(val) {
-				item.ID = kernel.String(val)
-			} else {
-				item.Name = kernel.String(val)
-			}
-			req.Extensions = append(req.Extensions, item)
-		}
-	}
+	req.Extensions = buildExtensionsParam(in.Extensions)
 
 	// Viewport
-	if in.Viewport != "" {
-		width, height, refreshRate, err := parseViewport(in.Viewport)
-		if err != nil {
-			pterm.Error.Printf("Invalid viewport format: %v\n", err)
-			return nil
-		}
-		req.Viewport = kernel.BrowserViewportParam{
-			Width:  width,
-			Height: height,
-		}
-		if refreshRate > 0 {
-			req.Viewport.RefreshRate = kernel.Int(refreshRate)
-		}
+	viewport, err := buildViewportParam(in.Viewport)
+	if err != nil {
+		pterm.Error.Println(err.Error())
+		return nil
+	}
+	if viewport != nil {
+		req.Viewport = *viewport
 	}
 
 	params := kernel.BrowserPoolNewParams{
@@ -284,18 +259,13 @@ func (c BrowserPoolsCmd) Update(ctx context.Context, in BrowserPoolsUpdateInput)
 	}
 
 	// Profile
-	if in.ProfileID != "" && in.ProfileName != "" {
-		pterm.Error.Println("must specify at most one of --profile-id or --profile-name")
+	profile, err := buildProfileParam(in.ProfileID, in.ProfileName, in.ProfileSaveChanges)
+	if err != nil {
+		pterm.Error.Println(err.Error())
 		return nil
-	} else if in.ProfileID != "" || in.ProfileName != "" {
-		req.Profile = kernel.BrowserProfileParam{
-			SaveChanges: kernel.Bool(in.ProfileSaveChanges.Value),
-		}
-		if in.ProfileID != "" {
-			req.Profile.ID = kernel.String(in.ProfileID)
-		} else if in.ProfileName != "" {
-			req.Profile.Name = kernel.String(in.ProfileName)
-		}
+	}
+	if profile != nil {
+		req.Profile = *profile
 	}
 
 	if in.ProxyID != "" {
@@ -303,36 +273,16 @@ func (c BrowserPoolsCmd) Update(ctx context.Context, in BrowserPoolsUpdateInput)
 	}
 
 	// Extensions
-	if len(in.Extensions) > 0 {
-		for _, ext := range in.Extensions {
-			val := strings.TrimSpace(ext)
-			if val == "" {
-				continue
-			}
-			item := kernel.BrowserExtensionParam{}
-			if cuidRegex.MatchString(val) {
-				item.ID = kernel.String(val)
-			} else {
-				item.Name = kernel.String(val)
-			}
-			req.Extensions = append(req.Extensions, item)
-		}
-	}
+	req.Extensions = buildExtensionsParam(in.Extensions)
 
 	// Viewport
-	if in.Viewport != "" {
-		width, height, refreshRate, err := parseViewport(in.Viewport)
-		if err != nil {
-			pterm.Error.Printf("Invalid viewport format: %v\n", err)
-			return nil
-		}
-		req.Viewport = kernel.BrowserViewportParam{
-			Width:  width,
-			Height: height,
-		}
-		if refreshRate > 0 {
-			req.Viewport.RefreshRate = kernel.Int(refreshRate)
-		}
+	viewport, err := buildViewportParam(in.Viewport)
+	if err != nil {
+		pterm.Error.Println(err.Error())
+		return nil
+	}
+	if viewport != nil {
+		req.Viewport = *viewport
 	}
 
 	params := kernel.BrowserPoolUpdateParams{
@@ -536,13 +486,13 @@ func init() {
 	browserPoolsUpdateCmd.Flags().String("proxy-id", "", "Proxy ID")
 	browserPoolsUpdateCmd.Flags().StringSlice("extension", []string{}, "Extension IDs or names")
 	browserPoolsUpdateCmd.Flags().String("viewport", "", "Viewport size (e.g. 1280x800)")
-	browserPoolsUpdateCmd.Flags().Bool("discard-all-idle", true, "Discard all idle browsers")
+	browserPoolsUpdateCmd.Flags().Bool("discard-all-idle", false, "Discard all idle browsers")
 
 	// delete flags
 	browserPoolsDeleteCmd.Flags().Bool("force", false, "Force delete even if browsers are leased")
 
 	// acquire flags
-	browserPoolsAcquireCmd.Flags().Int64("timeout", 5, "Acquire timeout in seconds")
+	browserPoolsAcquireCmd.Flags().Int64("timeout", 0, "Acquire timeout in seconds")
 
 	// release flags
 	browserPoolsReleaseCmd.Flags().String("session-id", "", "Browser session ID to release")
@@ -680,4 +630,65 @@ func runBrowserPoolsFlush(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 	c := BrowserPoolsCmd{client: &client.BrowserPools}
 	return c.Flush(cmd.Context(), BrowserPoolsFlushInput{IDOrName: args[0]})
+}
+
+func buildProfileParam(profileID, profileName string, saveChanges BoolFlag) (*kernel.BrowserProfileParam, error) {
+	if profileID != "" && profileName != "" {
+		return nil, fmt.Errorf("must specify at most one of --profile-id or --profile-name")
+	}
+	if profileID == "" && profileName == "" {
+		return nil, nil
+	}
+
+	profile := kernel.BrowserProfileParam{
+		SaveChanges: kernel.Bool(saveChanges.Value),
+	}
+	if profileID != "" {
+		profile.ID = kernel.String(profileID)
+	} else if profileName != "" {
+		profile.Name = kernel.String(profileName)
+	}
+	return &profile, nil
+}
+
+func buildExtensionsParam(extensions []string) []kernel.BrowserExtensionParam {
+	if len(extensions) == 0 {
+		return nil
+	}
+
+	var result []kernel.BrowserExtensionParam
+	for _, ext := range extensions {
+		val := strings.TrimSpace(ext)
+		if val == "" {
+			continue
+		}
+		item := kernel.BrowserExtensionParam{}
+		if cuidRegex.MatchString(val) {
+			item.ID = kernel.String(val)
+		} else {
+			item.Name = kernel.String(val)
+		}
+		result = append(result, item)
+	}
+	return result
+}
+
+func buildViewportParam(viewport string) (*kernel.BrowserViewportParam, error) {
+	if viewport == "" {
+		return nil, nil
+	}
+
+	width, height, refreshRate, err := parseViewport(viewport)
+	if err != nil {
+		return nil, fmt.Errorf("invalid viewport format: %v", err)
+	}
+
+	vp := kernel.BrowserViewportParam{
+		Width:  width,
+		Height: height,
+	}
+	if refreshRate > 0 {
+		vp.RefreshRate = kernel.Int(refreshRate)
+	}
+	return &vp, nil
 }
