@@ -23,6 +23,7 @@ import (
 	"github.com/onkernel/kernel-go-sdk/shared"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // BrowsersService defines the subset of the Kernel SDK browser client that we use.
@@ -227,7 +228,7 @@ func (b BrowsersCmd) List(ctx context.Context, in BrowsersListInput) error {
 		return nil
 	}
 
-	if browsers == nil || len(browsers) == 0 {
+	if len(browsers) == 0 {
 		pterm.Info.Println("No running browsers found")
 		return nil
 	}
@@ -300,7 +301,7 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 		pterm.Error.Println("must specify at most one of --profile-id or --profile-name")
 		return nil
 	} else if in.ProfileID != "" || in.ProfileName != "" {
-		params.Profile = kernel.BrowserNewParamsProfile{
+		params.Profile = kernel.BrowserProfileParam{
 			SaveChanges: kernel.Opt(in.ProfileSaveChanges.Value),
 		}
 		if in.ProfileID != "" {
@@ -322,7 +323,7 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 			if val == "" {
 				continue
 			}
-			item := kernel.BrowserNewParamsExtension{}
+			item := kernel.BrowserExtensionParam{}
 			if cuidRegex.MatchString(val) {
 				item.ID = kernel.Opt(val)
 			} else {
@@ -339,7 +340,7 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 			pterm.Error.Printf("Invalid viewport format: %v\n", err)
 			return nil
 		}
-		params.Viewport = kernel.BrowserNewParamsViewport{
+		params.Viewport = kernel.BrowserViewportParam{
 			Width:  width,
 			Height: height,
 		}
@@ -353,27 +354,31 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 		return util.CleanedUpSdkError{Err: err}
 	}
 
+	printBrowserSessionResult(browser.SessionID, browser.CdpWsURL, browser.BrowserLiveViewURL, browser.Persistence, browser.Profile)
+	return nil
+}
+
+func printBrowserSessionResult(sessionID, cdpURL, liveViewURL string, persistence kernel.BrowserPersistence, profile kernel.Profile) {
 	tableData := pterm.TableData{
 		{"Property", "Value"},
-		{"Session ID", browser.SessionID},
-		{"CDP WebSocket URL", browser.CdpWsURL},
+		{"Session ID", sessionID},
+		{"CDP WebSocket URL", cdpURL},
 	}
-	if browser.BrowserLiveViewURL != "" {
-		tableData = append(tableData, []string{"Live View URL", browser.BrowserLiveViewURL})
+	if liveViewURL != "" {
+		tableData = append(tableData, []string{"Live View URL", liveViewURL})
 	}
-	if browser.Persistence.ID != "" {
-		tableData = append(tableData, []string{"Persistent ID", browser.Persistence.ID})
+	if persistence.ID != "" {
+		tableData = append(tableData, []string{"Persistent ID", persistence.ID})
 	}
-	if browser.Profile.ID != "" || browser.Profile.Name != "" {
-		profVal := browser.Profile.Name
+	if profile.ID != "" || profile.Name != "" {
+		profVal := profile.Name
 		if profVal == "" {
-			profVal = browser.Profile.ID
+			profVal = profile.ID
 		}
 		tableData = append(tableData, []string{"Profile", profVal})
 	}
 
 	PrintTableNoPad(tableData, true)
-	return nil
 }
 
 func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
@@ -2043,6 +2048,8 @@ func init() {
 	browsersCreateCmd.Flags().StringSlice("extension", []string{}, "Extension IDs or names to load (repeatable; may be passed multiple times or comma-separated)")
 	browsersCreateCmd.Flags().String("viewport", "", "Browser viewport size (e.g., 1920x1080@25). Supported: 2560x1440@10, 1920x1080@25, 1920x1200@25, 1440x900@25, 1024x768@60, 1200x800@60")
 	browsersCreateCmd.Flags().Bool("viewport-interactive", false, "Interactively select viewport size from list")
+	browsersCreateCmd.Flags().String("pool-id", "", "Browser pool ID to acquire from (mutually exclusive with --pool-name)")
+	browsersCreateCmd.Flags().String("pool-name", "", "Browser pool name to acquire from (mutually exclusive with --pool-id)")
 
 	// Add flags for delete command
 	browsersDeleteCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
@@ -2085,6 +2092,77 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 	extensions, _ := cmd.Flags().GetStringSlice("extension")
 	viewport, _ := cmd.Flags().GetString("viewport")
 	viewportInteractive, _ := cmd.Flags().GetBool("viewport-interactive")
+	poolID, _ := cmd.Flags().GetString("pool-id")
+	poolName, _ := cmd.Flags().GetString("pool-name")
+
+	if poolID != "" && poolName != "" {
+		pterm.Error.Println("must specify at most one of --pool-id or --pool-name")
+		return nil
+	}
+
+	if poolID != "" || poolName != "" {
+		// When using a pool, configuration comes from the pool itself.
+		allowedFlags := map[string]bool{
+			"pool-id":   true,
+			"pool-name": true,
+			"timeout":   true,
+			// Global persistent flags that don't configure browsers
+			"no-color":  true,
+			"log-level": true,
+		}
+
+		// Check if any browser configuration flags were set (which would conflict).
+		var conflicts []string
+		cmd.Flags().Visit(func(f *pflag.Flag) {
+			if !allowedFlags[f.Name] {
+				conflicts = append(conflicts, "--"+f.Name)
+			}
+		})
+
+		if len(conflicts) > 0 {
+			flagLabel := "--pool-id"
+			if poolName != "" {
+				flagLabel = "--pool-name"
+			}
+			pterm.Warning.Printf("You specified %s, but also provided browser configuration flags: %s\n", flagLabel, strings.Join(conflicts, ", "))
+			pterm.Info.Println("When using a pool, all browser configuration comes from the pool itself.")
+			pterm.Info.Println("The conflicting flags will be ignored.")
+
+			result, _ := pterm.DefaultInteractiveConfirm.Show("Continue with pool configuration?")
+			if !result {
+				pterm.Info.Println("Cancelled. Remove conflicting flags or omit the pool flag.")
+				return nil
+			}
+			pterm.Success.Println("Proceeding with pool configuration...")
+		}
+
+		pool := poolID
+		if pool == "" {
+			pool = poolName
+		}
+
+		pterm.Info.Printf("Acquiring browser from pool %s...\n", pool)
+		poolSvc := client.BrowserPools
+
+		req := kernel.BrowserPoolAcquireRequestParam{}
+		if cmd.Flags().Changed("timeout") && timeout > 0 {
+			req.AcquireTimeoutSeconds = kernel.Int(int64(timeout))
+		}
+		acquireParams := kernel.BrowserPoolAcquireParams{
+			BrowserPoolAcquireRequest: req,
+		}
+
+		resp, err := (&poolSvc).Acquire(cmd.Context(), pool, acquireParams)
+		if err != nil {
+			return util.CleanedUpSdkError{Err: err}
+		}
+		if resp == nil {
+			pterm.Error.Println("Acquire request timed out (no browser available). Retry to continue waiting.")
+			return nil
+		}
+		printBrowserSessionResult(resp.SessionID, resp.CdpWsURL, resp.BrowserLiveViewURL, resp.Persistence, resp.Profile)
+		return nil
+	}
 
 	// Handle interactive viewport selection
 	if viewportInteractive {

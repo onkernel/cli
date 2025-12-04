@@ -123,6 +123,7 @@ func init() {
 	rootCmd.AddCommand(deployCmd)
 	rootCmd.AddCommand(invokeCmd)
 	rootCmd.AddCommand(browsersCmd)
+	rootCmd.AddCommand(browserPoolsCmd)
 	rootCmd.AddCommand(appCmd)
 	rootCmd.AddCommand(profilesCmd)
 	rootCmd.AddCommand(proxies.ProxiesCmd)
