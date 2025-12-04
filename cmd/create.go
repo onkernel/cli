@@ -18,9 +18,9 @@ var createCmd = &cobra.Command{
 }
 
 func init() {
-	createCmd.Flags().String("name", "", "Name of the application")
-	createCmd.Flags().String("language", "", "Language of the application")
-	createCmd.Flags().String("template", "", "Template to use for the application")
+	createCmd.Flags().StringP("name", "n", "", "Name of the application")
+	createCmd.Flags().StringP("language", "l", "", "Language of the application")
+	createCmd.Flags().StringP("template", "t", "", "Template to use for the application")
 }
 
 func runCreateApp(cmd *cobra.Command, args []string) error {

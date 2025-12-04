@@ -3,26 +3,22 @@ package create
 import (
 	"fmt"
 	"regexp"
+	"slices"
 
 	"github.com/AlecAivazis/survey/v2"
 )
 
-const defaultAppName = "my-kernel-app"
-
-// projectNameValidator ensures the project name is safe for file systems and package managers.
-func projectNameValidator(val any) error {
+func validateAppName(val any) error {
 	str, ok := val.(string)
 	if !ok {
 		return fmt.Errorf("invalid input type")
 	}
 
-	// Project name must be non-empty
 	if len(str) == 0 {
 		return fmt.Errorf("project name cannot be empty")
 	}
 
 	// Validate project name: only letters, numbers, underscores, and hyphens
-	// This regex prevents special characters that might break shell commands or filesystem paths.
 	matched, err := regexp.MatchString(`^[A-Za-z\-_\d]+$`, str)
 	if err != nil {
 		return err
@@ -33,7 +29,6 @@ func projectNameValidator(val any) error {
 	return nil
 }
 
-// PromptForAppName prompts the user for the application name if not provided
 func PromptForAppName(providedAppName string) (string, error) {
 	if providedAppName != "" {
 		return providedAppName, nil
@@ -41,32 +36,37 @@ func PromptForAppName(providedAppName string) (string, error) {
 
 	var appName string
 	prompt := &survey.Input{
-		Message: "What is the name of your project?",
-		Default: defaultAppName,
+		Message: AppNamePrompt,
+		Default: DefaultAppName,
 	}
 
-	if err := survey.AskOne(prompt, &appName, survey.WithValidator(projectNameValidator)); err != nil {
+	if err := survey.AskOne(prompt, &appName, survey.WithValidator(validateAppName)); err != nil {
 		return "", err
 	}
 
 	return appName, nil
 }
 
-func PromptForLanguage(providedLanguage string) (string, error) {
-	if providedLanguage != "" {
-		return providedLanguage, nil
-	}
-	var language string
+func handleLangugePrompt() (string, error) {
+	var l string
 	languagePrompt := &survey.Select{
-		Message: "Choose a programming language:",
-		// TODO: create constants so that more languages can be added later
-		Options: []string{"typescript", "python"},
-		Default: "typescript",
+		Message: LanguagePrompt,
+		Options: SupportedLanguages,
 	}
-	if err := survey.AskOne(languagePrompt, &language); err != nil {
+	if err := survey.AskOne(languagePrompt, &l); err != nil {
 		return "", err
 	}
-	return language, nil
+	return l, nil
+}
+
+func PromptForLanguage(providedLanguage string) (string, error) {
+	l := NormalizeLanguage(providedLanguage)
+	if l != "" && !slices.Contains(SupportedLanguages, l) {
+		return handleLangugePrompt()
+	} else if providedLanguage != "" {
+		return l, nil
+	}
+	return handleLangugePrompt()
 }
 
 func PromptForTemplate(providedTemplate string) (string, error) {
@@ -76,9 +76,8 @@ func PromptForTemplate(providedTemplate string) (string, error) {
 
 	var template string
 	templatePrompt := &survey.Select{
-		Message: "Choose a template:",
-		Options: []string{"sample-app"},
-		Default: "sample-app",
+		Message: TemplatePrompt,
+		Options: GetSupportedTemplates(),
 	}
 	if err := survey.AskOne(templatePrompt, &template); err != nil {
 		return "", err
