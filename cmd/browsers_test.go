@@ -54,11 +54,19 @@ func setupStdoutCapture(t *testing.T) {
 
 // FakeBrowsersService is a configurable fake implementing BrowsersService.
 type FakeBrowsersService struct {
+	GetFunc            func(ctx context.Context, id string, opts ...option.RequestOption) (*kernel.BrowserGetResponse, error)
 	ListFunc           func(ctx context.Context, query kernel.BrowserListParams, opts ...option.RequestOption) (*pagination.OffsetPagination[kernel.BrowserListResponse], error)
 	NewFunc            func(ctx context.Context, body kernel.BrowserNewParams, opts ...option.RequestOption) (*kernel.BrowserNewResponse, error)
 	DeleteFunc         func(ctx context.Context, body kernel.BrowserDeleteParams, opts ...option.RequestOption) error
 	DeleteByIDFunc     func(ctx context.Context, id string, opts ...option.RequestOption) error
 	LoadExtensionsFunc func(ctx context.Context, id string, body kernel.BrowserLoadExtensionsParams, opts ...option.RequestOption) error
+}
+
+func (f *FakeBrowsersService) Get(ctx context.Context, id string, opts ...option.RequestOption) (*kernel.BrowserGetResponse, error) {
+	if f.GetFunc != nil {
+		return f.GetFunc(ctx, id, opts...)
+	}
+	return &kernel.BrowserGetResponse{}, nil
 }
 
 func (f *FakeBrowsersService) List(ctx context.Context, query kernel.BrowserListParams, opts ...option.RequestOption) (*pagination.OffsetPagination[kernel.BrowserListResponse], error) {
@@ -266,31 +274,40 @@ func TestBrowsersDelete_WithConfirm_NotFound(t *testing.T) {
 }
 
 func TestBrowsersView_ByID_PrintsURL(t *testing.T) {
+	// Capture both pterm output and raw stdout
 	setupStdoutCapture(t)
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	t.Cleanup(func() {
+		os.Stdout = oldStdout
+	})
 
-	list := []kernel.BrowserListResponse{{
-		SessionID:          "abc",
-		BrowserLiveViewURL: "http://live-url",
-	}}
 	fake := &FakeBrowsersService{
-		ListFunc: func(ctx context.Context, query kernel.BrowserListParams, opts ...option.RequestOption) (*pagination.OffsetPagination[kernel.BrowserListResponse], error) {
-			return &pagination.OffsetPagination[kernel.BrowserListResponse]{Items: list}, nil
+		GetFunc: func(ctx context.Context, id string, opts ...option.RequestOption) (*kernel.BrowserGetResponse, error) {
+			return &kernel.BrowserGetResponse{
+				SessionID:          "abc",
+				BrowserLiveViewURL: "http://live-url",
+			}, nil
 		},
 	}
 	b := BrowsersCmd{browsers: fake}
 	_ = b.View(context.Background(), BrowsersViewInput{Identifier: "abc"})
 
-	out := outBuf.String()
-	assert.Contains(t, out, "http://live-url")
+	// Capture stdout
+	w.Close()
+	var stdoutBuf bytes.Buffer
+	io.Copy(&stdoutBuf, r)
+
+	assert.Contains(t, stdoutBuf.String(), "http://live-url")
 }
 
-func TestBrowsersView_NotFound_ByEither(t *testing.T) {
+func TestBrowsersView_NotFound(t *testing.T) {
 	setupStdoutCapture(t)
 
-	list := []kernel.BrowserListResponse{{SessionID: "abc", Persistence: kernel.BrowserPersistence{ID: "pid-xyz"}}}
 	fake := &FakeBrowsersService{
-		ListFunc: func(ctx context.Context, query kernel.BrowserListParams, opts ...option.RequestOption) (*pagination.OffsetPagination[kernel.BrowserListResponse], error) {
-			return &pagination.OffsetPagination[kernel.BrowserListResponse]{Items: list}, nil
+		GetFunc: func(ctx context.Context, id string, opts ...option.RequestOption) (*kernel.BrowserGetResponse, error) {
+			return nil, nil
 		},
 	}
 	b := BrowsersCmd{browsers: fake}
@@ -300,19 +317,137 @@ func TestBrowsersView_NotFound_ByEither(t *testing.T) {
 	assert.Contains(t, out, "Browser 'missing' not found")
 }
 
-func TestBrowsersView_PrintsErrorOnListFailure(t *testing.T) {
+func TestBrowsersView_HeadlessBrowser_ShowsWarning(t *testing.T) {
 	setupStdoutCapture(t)
 
 	fake := &FakeBrowsersService{
-		ListFunc: func(ctx context.Context, query kernel.BrowserListParams, opts ...option.RequestOption) (*pagination.OffsetPagination[kernel.BrowserListResponse], error) {
-			return nil, errors.New("list error")
+		GetFunc: func(ctx context.Context, id string, opts ...option.RequestOption) (*kernel.BrowserGetResponse, error) {
+			return &kernel.BrowserGetResponse{
+				SessionID:          "abc",
+				Headless:           true,
+				BrowserLiveViewURL: "",
+			}, nil
+		},
+	}
+	b := BrowsersCmd{browsers: fake}
+	_ = b.View(context.Background(), BrowsersViewInput{Identifier: "abc"})
+
+	out := outBuf.String()
+	assert.Contains(t, out, "headless mode")
+}
+
+func TestBrowsersView_PrintsErrorOnGetFailure(t *testing.T) {
+	setupStdoutCapture(t)
+
+	fake := &FakeBrowsersService{
+		GetFunc: func(ctx context.Context, id string, opts ...option.RequestOption) (*kernel.BrowserGetResponse, error) {
+			return nil, errors.New("get error")
 		},
 	}
 	b := BrowsersCmd{browsers: fake}
 	err := b.View(context.Background(), BrowsersViewInput{Identifier: "any"})
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "list error")
+	assert.Contains(t, err.Error(), "get error")
+}
+
+func TestBrowsersGet_PrintsDetails(t *testing.T) {
+	setupStdoutCapture(t)
+
+	created := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
+	fake := &FakeBrowsersService{
+		GetFunc: func(ctx context.Context, id string, opts ...option.RequestOption) (*kernel.BrowserGetResponse, error) {
+			return &kernel.BrowserGetResponse{
+				SessionID:          "sess-123",
+				CdpWsURL:           "ws://cdp-url",
+				BrowserLiveViewURL: "http://live-view",
+				CreatedAt:          created,
+				TimeoutSeconds:     300,
+				Headless:           false,
+				Stealth:            true,
+				KioskMode:          false,
+				Viewport:           shared.BrowserViewport{Width: 1920, Height: 1080, RefreshRate: 25},
+				Persistence:        kernel.BrowserPersistence{ID: "persist-id"},
+				Profile:            kernel.Profile{ID: "prof-id", Name: "my-profile"},
+				ProxyID:            "proxy-123",
+			}, nil
+		},
+	}
+	b := BrowsersCmd{browsers: fake}
+	_ = b.Get(context.Background(), BrowsersGetInput{Identifier: "sess-123"})
+
+	out := outBuf.String()
+	assert.Contains(t, out, "sess-123")
+	assert.Contains(t, out, "ws://cdp-url")
+	assert.Contains(t, out, "http://live-view")
+	assert.Contains(t, out, "300")
+	assert.Contains(t, out, "false") // Headless
+	assert.Contains(t, out, "true")  // Stealth
+	assert.Contains(t, out, "1920x1080@25")
+	assert.Contains(t, out, "persist-id")
+	assert.Contains(t, out, "my-profile")
+	assert.Contains(t, out, "proxy-123")
+}
+
+func TestBrowsersGet_JSONOutput(t *testing.T) {
+	// Capture both pterm output and raw stdout
+	setupStdoutCapture(t)
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	t.Cleanup(func() {
+		os.Stdout = oldStdout
+	})
+
+	fake := &FakeBrowsersService{
+		GetFunc: func(ctx context.Context, id string, opts ...option.RequestOption) (*kernel.BrowserGetResponse, error) {
+			return &kernel.BrowserGetResponse{
+				SessionID: "sess-json",
+				CdpWsURL:  "ws://cdp",
+			}, nil
+		},
+	}
+	b := BrowsersCmd{browsers: fake}
+	_ = b.Get(context.Background(), BrowsersGetInput{Identifier: "sess-json", Output: "json"})
+
+	// Capture stdout
+	w.Close()
+	var stdoutBuf bytes.Buffer
+	io.Copy(&stdoutBuf, r)
+
+	out := stdoutBuf.String()
+	assert.Contains(t, out, "\"session_id\"")
+	assert.Contains(t, out, "sess-json")
+}
+
+func TestBrowsersGet_NotFound(t *testing.T) {
+	setupStdoutCapture(t)
+
+	fake := &FakeBrowsersService{
+		GetFunc: func(ctx context.Context, id string, opts ...option.RequestOption) (*kernel.BrowserGetResponse, error) {
+			return nil, nil
+		},
+	}
+	b := BrowsersCmd{browsers: fake}
+	_ = b.Get(context.Background(), BrowsersGetInput{Identifier: "missing"})
+
+	out := outBuf.String()
+	assert.Contains(t, out, "Browser 'missing' not found")
+}
+
+func TestBrowsersGet_Error(t *testing.T) {
+	setupStdoutCapture(t)
+
+	fake := &FakeBrowsersService{
+		GetFunc: func(ctx context.Context, id string, opts ...option.RequestOption) (*kernel.BrowserGetResponse, error) {
+			return nil, errors.New("get failed")
+		},
+	}
+	b := BrowsersCmd{browsers: fake}
+	err := b.Get(context.Background(), BrowsersGetInput{Identifier: "any"})
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "get failed")
 }
 
 // --- Fakes for sub-services ---
