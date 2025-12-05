@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/pterm/pterm"
 )
 
 func validateAppName(val any) error {
@@ -69,17 +70,11 @@ func PromptForLanguage(providedLanguage string) (string, error) {
 		return l, nil
 	}
 
+	pterm.Warning.Printfln("Language '%s' not found. Please select from available languages.\n", providedLanguage)
 	return handleLangugePrompt()
 }
 
-// TODO: add validation for template
-func PromptForTemplate(providedTemplate string, providedLanguage string) (string, error) {
-	if providedTemplate != "" {
-		return providedTemplate, nil
-	}
-
-	templateKVs := GetSupportedTemplatesForLanguage(NormalizeLanguage(providedLanguage))
-
+func handleTemplatePrompt(templateKVs TemplateKeyValues) (string, error) {
 	var selectedValue string
 	templatePrompt := &survey.Select{
 		Message: TemplatePrompt,
@@ -90,4 +85,19 @@ func PromptForTemplate(providedTemplate string, providedLanguage string) (string
 	}
 
 	return templateKVs.GetTemplateKeyFromValue(selectedValue)
+}
+
+func PromptForTemplate(providedTemplate string, providedLanguage string) (string, error) {
+	templateKVs := GetSupportedTemplatesForLanguage(NormalizeLanguage(providedLanguage))
+
+	if providedTemplate == "" {
+		return handleTemplatePrompt(templateKVs)
+	}
+
+	if templateKVs.ContainsKey(providedTemplate) {
+		return providedTemplate, nil
+	}
+
+	pterm.Warning.Printfln("Template '%s' not found. Please select from available templates.\n", providedTemplate)
+	return handleTemplatePrompt(templateKVs)
 }

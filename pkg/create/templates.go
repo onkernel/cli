@@ -93,3 +93,13 @@ func (tkv TemplateKeyValues) GetTemplateKeyFromValue(selectedValue string) (stri
 	}
 	return "", fmt.Errorf("template not found: %s", selectedValue)
 }
+
+// ContainsKey checks if a template key exists in the TemplateKeyValues
+func (tkv TemplateKeyValues) ContainsKey(key string) bool {
+	for _, kv := range tkv {
+		if kv.Key == key {
+			return true
+		}
+	}
+	return false
+}
