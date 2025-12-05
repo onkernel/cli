@@ -1,0 +1,18 @@
+{
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@onkernel/sdk": ">=0.14.2",
+    "dotenv": "^16.5.0",
+    "openai": "^5.7.0",
+    "playwright": "^1.53.0",
+    "sharp": "^0.34.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.3",
+    "typescript": "^5.8.3"
+  }
+}
