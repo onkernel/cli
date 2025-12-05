@@ -29,6 +29,7 @@ import (
 // BrowsersService defines the subset of the Kernel SDK browser client that we use.
 // See https://github.com/onkernel/kernel-go-sdk/blob/main/browser.go
 type BrowsersService interface {
+	Get(ctx context.Context, id string, opts ...option.RequestOption) (res *kernel.BrowserGetResponse, err error)
 	List(ctx context.Context, query kernel.BrowserListParams, opts ...option.RequestOption) (res *pagination.OffsetPagination[kernel.BrowserListResponse], err error)
 	New(ctx context.Context, body kernel.BrowserNewParams, opts ...option.RequestOption) (res *kernel.BrowserNewResponse, err error)
 	Delete(ctx context.Context, body kernel.BrowserDeleteParams, opts ...option.RequestOption) (err error)
@@ -171,6 +172,11 @@ type BrowsersDeleteInput struct {
 
 type BrowsersViewInput struct {
 	Identifier string
+}
+
+type BrowsersGetInput struct {
+	Identifier string
+	Output     string
 }
 
 // BrowsersCmd is a cobra-independent command handler for browsers operations.
@@ -446,17 +452,103 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 }
 
 func (b BrowsersCmd) View(ctx context.Context, in BrowsersViewInput) error {
-	foundBrowser, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	browser, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
 	}
-	if foundBrowser == nil {
+	if browser == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	if browser.BrowserLiveViewURL == "" {
+		if browser.Headless {
+			pterm.Warning.Println("This browser is running in headless mode and does not have a live view URL")
+		} else {
+			pterm.Warning.Println("No live view URL available for this browser")
+		}
+		return nil
+	}
+
+	fmt.Println(browser.BrowserLiveViewURL)
+	return nil
+}
+
+func (b BrowsersCmd) Get(ctx context.Context, in BrowsersGetInput) error {
+	if in.Output != "" && in.Output != "json" {
+		pterm.Error.Println("unsupported --output value: use 'json'")
+		return nil
+	}
+
+	browser, err := b.browsers.Get(ctx, in.Identifier)
+	if err != nil {
+		return util.CleanedUpSdkError{Err: err}
+	}
+	if browser == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
 		return nil
 	}
 
-	// Output just the URL
-	pterm.Info.Println(foundBrowser.BrowserLiveViewURL)
+	if in.Output == "json" {
+		bs, err := json.MarshalIndent(browser, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(bs))
+		return nil
+	}
+
+	// Build table with all browser details
+	tableData := pterm.TableData{
+		{"Property", "Value"},
+		{"Session ID", browser.SessionID},
+		{"Created At", util.FormatLocal(browser.CreatedAt)},
+		{"CDP WebSocket URL", browser.CdpWsURL},
+	}
+
+	if browser.BrowserLiveViewURL != "" {
+		tableData = append(tableData, []string{"Live View URL", browser.BrowserLiveViewURL})
+	}
+
+	tableData = append(tableData, []string{"Timeout (seconds)", fmt.Sprintf("%d", browser.TimeoutSeconds)})
+	tableData = append(tableData, []string{"Headless", fmt.Sprintf("%t", browser.Headless)})
+	tableData = append(tableData, []string{"Stealth", fmt.Sprintf("%t", browser.Stealth)})
+	tableData = append(tableData, []string{"Kiosk Mode", fmt.Sprintf("%t", browser.KioskMode)})
+
+	// Viewport
+	if browser.Viewport.Width > 0 && browser.Viewport.Height > 0 {
+		viewportStr := fmt.Sprintf("%dx%d", browser.Viewport.Width, browser.Viewport.Height)
+		if browser.Viewport.RefreshRate > 0 {
+			viewportStr = fmt.Sprintf("%s@%d", viewportStr, browser.Viewport.RefreshRate)
+		}
+		tableData = append(tableData, []string{"Viewport", viewportStr})
+	}
+
+	// Persistence
+	if browser.Persistence.ID != "" {
+		tableData = append(tableData, []string{"Persistence ID", browser.Persistence.ID})
+	}
+
+	// Profile
+	if browser.Profile.ID != "" || browser.Profile.Name != "" {
+		if browser.Profile.Name != "" {
+			tableData = append(tableData, []string{"Profile Name", browser.Profile.Name})
+		}
+		if browser.Profile.ID != "" {
+			tableData = append(tableData, []string{"Profile ID", browser.Profile.ID})
+		}
+	}
+
+	// Proxy
+	if browser.ProxyID != "" {
+		tableData = append(tableData, []string{"Proxy ID", browser.ProxyID})
+	}
+
+	// Deleted at (if soft-deleted)
+	if !browser.DeletedAt.IsZero() {
+		tableData = append(tableData, []string{"Deleted At", util.FormatLocal(browser.DeletedAt)})
+	}
+
+	PrintTableNoPad(tableData, true)
 	return nil
 }
 
@@ -1804,6 +1896,14 @@ var browsersViewCmd = &cobra.Command{
 	RunE:  runBrowsersView,
 }
 
+var browsersGetCmd = &cobra.Command{
+	Use:   "get <id>",
+	Short: "Get detailed information about a browser session",
+	Long:  "Retrieve and display detailed information about a specific browser session including configuration, URLs, and status.",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runBrowsersGet,
+}
+
 func init() {
 	// list flags
 	browsersListCmd.Flags().StringP("output", "o", "", "Output format: json for raw API response")
@@ -1811,10 +1911,14 @@ func init() {
 	browsersListCmd.Flags().Int("limit", 0, "Maximum number of results to return (default 20, max 100)")
 	browsersListCmd.Flags().Int("offset", 0, "Number of results to skip (for pagination)")
 
+	// get flags
+	browsersGetCmd.Flags().StringP("output", "o", "", "Output format: json for raw API response")
+
 	browsersCmd.AddCommand(browsersListCmd)
 	browsersCmd.AddCommand(browsersCreateCmd)
 	browsersCmd.AddCommand(browsersDeleteCmd)
 	browsersCmd.AddCommand(browsersViewCmd)
+	browsersCmd.AddCommand(browsersGetCmd)
 
 	// logs
 	logsRoot := &cobra.Command{Use: "logs", Short: "Browser logs operations"}
@@ -2197,6 +2301,18 @@ func runBrowsersView(cmd *cobra.Command, args []string) error {
 	svc := client.Browsers
 	b := BrowsersCmd{browsers: &svc}
 	return b.View(cmd.Context(), in)
+}
+
+func runBrowsersGet(cmd *cobra.Command, args []string) error {
+	client := getKernelClient(cmd)
+	out, _ := cmd.Flags().GetString("output")
+
+	svc := client.Browsers
+	b := BrowsersCmd{browsers: &svc}
+	return b.Get(cmd.Context(), BrowsersGetInput{
+		Identifier: args[0],
+		Output:     out,
+	})
 }
 
 func runBrowsersLogsStream(cmd *cobra.Command, args []string) error {
