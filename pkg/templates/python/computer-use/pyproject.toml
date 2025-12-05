@@ -1,0 +1,15 @@
+[project]
+name = "python-cu"
+version = "0.1.0"
+description = "Kernel reference app for Anthropic Computer Use"
+requires-python = ">=3.9"
+dependencies = [
+    "anthropic~=0.52.1",
+    "playwright~=1.52.0",
+    "python-dateutil~=2.8.2",
+    "pydantic~=2.11.5",
+    "typing-extensions~=4.13.2",
+    "kernel>=0.14.2",
+    "python-dotenv~=1.0.0",
+    "httpx~=0.27.0",
+]
