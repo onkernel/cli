@@ -1,0 +1,14 @@
+{
+  "name": "ts-gemini-cua",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@browserbasehq/stagehand": "^2.5.2",
+    "@onkernel/sdk": "^0.15.0",
+    "zod": "^3.25.67"
+  }
+}

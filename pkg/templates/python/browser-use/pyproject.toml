@@ -1,0 +1,11 @@
+[project]
+name = "python-bu"
+version = "0.1.0"
+description = "Kernel sample app for Browser Use"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "browser-use>=0.7.10",
+    "kernel>=0.14.2",
+    "pydantic>=2.10.6",
+]

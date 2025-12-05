@@ -1,0 +1,14 @@
+{
+  "name": "ts-stagehand",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@browserbasehq/stagehand": "^3.0.1",
+    "@onkernel/sdk": "^0.18.0",
+    "zod": "=3.25.67"
+  }
+}

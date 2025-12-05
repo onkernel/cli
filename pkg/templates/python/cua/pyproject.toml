@@ -1,0 +1,30 @@
+[project]
+name = "python-cua"
+version = "0.1.0"
+description = "Kernel sample app for CUA"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "annotated-types==0.7.0",
+    "anyio==4.9.0",
+    "certifi==2025.6.15",
+    "charset-normalizer==3.4.2",
+    "distro==1.9.0",
+    "greenlet==3.2.3",
+    "h11==0.16.0",
+    "httpcore==1.0.9",
+    "httpx==0.28.1",
+    "idna==3.10",
+    "jiter==0.10.0",
+    "pillow==11.2.1",
+    "kernel>=0.14.2",
+    "playwright==1.52.0",
+    "pydantic==2.11.7",
+    "pydantic_core==2.33.2",
+    "pyee==13.0.0",
+    "python-dotenv==1.1.0",
+    "requests==2.32.4",
+    "sniffio==1.3.1",
+    "typing_extensions==4.14.0",
+    "urllib3==2.5.0",
+]
