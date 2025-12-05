@@ -73,18 +73,21 @@ func PromptForLanguage(providedLanguage string) (string, error) {
 }
 
 // TODO: add validation for template
-func PromptForTemplate(providedTemplate string) (string, error) {
+func PromptForTemplate(providedTemplate string, providedLanguage string) (string, error) {
 	if providedTemplate != "" {
 		return providedTemplate, nil
 	}
 
-	var template string
+	templateKVs := GetSupportedTemplatesForLanguage(NormalizeLanguage(providedLanguage))
+
+	var selectedValue string
 	templatePrompt := &survey.Select{
 		Message: TemplatePrompt,
-		Options: GetSupportedTemplates(),
+		Options: templateKVs.GetTemplateDisplayValues(),
 	}
-	if err := survey.AskOne(templatePrompt, &template); err != nil {
+	if err := survey.AskOne(templatePrompt, &selectedValue); err != nil {
 		return "", err
 	}
-	return template, nil
+
+	return templateKVs.GetTemplateKeyFromValue(selectedValue)
 }
