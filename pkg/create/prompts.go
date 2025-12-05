@@ -96,17 +96,19 @@ func PromptForLanguage(providedLanguage string) (string, error) {
 }
 
 // TODO: add validation for template
-func PromptForTemplate(providedTemplate string) (string, error) {
+func PromptForTemplate(providedTemplate string, providedLanguage string) (string, error) {
 	if providedTemplate != "" {
 		return providedTemplate, nil
 	}
+	templateKVs := GetSupportedTemplatesForLanguage(NormalizeLanguage(providedLanguage))
 
 	template, err := pterm.DefaultInteractiveSelect.
-		WithOptions(GetSupportedTemplates()).
+		WithOptions(templateKVs.GetTemplateDisplayValues()).
 		WithDefaultText(TemplatePrompt).
 		Show()
 	if err != nil {
 		return "", err
 	}
-	return template, nil
+
+	return templateKVs.GetTemplateKeyFromValue(template)
 }
