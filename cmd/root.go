@@ -135,7 +135,8 @@ func init() {
 	rootCmd.AddCommand(profilesCmd)
 	rootCmd.AddCommand(proxies.ProxiesCmd)
 	rootCmd.AddCommand(extensionsCmd)
-	rootCmd.AddCommand(createCmd)
+	// Hide create command while WIP
+	// rootCmd.AddCommand(createCmd)
 
 	rootCmd.PersistentPostRunE = func(cmd *cobra.Command, args []string) error {
 		// running synchronously so we never slow the command
