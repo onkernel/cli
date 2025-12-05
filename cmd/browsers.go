@@ -383,22 +383,9 @@ func printBrowserSessionResult(sessionID, cdpURL, liveViewURL string, persistenc
 
 func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 	if !in.SkipConfirm {
-		page, err := b.browsers.List(ctx, kernel.BrowserListParams{})
+		found, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 		if err != nil {
 			return util.CleanedUpSdkError{Err: err}
-		}
-		if page == nil || page.Items == nil || len(page.Items) == 0 {
-			pterm.Error.Println("No browsers found")
-			return nil
-		}
-
-		var found *kernel.BrowserListResponse
-		for _, br := range page.Items {
-			if br.SessionID == in.Identifier || br.Persistence.ID == in.Identifier {
-				bCopy := br
-				found = &bCopy
-				break
-			}
 		}
 		if found == nil {
 			pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -459,24 +446,10 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 }
 
 func (b BrowsersCmd) View(ctx context.Context, in BrowsersViewInput) error {
-	page, err := b.browsers.List(ctx, kernel.BrowserListParams{})
+	foundBrowser, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
 	}
-
-	if page == nil || page.Items == nil || len(page.Items) == 0 {
-		pterm.Error.Println("No browsers found")
-		return nil
-	}
-
-	var foundBrowser *kernel.BrowserListResponse
-	for _, browser := range page.Items {
-		if browser.Persistence.ID == in.Identifier || browser.SessionID == in.Identifier {
-			foundBrowser = &browser
-			break
-		}
-	}
-
 	if foundBrowser == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
 		return nil
@@ -2643,16 +2616,37 @@ func truncateURL(url string, maxLen int) string {
 	return url[:maxLen-3] + "..."
 }
 
-// resolveBrowserByIdentifier finds a browser by session ID or persistent ID (backward compatibility).
-func (b BrowsersCmd) resolveBrowserByIdentifier(ctx context.Context, identifier string) (*kernel.BrowserListResponse, error) {
+// listAllBrowsers fetches all browsers by paginating through all pages.
+func (b BrowsersCmd) listAllBrowsers(ctx context.Context) ([]kernel.BrowserListResponse, error) {
+	var allBrowsers []kernel.BrowserListResponse
 	page, err := b.browsers.List(ctx, kernel.BrowserListParams{})
 	if err != nil {
 		return nil, err
 	}
-	if page == nil || page.Items == nil {
-		return nil, nil
+	for page != nil && len(page.Items) > 0 {
+		allBrowsers = append(allBrowsers, page.Items...)
+		page = safeGetNextPage(page)
 	}
-	for _, br := range page.Items {
+	return allBrowsers, nil
+}
+
+// safeGetNextPage attempts to get the next page, returning nil if unavailable or on error.
+func safeGetNextPage(page *pagination.OffsetPagination[kernel.BrowserListResponse]) *pagination.OffsetPagination[kernel.BrowserListResponse] {
+	defer func() { recover() }()
+	nextPage, err := page.GetNextPage()
+	if err != nil {
+		return nil
+	}
+	return nextPage
+}
+
+// resolveBrowserByIdentifier finds a browser by session ID or persistent ID (backward compatibility).
+func (b BrowsersCmd) resolveBrowserByIdentifier(ctx context.Context, identifier string) (*kernel.BrowserListResponse, error) {
+	browsers, err := b.listAllBrowsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, br := range browsers {
 		if br.SessionID == identifier || br.Persistence.ID == identifier {
 			bCopy := br
 			return &bCopy, nil
