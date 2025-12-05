@@ -39,6 +39,6 @@ func TestTemplates(t *testing.T) {
 	assert.NotEmpty(t, sampleApp.Languages, "Template should support at least one language")
 
 	// Should support both typescript and python
-	assert.Contains(t, sampleApp.Languages, Language(LanguageTypeScript), "sample-app should support typescript")
-	assert.Contains(t, sampleApp.Languages, Language(LanguagePython), "sample-app should support python")
+	assert.Contains(t, sampleApp.Languages, string(LanguageTypeScript), "sample-app should support typescript")
+	assert.Contains(t, sampleApp.Languages, string(LanguagePython), "sample-app should support python")
 }

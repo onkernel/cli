@@ -7,8 +7,6 @@ const (
 	TemplatePrompt = "Select a template:"
 )
 
-type Language string
-
 const (
 	LanguageTypeScript          = "typescript"
 	LanguagePython              = "python"
@@ -19,14 +17,14 @@ const (
 type TemplateInfo struct {
 	Name        string
 	Description string
-	Languages   []Language
+	Languages   []string
 }
 
 var Templates = map[string]TemplateInfo{
 	"sample-app": {
 		Name:        "Sample App",
 		Description: "Implements basic Kernel apps",
-		Languages:   []Language{LanguageTypeScript, LanguagePython},
+		Languages:   []string{LanguageTypeScript, LanguagePython},
 	},
 }
 

@@ -49,6 +49,7 @@ func runCreateApp(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to resolve app path: %w", err)
 	}
 
+	// TODO: handle overwrite gracefully (prompt user)
 	// Check if directory already exists
 	if _, err := os.Stat(appPath); err == nil {
 		return fmt.Errorf("directory %s already exists", appName)
@@ -59,7 +60,7 @@ func runCreateApp(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	fmt.Printf("\nCreating a new %s %s\n\n", language, template)
+	pterm.Println(fmt.Sprintf("\nCreating a new %s %s\n", language, template))
 
 	spinner, _ := pterm.DefaultSpinner.Start("Copying template files...")
 

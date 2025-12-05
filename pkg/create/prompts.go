@@ -60,15 +60,19 @@ func handleLangugePrompt() (string, error) {
 }
 
 func PromptForLanguage(providedLanguage string) (string, error) {
-	l := NormalizeLanguage(providedLanguage)
-	if l != "" && !slices.Contains(SupportedLanguages, l) {
+	if providedLanguage == "" {
 		return handleLangugePrompt()
-	} else if providedLanguage != "" {
+	}
+
+	l := NormalizeLanguage(providedLanguage)
+	if slices.Contains(SupportedLanguages, l) {
 		return l, nil
 	}
+
 	return handleLangugePrompt()
 }
 
+// TODO: add validation for template
 func PromptForTemplate(providedTemplate string) (string, error) {
 	if providedTemplate != "" {
 		return providedTemplate, nil
