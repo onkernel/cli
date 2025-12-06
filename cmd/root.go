@@ -128,6 +128,7 @@ func init() {
 	rootCmd.AddCommand(profilesCmd)
 	rootCmd.AddCommand(proxies.ProxiesCmd)
 	rootCmd.AddCommand(extensionsCmd)
+	rootCmd.AddCommand(agentsCmd)
 
 	rootCmd.PersistentPostRunE = func(cmd *cobra.Command, args []string) error {
 		// running synchronously so we never slow the command
