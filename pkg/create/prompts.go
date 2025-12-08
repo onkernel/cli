@@ -33,7 +33,7 @@ func validateAppName(val any) error {
 
 // handleAppNamePrompt prompts the user for an app name interactively.
 func handleAppNamePrompt() (string, error) {
-	promptText := fmt.Sprintf("%s (default: %s)", AppNamePrompt, DefaultAppName)
+	promptText := fmt.Sprintf("%s (%s)", AppNamePrompt, DefaultAppName)
 	appName, err := pterm.DefaultInteractiveTextInput.
 		WithDefaultText(promptText).
 		Show()

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,14 +13,18 @@ import (
 func TestCreateCommand(t *testing.T) {
 	tests := []struct {
 		name        string
-		args        []string
+		input       CreateInput
 		wantErr     bool
 		errContains string
 		validate    func(t *testing.T, appPath string)
 	}{
 		{
 			name: "create typescript sample-app",
-			args: []string{"--name", "test-app", "--language", "typescript", "--template", "sample-app"},
+			input: CreateInput{
+				Name:     "test-app",
+				Language: "typescript",
+				Template: "sample-app",
+			},
 			validate: func(t *testing.T, appPath string) {
 				// Verify files were created
 				assert.FileExists(t, filepath.Join(appPath, "index.ts"))
@@ -29,10 +34,14 @@ func TestCreateCommand(t *testing.T) {
 			},
 		},
 		{
-			name:        "fail with python sample-app (template not found)",
-			args:        []string{"--name", "test-app", "--language", "python", "--template", "sample-app"},
+			name: "fail with invalid template",
+			input: CreateInput{
+				Name:     "test-app",
+				Language: "typescript",
+				Template: "nonexistent",
+			},
 			wantErr:     true,
-			errContains: "template not found: python/sample-app",
+			errContains: "template not found: typescript/nonexistent",
 		},
 	}
 
@@ -50,8 +59,8 @@ func TestCreateCommand(t *testing.T) {
 				os.Chdir(orgDir)
 			})
 
-			createCmd.SetArgs(tt.args)
-			err = createCmd.Execute()
+			c := CreateCmd{}
+			err = c.Create(context.Background(), tt.input)
 
 			// Check if error is expected
 			if tt.wantErr {
@@ -65,7 +74,7 @@ func TestCreateCommand(t *testing.T) {
 			require.NoError(t, err, "failed to execute create command")
 
 			// Validate the created app
-			appPath := filepath.Join(tmpDir, "test-app")
+			appPath := filepath.Join(tmpDir, tt.input.Name)
 			assert.DirExists(t, appPath, "app directory should be created")
 
 			if tt.validate != nil {
