@@ -76,9 +76,6 @@ func runCreateApp(cmd *cobra.Command, args []string) error {
   kernel login  # or: export KERNEL_API_KEY=<YOUR_API_KEY>
   kernel deploy index.ts
   kernel invoke ts-basic get-page-title --payload '{"url": "https://www.google.com"}'
-  # Do this in a separate tab
-  kernel login  # or: export KERNEL_API_KEY=<YOUR_API_KEY>
-  kernel logs ts-basic --follow
 `, appName)
 
 	pterm.Success.Println("🎉 Kernel app created successfully!")
