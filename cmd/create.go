@@ -45,6 +45,12 @@ func (c CreateCmd) Create(ctx context.Context, ci CreateInput) error {
 		spinner.Fail("Failed to copy template files")
 		return fmt.Errorf("failed to copy template files: %w", err)
 	}
+
+	if err := create.InstallDependencies(appPath, ci.Language); err != nil {
+		spinner.Fail("Failed to install dependencies")
+		return fmt.Errorf("failed to install dependencies: %w", err)
+	}
+
 	spinner.Success(fmt.Sprintf("✔ %s environment set up successfully", ci.Language))
 
 	nextSteps := fmt.Sprintf(`Next steps:

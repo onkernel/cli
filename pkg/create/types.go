@@ -14,6 +14,11 @@ const (
 	LanguageShorthandPython     = "py"
 )
 
+var InstallCommands = map[string]string{
+	LanguageTypeScript: "npm install",
+	LanguagePython:     "uv venv",
+}
+
 // SupportedLanguages returns a list of all supported languages
 var SupportedLanguages = []string{
 	LanguageTypeScript,
