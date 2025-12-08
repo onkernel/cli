@@ -189,22 +189,24 @@ func (c BrowserPoolsCmd) Get(ctx context.Context, in BrowserPoolsGetInput) error
 
 	cfg := pool.BrowserPoolConfig
 
-	rows := pterm.TableData{{"Property", "Value"}}
-	rows = append(rows, []string{"ID", pool.ID})
-	rows = append(rows, []string{"Name", util.OrDash(pool.Name)})
-	rows = append(rows, []string{"Size", fmt.Sprintf("%d", cfg.Size)})
-	rows = append(rows, []string{"Available", fmt.Sprintf("%d", pool.AvailableCount)})
-	rows = append(rows, []string{"Acquired", fmt.Sprintf("%d", pool.AcquiredCount)})
-	rows = append(rows, []string{"Fill Rate", formatFillRate(cfg.FillRatePerMinute)})
-	rows = append(rows, []string{"Timeout (seconds)", fmt.Sprintf("%d", cfg.TimeoutSeconds)})
-	rows = append(rows, []string{"Headless", fmt.Sprintf("%t", cfg.Headless)})
-	rows = append(rows, []string{"Stealth", fmt.Sprintf("%t", cfg.Stealth)})
-	rows = append(rows, []string{"Kiosk Mode", fmt.Sprintf("%t", cfg.KioskMode)})
-	rows = append(rows, []string{"Profile", formatProfile(cfg.Profile)})
-	rows = append(rows, []string{"Proxy ID", util.OrDash(cfg.ProxyID)})
-	rows = append(rows, []string{"Extensions", formatExtensions(cfg.Extensions)})
-	rows = append(rows, []string{"Viewport", formatViewport(cfg.Viewport)})
-	rows = append(rows, []string{"Created At", util.FormatLocal(pool.CreatedAt)})
+	rows := pterm.TableData{
+		{"Property", "Value"},
+		{"ID", pool.ID},
+		{"Name", util.OrDash(pool.Name)},
+		{"Created At", util.FormatLocal(pool.CreatedAt)},
+		{"Size", fmt.Sprintf("%d", cfg.Size)},
+		{"Available", fmt.Sprintf("%d", pool.AvailableCount)},
+		{"Acquired", fmt.Sprintf("%d", pool.AcquiredCount)},
+		{"Fill Rate", formatFillRate(cfg.FillRatePerMinute)},
+		{"Timeout", fmt.Sprintf("%d seconds", cfg.TimeoutSeconds)},
+		{"Headless", fmt.Sprintf("%t", cfg.Headless)},
+		{"Stealth", fmt.Sprintf("%t", cfg.Stealth)},
+		{"Kiosk Mode", fmt.Sprintf("%t", cfg.KioskMode)},
+		{"Profile", formatProfile(cfg.Profile)},
+		{"Proxy ID", util.OrDash(cfg.ProxyID)},
+		{"Extensions", formatExtensions(cfg.Extensions)},
+		{"Viewport", formatViewport(cfg.Viewport)},
+	}
 
 	PrintTableNoPad(rows, true)
 	return nil
