@@ -1,4 +1,4 @@
-# Kernel Typescript Sample App - CUA
+# Kernel TypeScript Sample App - CUA
 
 This is a Kernel application that demonstrates using the Computer Using Agent (CUA) from OpenAI.
 
