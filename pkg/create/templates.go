@@ -3,6 +3,7 @@ package create
 import (
 	"fmt"
 	"slices"
+	"sort"
 )
 
 type TemplateInfo struct {
@@ -72,6 +73,11 @@ func GetSupportedTemplatesForLanguage(language string) TemplateKeyValues {
 			})
 		}
 	}
+
+	sort.Slice(templates, func(i, j int) bool {
+		return templates[i].Key < templates[j].Key
+	})
+
 	return templates
 }
 
