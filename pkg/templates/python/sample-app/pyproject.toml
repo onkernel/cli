@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Kernel application template - Python"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["kernel>=0.14.2", "playwright>=1.52.0"]
+dependencies = ["kernel>=0.22.0", "playwright>=1.56.0"]
 
 [dependency-groups]
-dev = ["mypy>=1.15.0"]
+dev = ["mypy>=1.19.0"]
