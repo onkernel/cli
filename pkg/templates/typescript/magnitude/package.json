@@ -7,8 +7,8 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@onkernel/sdk": ">=0.14.2",
-    "magnitude-core": "latest",
-    "zod": "^3.25.0"
+    "@onkernel/sdk": "^0.22.0",
+    "magnitude-core": "^0.3.0",
+    "zod": "^4.1.13"
   }
 }

@@ -7,8 +7,8 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@browserbasehq/stagehand": "^3.0.1",
-    "@onkernel/sdk": "^0.18.0",
-    "zod": "=3.25.67"
+    "@browserbasehq/stagehand": "^3.0.5",
+    "@onkernel/sdk": "^0.22.0",
+    "zod": "^4.1.13"
   }
 }
