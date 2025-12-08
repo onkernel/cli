@@ -68,7 +68,7 @@ func runCreateApp(cmd *cobra.Command, args []string) error {
 		spinner.Fail("Failed to copy template files")
 		return fmt.Errorf("failed to copy template files: %w", err)
 	}
-	spinner.Success("✔ TypeScript environment set up successfully")
+	spinner.Success(fmt.Sprintf("✔ %s environment set up successfully", language))
 
 	nextSteps := fmt.Sprintf(`Next steps:
   brew install onkernel/tap/kernel

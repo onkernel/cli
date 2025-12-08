@@ -8,6 +8,8 @@ import (
 	"github.com/pterm/pterm"
 )
 
+// validateAppName validates that an app name follows the required format.
+// Returns an error if the name is invalid.
 func validateAppName(val any) error {
 	str, ok := val.(string)
 	if !ok {
@@ -29,11 +31,8 @@ func validateAppName(val any) error {
 	return nil
 }
 
-func PromptForAppName(providedAppName string) (string, error) {
-	if providedAppName != "" {
-		return providedAppName, nil
-	}
-
+// handleAppNamePrompt prompts the user for an app name interactively.
+func handleAppNamePrompt() (string, error) {
 	promptText := fmt.Sprintf("%s (default: %s)", AppNamePrompt, DefaultAppName)
 	appName, err := pterm.DefaultInteractiveTextInput.
 		WithDefaultText(promptText).
@@ -42,17 +41,34 @@ func PromptForAppName(providedAppName string) (string, error) {
 		return "", err
 	}
 
-	// Use default if user just pressed enter without typing anything
 	if appName == "" {
 		appName = DefaultAppName
 	}
 
-	// Validate the app name
 	if err := validateAppName(appName); err != nil {
-		return "", err
+		pterm.Warning.Printf("Invalid app name '%s': %v\n", appName, err)
+		pterm.Info.Println("Please provide a valid app name.")
+		return handleAppNamePrompt()
 	}
 
 	return appName, nil
+}
+
+// PromptForAppName validates the provided app name or prompts the user for one.
+// If the provided name is invalid, it shows a warning and prompts the user.
+func PromptForAppName(providedAppName string) (string, error) {
+	// If no app name was provided, prompt the user
+	if providedAppName == "" {
+		return handleAppNamePrompt()
+	}
+
+	if err := validateAppName(providedAppName); err != nil {
+		pterm.Warning.Printf("Invalid app name '%s': %v\n", providedAppName, err)
+		pterm.Info.Println("Please provide a valid app name.")
+		return handleAppNamePrompt()
+	}
+
+	return providedAppName, nil
 }
 
 func handleLanguagePrompt() (string, error) {
