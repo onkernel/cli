@@ -380,7 +380,7 @@ func buildBrowserTableData(sessionID, cdpURL, liveViewURL string, persistence ke
 		tableData = append(tableData, []string{"Live View URL", liveViewURL})
 	}
 	if persistence.ID != "" {
-		tableData = append(tableData, []string{"Persistence ID", persistence.ID})
+		tableData = append(tableData, []string{"Persistent ID", persistence.ID})
 	}
 	if profile.ID != "" || profile.Name != "" {
 		profVal := profile.Name
