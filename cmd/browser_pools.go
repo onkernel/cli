@@ -67,13 +67,9 @@ func (c BrowserPoolsCmd) List(ctx context.Context, in BrowserPoolsListInput) err
 	}
 
 	for _, p := range *pools {
-		name := p.Name
-		if name == "" {
-			name = "-"
-		}
 		tableData = append(tableData, []string{
 			p.ID,
-			name,
+			util.OrDash(p.Name),
 			fmt.Sprintf("%d", p.AvailableCount),
 			fmt.Sprintf("%d", p.AcquiredCount),
 			util.FormatLocal(p.CreatedAt),
@@ -125,7 +121,6 @@ func (c BrowserPoolsCmd) Create(ctx context.Context, in BrowserPoolsCreateInput)
 		req.KioskMode = kernel.Bool(in.Kiosk.Value)
 	}
 
-	// Profile
 	profile, err := buildProfileParam(in.ProfileID, in.ProfileName, in.ProfileSaveChanges)
 	if err != nil {
 		pterm.Error.Println(err.Error())
@@ -139,10 +134,8 @@ func (c BrowserPoolsCmd) Create(ctx context.Context, in BrowserPoolsCreateInput)
 		req.ProxyID = kernel.String(in.ProxyID)
 	}
 
-	// Extensions
 	req.Extensions = buildExtensionsParam(in.Extensions)
 
-	// Viewport
 	viewport, err := buildViewportParam(in.Viewport)
 	if err != nil {
 		pterm.Error.Println(err.Error())
@@ -194,21 +187,26 @@ func (c BrowserPoolsCmd) Get(ctx context.Context, in BrowserPoolsGetInput) error
 		return nil
 	}
 
-	name := pool.Name
-	if name == "" {
-		name = "-"
-	}
-	tableData := pterm.TableData{
-		{"Property", "Value"},
-		{"ID", pool.ID},
-		{"Name", name},
-		{"Size", fmt.Sprintf("%d", pool.BrowserPoolConfig.Size)},
-		{"Available", fmt.Sprintf("%d", pool.AvailableCount)},
-		{"Acquired", fmt.Sprintf("%d", pool.AcquiredCount)},
-		{"Timeout", fmt.Sprintf("%d", pool.BrowserPoolConfig.TimeoutSeconds)},
-		{"Created At", util.FormatLocal(pool.CreatedAt)},
-	}
-	PrintTableNoPad(tableData, true)
+	cfg := pool.BrowserPoolConfig
+
+	rows := pterm.TableData{{"Property", "Value"}}
+	rows = append(rows, []string{"ID", pool.ID})
+	rows = append(rows, []string{"Name", util.OrDash(pool.Name)})
+	rows = append(rows, []string{"Size", fmt.Sprintf("%d", cfg.Size)})
+	rows = append(rows, []string{"Available", fmt.Sprintf("%d", pool.AvailableCount)})
+	rows = append(rows, []string{"Acquired", fmt.Sprintf("%d", pool.AcquiredCount)})
+	rows = append(rows, []string{"Fill Rate", formatFillRate(cfg.FillRatePerMinute)})
+	rows = append(rows, []string{"Timeout (seconds)", fmt.Sprintf("%d", cfg.TimeoutSeconds)})
+	rows = append(rows, []string{"Headless", fmt.Sprintf("%t", cfg.Headless)})
+	rows = append(rows, []string{"Stealth", fmt.Sprintf("%t", cfg.Stealth)})
+	rows = append(rows, []string{"Kiosk Mode", fmt.Sprintf("%t", cfg.KioskMode)})
+	rows = append(rows, []string{"Profile", formatProfile(cfg.Profile)})
+	rows = append(rows, []string{"Proxy ID", util.OrDash(cfg.ProxyID)})
+	rows = append(rows, []string{"Extensions", formatExtensions(cfg.Extensions)})
+	rows = append(rows, []string{"Viewport", formatViewport(cfg.Viewport)})
+	rows = append(rows, []string{"Created At", util.FormatLocal(pool.CreatedAt)})
+
+	PrintTableNoPad(rows, true)
 	return nil
 }
 
@@ -258,7 +256,6 @@ func (c BrowserPoolsCmd) Update(ctx context.Context, in BrowserPoolsUpdateInput)
 		req.DiscardAllIdle = kernel.Bool(in.DiscardAllIdle.Value)
 	}
 
-	// Profile
 	profile, err := buildProfileParam(in.ProfileID, in.ProfileName, in.ProfileSaveChanges)
 	if err != nil {
 		pterm.Error.Println(err.Error())
@@ -272,10 +269,8 @@ func (c BrowserPoolsCmd) Update(ctx context.Context, in BrowserPoolsUpdateInput)
 		req.ProxyID = kernel.String(in.ProxyID)
 	}
 
-	// Extensions
 	req.Extensions = buildExtensionsParam(in.Extensions)
 
-	// Viewport
 	viewport, err := buildViewportParam(in.Viewport)
 	if err != nil {
 		pterm.Error.Println(err.Error())
@@ -450,10 +445,8 @@ var browserPoolsFlushCmd = &cobra.Command{
 }
 
 func init() {
-	// list flags
 	browserPoolsListCmd.Flags().StringP("output", "o", "", "Output format: json for raw API response")
 
-	// create flags
 	browserPoolsCreateCmd.Flags().String("name", "", "Optional unique name for the pool")
 	browserPoolsCreateCmd.Flags().Int64("size", 0, "Number of browsers in the pool")
 	_ = browserPoolsCreateCmd.MarkFlagRequired("size")
@@ -469,10 +462,8 @@ func init() {
 	browserPoolsCreateCmd.Flags().StringSlice("extension", []string{}, "Extension IDs or names")
 	browserPoolsCreateCmd.Flags().String("viewport", "", "Viewport size (e.g. 1280x800)")
 
-	// get flags
 	browserPoolsGetCmd.Flags().StringP("output", "o", "", "Output format: json for raw API response")
 
-	// update flags
 	browserPoolsUpdateCmd.Flags().String("name", "", "Update the pool name")
 	browserPoolsUpdateCmd.Flags().Int64("size", 0, "Number of browsers in the pool")
 	browserPoolsUpdateCmd.Flags().Int64("fill-rate", 0, "Fill rate per minute")
@@ -488,13 +479,10 @@ func init() {
 	browserPoolsUpdateCmd.Flags().String("viewport", "", "Viewport size (e.g. 1280x800)")
 	browserPoolsUpdateCmd.Flags().Bool("discard-all-idle", false, "Discard all idle browsers")
 
-	// delete flags
 	browserPoolsDeleteCmd.Flags().Bool("force", false, "Force delete even if browsers are leased")
 
-	// acquire flags
 	browserPoolsAcquireCmd.Flags().Int64("timeout", 0, "Acquire timeout in seconds")
 
-	// release flags
 	browserPoolsReleaseCmd.Flags().String("session-id", "", "Browser session ID to release")
 	_ = browserPoolsReleaseCmd.MarkFlagRequired("session-id")
 	browserPoolsReleaseCmd.Flags().Bool("reuse", true, "Reuse the browser instance")
@@ -691,4 +679,43 @@ func buildViewportParam(viewport string) (*kernel.BrowserViewportParam, error) {
 		vp.RefreshRate = kernel.Int(refreshRate)
 	}
 	return &vp, nil
+}
+
+func formatFillRate(rate int64) string {
+	if rate > 0 {
+		return fmt.Sprintf("%d%%", rate)
+	}
+	return "-"
+}
+
+func formatProfile(profile kernel.BrowserProfile) string {
+	name := util.FirstOrDash(profile.Name, profile.ID)
+	if name == "-" {
+		return "-"
+	}
+	if profile.SaveChanges {
+		return fmt.Sprintf("%s (save changes: true)", name)
+	}
+	return fmt.Sprintf("%s (save changes: false)", name)
+}
+
+func formatExtensions(extensions []kernel.BrowserExtension) string {
+	var names []string
+	for _, ext := range extensions {
+		if name := util.FirstOrDash(ext.Name, ext.ID); name != "-" {
+			names = append(names, name)
+		}
+	}
+	return util.JoinOrDash(names...)
+}
+
+func formatViewport(viewport kernel.BrowserViewport) string {
+	if viewport.Width == 0 || viewport.Height == 0 {
+		return "-"
+	}
+	s := fmt.Sprintf("%dx%d", viewport.Width, viewport.Height)
+	if viewport.RefreshRate > 0 {
+		s += fmt.Sprintf("@%d", viewport.RefreshRate)
+	}
+	return s
 }
