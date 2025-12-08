@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"slices"
 
-	"github.com/AlecAivazis/survey/v2"
+	"github.com/pterm/pterm"
 )
 
 func validateAppName(val any) error {
@@ -34,26 +34,33 @@ func PromptForAppName(providedAppName string) (string, error) {
 		return providedAppName, nil
 	}
 
-	var appName string
-	prompt := &survey.Input{
-		Message: AppNamePrompt,
-		Default: DefaultAppName,
+	promptText := fmt.Sprintf("%s (default: %s)", AppNamePrompt, DefaultAppName)
+	appName, err := pterm.DefaultInteractiveTextInput.
+		WithDefaultText(promptText).
+		Show()
+	if err != nil {
+		return "", err
 	}
 
-	if err := survey.AskOne(prompt, &appName, survey.WithValidator(validateAppName)); err != nil {
+	// Use default if user just pressed enter without typing anything
+	if appName == "" {
+		appName = DefaultAppName
+	}
+
+	// Validate the app name
+	if err := validateAppName(appName); err != nil {
 		return "", err
 	}
 
 	return appName, nil
 }
 
-func handleLangugePrompt() (string, error) {
-	var l string
-	languagePrompt := &survey.Select{
-		Message: LanguagePrompt,
-		Options: SupportedLanguages,
-	}
-	if err := survey.AskOne(languagePrompt, &l); err != nil {
+func handleLanguagePrompt() (string, error) {
+	l, err := pterm.DefaultInteractiveSelect.
+		WithOptions(SupportedLanguages).
+		WithDefaultText(LanguagePrompt).
+		Show()
+	if err != nil {
 		return "", err
 	}
 	return l, nil
@@ -61,7 +68,7 @@ func handleLangugePrompt() (string, error) {
 
 func PromptForLanguage(providedLanguage string) (string, error) {
 	if providedLanguage == "" {
-		return handleLangugePrompt()
+		return handleLanguagePrompt()
 	}
 
 	l := NormalizeLanguage(providedLanguage)
@@ -69,7 +76,7 @@ func PromptForLanguage(providedLanguage string) (string, error) {
 		return l, nil
 	}
 
-	return handleLangugePrompt()
+	return handleLanguagePrompt()
 }
 
 // TODO: add validation for template
@@ -78,12 +85,11 @@ func PromptForTemplate(providedTemplate string) (string, error) {
 		return providedTemplate, nil
 	}
 
-	var template string
-	templatePrompt := &survey.Select{
-		Message: TemplatePrompt,
-		Options: GetSupportedTemplates(),
-	}
-	if err := survey.AskOne(templatePrompt, &template); err != nil {
+	template, err := pterm.DefaultInteractiveSelect.
+		WithOptions(GetSupportedTemplates()).
+		WithDefaultText(TemplatePrompt).
+		Show()
+	if err != nil {
 		return "", err
 	}
 	return template, nil
