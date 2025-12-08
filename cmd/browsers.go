@@ -365,6 +365,12 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 }
 
 func printBrowserSessionResult(sessionID, cdpURL, liveViewURL string, persistence kernel.BrowserPersistence, profile kernel.Profile) {
+	tableData := buildBrowserTableData(sessionID, cdpURL, liveViewURL, persistence, profile)
+	PrintTableNoPad(tableData, true)
+}
+
+// buildBrowserTableData creates a base table with common browser session fields.
+func buildBrowserTableData(sessionID, cdpURL, liveViewURL string, persistence kernel.BrowserPersistence, profile kernel.Profile) pterm.TableData {
 	tableData := pterm.TableData{
 		{"Property", "Value"},
 		{"Session ID", sessionID},
@@ -374,7 +380,7 @@ func printBrowserSessionResult(sessionID, cdpURL, liveViewURL string, persistenc
 		tableData = append(tableData, []string{"Live View URL", liveViewURL})
 	}
 	if persistence.ID != "" {
-		tableData = append(tableData, []string{"Persistent ID", persistence.ID})
+		tableData = append(tableData, []string{"Persistence ID", persistence.ID})
 	}
 	if profile.ID != "" || profile.Name != "" {
 		profVal := profile.Name
@@ -383,8 +389,7 @@ func printBrowserSessionResult(sessionID, cdpURL, liveViewURL string, persistenc
 		}
 		tableData = append(tableData, []string{"Profile", profVal})
 	}
-
-	PrintTableNoPad(tableData, true)
+	return tableData
 }
 
 func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
@@ -497,24 +502,21 @@ func (b BrowsersCmd) Get(ctx context.Context, in BrowsersGetInput) error {
 		return nil
 	}
 
-	// Build table with all browser details
-	tableData := pterm.TableData{
-		{"Property", "Value"},
-		{"Session ID", browser.SessionID},
-		{"Created At", util.FormatLocal(browser.CreatedAt)},
-		{"CDP WebSocket URL", browser.CdpWsURL},
-	}
+	// Build table starting with common browser fields
+	tableData := buildBrowserTableData(
+		browser.SessionID,
+		browser.CdpWsURL,
+		browser.BrowserLiveViewURL,
+		browser.Persistence,
+		browser.Profile,
+	)
 
-	if browser.BrowserLiveViewURL != "" {
-		tableData = append(tableData, []string{"Live View URL", browser.BrowserLiveViewURL})
-	}
-
+	// Append additional detailed fields
+	tableData = append(tableData, []string{"Created At", util.FormatLocal(browser.CreatedAt)})
 	tableData = append(tableData, []string{"Timeout (seconds)", fmt.Sprintf("%d", browser.TimeoutSeconds)})
 	tableData = append(tableData, []string{"Headless", fmt.Sprintf("%t", browser.Headless)})
 	tableData = append(tableData, []string{"Stealth", fmt.Sprintf("%t", browser.Stealth)})
 	tableData = append(tableData, []string{"Kiosk Mode", fmt.Sprintf("%t", browser.KioskMode)})
-
-	// Viewport
 	if browser.Viewport.Width > 0 && browser.Viewport.Height > 0 {
 		viewportStr := fmt.Sprintf("%dx%d", browser.Viewport.Width, browser.Viewport.Height)
 		if browser.Viewport.RefreshRate > 0 {
@@ -522,28 +524,9 @@ func (b BrowsersCmd) Get(ctx context.Context, in BrowsersGetInput) error {
 		}
 		tableData = append(tableData, []string{"Viewport", viewportStr})
 	}
-
-	// Persistence
-	if browser.Persistence.ID != "" {
-		tableData = append(tableData, []string{"Persistence ID", browser.Persistence.ID})
-	}
-
-	// Profile
-	if browser.Profile.ID != "" || browser.Profile.Name != "" {
-		if browser.Profile.Name != "" {
-			tableData = append(tableData, []string{"Profile Name", browser.Profile.Name})
-		}
-		if browser.Profile.ID != "" {
-			tableData = append(tableData, []string{"Profile ID", browser.Profile.ID})
-		}
-	}
-
-	// Proxy
 	if browser.ProxyID != "" {
 		tableData = append(tableData, []string{"Proxy ID", browser.ProxyID})
 	}
-
-	// Deleted at (if soft-deleted)
 	if !browser.DeletedAt.IsZero() {
 		tableData = append(tableData, []string{"Deleted At", util.FormatLocal(browser.DeletedAt)})
 	}
