@@ -16,7 +16,7 @@ const (
 
 var InstallCommands = map[string]string{
 	LanguageTypeScript: "npm install",
-	LanguagePython:     "uv venv",
+	LanguagePython:     "uv venv && source .venv/bin/activate && uv sync",
 }
 
 // SupportedLanguages returns a list of all supported languages

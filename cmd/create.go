@@ -46,12 +46,24 @@ func (c CreateCmd) Create(ctx context.Context, ci CreateInput) error {
 		return fmt.Errorf("failed to copy template files: %w", err)
 	}
 
-	if err := create.InstallDependencies(appPath, ci.Language); err != nil {
-		spinner.Fail("Failed to install dependencies")
-		return fmt.Errorf("failed to install dependencies: %w", err)
+	ok, _ := create.InstallDependencies(appPath, ci.Language)
+	if !ok {
+		pterm.Warning.Println("Failed to install dependencies. Please install them manually:")
+		switch ci.Language {
+		case create.LanguageTypeScript:
+			pterm.Println(fmt.Sprintf("  cd %s", ci.Name))
+			pterm.Println("  npm install")
+		case create.LanguagePython:
+			pterm.Println(fmt.Sprintf("  cd %s", ci.Name))
+			pterm.Println("  uv venv && source .venv/bin/activate && uv sync")
+		}
+		pterm.Println()
+	} else {
+		spinner.Success(fmt.Sprintf("✔ %s environment set up successfully", ci.Language))
 	}
 
-	spinner.Success(fmt.Sprintf("✔ %s environment set up successfully", ci.Language))
+	pterm.Success.Println("🎉 Kernel app created successfully!")
+	pterm.Println()
 
 	nextSteps := fmt.Sprintf(`Next steps:
   brew install onkernel/tap/kernel
@@ -61,8 +73,6 @@ func (c CreateCmd) Create(ctx context.Context, ci CreateInput) error {
   kernel invoke ts-basic get-page-title --payload '{"url": "https://www.google.com"}'
 `, ci.Name)
 
-	pterm.Success.Println("🎉 Kernel app created successfully!")
-	pterm.Println()
 	pterm.FgYellow.Println(nextSteps)
 
 	return nil

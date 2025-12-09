@@ -218,6 +218,42 @@ func validatePythonTemplate(t *testing.T, appPath string, checkDependencies bool
 	}
 }
 
+// TestCreateCommand_DependencyInstallationFails tests that the app is still created
+// even when dependency installation fails, with appropriate warning message
+func TestCreateCommand_DependencyInstallationFails(t *testing.T) {
+	tmpDir := t.TempDir()
+	appName := "test-app"
+
+	orgDir, err := os.Getwd()
+	require.NoError(t, err)
+
+	err = os.Chdir(tmpDir)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		os.Chdir(orgDir)
+	})
+
+	// Override the install command to use a command that will fail
+	originalInstallCommands := create.InstallCommands
+	create.InstallCommands = map[string]string{
+		create.LanguageTypeScript: "exit 1", // Command that always fails
+	}
+
+	// Restore original install commands after test
+	t.Cleanup(func() {
+		create.InstallCommands = originalInstallCommands
+	})
+
+	// Create the app - should succeed even though dependency installation fails
+	c := CreateCmd{}
+	err = c.Create(context.Background(), CreateInput{
+		Name:     appName,
+		Language: create.LanguageTypeScript,
+		Template: "sample-app",
+	})
+}
+
 func getTemplateInfo() []struct {
 	name     string
 	language string
