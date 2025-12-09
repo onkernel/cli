@@ -1,5 +1,5 @@
 {
-  "name": "ts-basic",
+  "name": "ts-cu",
   "module": "index.ts",
   "type": "module",
   "private": true,
@@ -8,6 +8,8 @@
   },
   "dependencies": {
     "@onkernel/sdk": "^0.22.0",
-    "playwright": "^1.57.0"
+    "playwright": "^1.57.0",
+    "@anthropic-ai/sdk": "^0.71.2",
+    "luxon": "^3.7.2"
   }
 }

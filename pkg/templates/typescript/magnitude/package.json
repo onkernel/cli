@@ -1,5 +1,5 @@
 {
-  "name": "ts-basic",
+  "name": "ts-magnitude",
   "module": "index.ts",
   "type": "module",
   "private": true,
@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@onkernel/sdk": "^0.22.0",
-    "playwright": "^1.57.0"
+    "magnitude-core": "^0.3.0",
+    "zod": "^4.1.13"
   }
 }

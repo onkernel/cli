@@ -90,7 +90,7 @@ func runCreateApp(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get language: %w", err)
 	}
 
-	template, err = create.PromptForTemplate(template)
+	template, err = create.PromptForTemplate(template, language)
 	if err != nil {
 		return fmt.Errorf("failed to get template: %w", err)
 	}

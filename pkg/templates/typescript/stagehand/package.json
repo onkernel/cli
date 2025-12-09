@@ -1,5 +1,5 @@
 {
-  "name": "ts-basic",
+  "name": "ts-stagehand",
   "module": "index.ts",
   "type": "module",
   "private": true,
@@ -7,7 +7,8 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@browserbasehq/stagehand": "^3.0.5",
     "@onkernel/sdk": "^0.22.0",
-    "playwright": "^1.57.0"
+    "zod": "^4.1.13"
   }
 }
