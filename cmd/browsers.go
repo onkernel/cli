@@ -29,6 +29,7 @@ import (
 // BrowsersService defines the subset of the Kernel SDK browser client that we use.
 // See https://github.com/onkernel/kernel-go-sdk/blob/main/browser.go
 type BrowsersService interface {
+	Get(ctx context.Context, id string, opts ...option.RequestOption) (res *kernel.BrowserGetResponse, err error)
 	List(ctx context.Context, query kernel.BrowserListParams, opts ...option.RequestOption) (res *pagination.OffsetPagination[kernel.BrowserListResponse], err error)
 	New(ctx context.Context, body kernel.BrowserNewParams, opts ...option.RequestOption) (res *kernel.BrowserNewResponse, err error)
 	Delete(ctx context.Context, body kernel.BrowserDeleteParams, opts ...option.RequestOption) (err error)
@@ -171,6 +172,11 @@ type BrowsersDeleteInput struct {
 
 type BrowsersViewInput struct {
 	Identifier string
+}
+
+type BrowsersGetInput struct {
+	Identifier string
+	Output     string
 }
 
 // BrowsersCmd is a cobra-independent command handler for browsers operations.
@@ -359,6 +365,12 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 }
 
 func printBrowserSessionResult(sessionID, cdpURL, liveViewURL string, persistence kernel.BrowserPersistence, profile kernel.Profile) {
+	tableData := buildBrowserTableData(sessionID, cdpURL, liveViewURL, persistence, profile)
+	PrintTableNoPad(tableData, true)
+}
+
+// buildBrowserTableData creates a base table with common browser session fields.
+func buildBrowserTableData(sessionID, cdpURL, liveViewURL string, persistence kernel.BrowserPersistence, profile kernel.Profile) pterm.TableData {
 	tableData := pterm.TableData{
 		{"Property", "Value"},
 		{"Session ID", sessionID},
@@ -377,28 +389,14 @@ func printBrowserSessionResult(sessionID, cdpURL, liveViewURL string, persistenc
 		}
 		tableData = append(tableData, []string{"Profile", profVal})
 	}
-
-	PrintTableNoPad(tableData, true)
+	return tableData
 }
 
 func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 	if !in.SkipConfirm {
-		page, err := b.browsers.List(ctx, kernel.BrowserListParams{})
+		found, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
 		if err != nil {
 			return util.CleanedUpSdkError{Err: err}
-		}
-		if page == nil || page.Items == nil || len(page.Items) == 0 {
-			pterm.Error.Println("No browsers found")
-			return nil
-		}
-
-		var found *kernel.BrowserListResponse
-		for _, br := range page.Items {
-			if br.SessionID == in.Identifier || br.Persistence.ID == in.Identifier {
-				bCopy := br
-				found = &bCopy
-				break
-			}
 		}
 		if found == nil {
 			pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
@@ -459,31 +457,81 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 }
 
 func (b BrowsersCmd) View(ctx context.Context, in BrowsersViewInput) error {
-	page, err := b.browsers.List(ctx, kernel.BrowserListParams{})
+	browser, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
 	}
-
-	if page == nil || page.Items == nil || len(page.Items) == 0 {
-		pterm.Error.Println("No browsers found")
+	if browser == nil {
+		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
+		return nil
+	}
+	if browser.BrowserLiveViewURL == "" {
+		if browser.Headless {
+			pterm.Warning.Println("This browser is running in headless mode and does not have a live view URL")
+		} else {
+			pterm.Warning.Println("No live view URL available for this browser")
+		}
 		return nil
 	}
 
-	var foundBrowser *kernel.BrowserListResponse
-	for _, browser := range page.Items {
-		if browser.Persistence.ID == in.Identifier || browser.SessionID == in.Identifier {
-			foundBrowser = &browser
-			break
-		}
+	fmt.Println(browser.BrowserLiveViewURL)
+	return nil
+}
+
+func (b BrowsersCmd) Get(ctx context.Context, in BrowsersGetInput) error {
+	if in.Output != "" && in.Output != "json" {
+		pterm.Error.Println("unsupported --output value: use 'json'")
+		return nil
 	}
 
-	if foundBrowser == nil {
+	browser, err := b.browsers.Get(ctx, in.Identifier)
+	if err != nil {
+		return util.CleanedUpSdkError{Err: err}
+	}
+	if browser == nil {
 		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
 		return nil
 	}
 
-	// Output just the URL
-	pterm.Info.Println(foundBrowser.BrowserLiveViewURL)
+	if in.Output == "json" {
+		bs, err := json.MarshalIndent(browser, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(bs))
+		return nil
+	}
+
+	// Build table starting with common browser fields
+	tableData := buildBrowserTableData(
+		browser.SessionID,
+		browser.CdpWsURL,
+		browser.BrowserLiveViewURL,
+		browser.Persistence,
+		browser.Profile,
+	)
+
+	// Append additional detailed fields
+	tableData = append(tableData, []string{"Created At", util.FormatLocal(browser.CreatedAt)})
+	tableData = append(tableData, []string{"Timeout (seconds)", fmt.Sprintf("%d", browser.TimeoutSeconds)})
+	tableData = append(tableData, []string{"Headless", fmt.Sprintf("%t", browser.Headless)})
+	tableData = append(tableData, []string{"Stealth", fmt.Sprintf("%t", browser.Stealth)})
+	tableData = append(tableData, []string{"Kiosk Mode", fmt.Sprintf("%t", browser.KioskMode)})
+	if browser.Viewport.Width > 0 && browser.Viewport.Height > 0 {
+		viewportStr := fmt.Sprintf("%dx%d", browser.Viewport.Width, browser.Viewport.Height)
+		if browser.Viewport.RefreshRate > 0 {
+			viewportStr = fmt.Sprintf("%s@%d", viewportStr, browser.Viewport.RefreshRate)
+		}
+		tableData = append(tableData, []string{"Viewport", viewportStr})
+	}
+	if browser.ProxyID != "" {
+		tableData = append(tableData, []string{"Proxy ID", browser.ProxyID})
+	}
+	if !browser.DeletedAt.IsZero() {
+		tableData = append(tableData, []string{"Deleted At", util.FormatLocal(browser.DeletedAt)})
+	}
+
+	PrintTableNoPad(tableData, true)
 	return nil
 }
 
@@ -1831,6 +1879,14 @@ var browsersViewCmd = &cobra.Command{
 	RunE:  runBrowsersView,
 }
 
+var browsersGetCmd = &cobra.Command{
+	Use:   "get <id>",
+	Short: "Get detailed information about a browser session",
+	Long:  "Retrieve and display detailed information about a specific browser session including configuration, URLs, and status.",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runBrowsersGet,
+}
+
 func init() {
 	// list flags
 	browsersListCmd.Flags().StringP("output", "o", "", "Output format: json for raw API response")
@@ -1838,10 +1894,14 @@ func init() {
 	browsersListCmd.Flags().Int("limit", 0, "Maximum number of results to return (default 20, max 100)")
 	browsersListCmd.Flags().Int("offset", 0, "Number of results to skip (for pagination)")
 
+	// get flags
+	browsersGetCmd.Flags().StringP("output", "o", "", "Output format: json for raw API response")
+
 	browsersCmd.AddCommand(browsersListCmd)
 	browsersCmd.AddCommand(browsersCreateCmd)
 	browsersCmd.AddCommand(browsersDeleteCmd)
 	browsersCmd.AddCommand(browsersViewCmd)
+	browsersCmd.AddCommand(browsersGetCmd)
 
 	// logs
 	logsRoot := &cobra.Command{Use: "logs", Short: "Browser logs operations"}
@@ -2224,6 +2284,18 @@ func runBrowsersView(cmd *cobra.Command, args []string) error {
 	svc := client.Browsers
 	b := BrowsersCmd{browsers: &svc}
 	return b.View(cmd.Context(), in)
+}
+
+func runBrowsersGet(cmd *cobra.Command, args []string) error {
+	client := getKernelClient(cmd)
+	out, _ := cmd.Flags().GetString("output")
+
+	svc := client.Browsers
+	b := BrowsersCmd{browsers: &svc}
+	return b.Get(cmd.Context(), BrowsersGetInput{
+		Identifier: args[0],
+		Output:     out,
+	})
 }
 
 func runBrowsersLogsStream(cmd *cobra.Command, args []string) error {
@@ -2643,16 +2715,37 @@ func truncateURL(url string, maxLen int) string {
 	return url[:maxLen-3] + "..."
 }
 
-// resolveBrowserByIdentifier finds a browser by session ID or persistent ID (backward compatibility).
-func (b BrowsersCmd) resolveBrowserByIdentifier(ctx context.Context, identifier string) (*kernel.BrowserListResponse, error) {
+// listAllBrowsers fetches all browsers by paginating through all pages.
+func (b BrowsersCmd) listAllBrowsers(ctx context.Context) ([]kernel.BrowserListResponse, error) {
+	var allBrowsers []kernel.BrowserListResponse
 	page, err := b.browsers.List(ctx, kernel.BrowserListParams{})
 	if err != nil {
 		return nil, err
 	}
-	if page == nil || page.Items == nil {
-		return nil, nil
+	for page != nil && len(page.Items) > 0 {
+		allBrowsers = append(allBrowsers, page.Items...)
+		page = safeGetNextPage(page)
 	}
-	for _, br := range page.Items {
+	return allBrowsers, nil
+}
+
+// safeGetNextPage attempts to get the next page, returning nil if unavailable or on error.
+func safeGetNextPage(page *pagination.OffsetPagination[kernel.BrowserListResponse]) *pagination.OffsetPagination[kernel.BrowserListResponse] {
+	defer func() { recover() }()
+	nextPage, err := page.GetNextPage()
+	if err != nil {
+		return nil
+	}
+	return nextPage
+}
+
+// resolveBrowserByIdentifier finds a browser by session ID or persistent ID (backward compatibility).
+func (b BrowsersCmd) resolveBrowserByIdentifier(ctx context.Context, identifier string) (*kernel.BrowserListResponse, error) {
+	browsers, err := b.listAllBrowsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, br := range browsers {
 		if br.SessionID == identifier || br.Persistence.ID == identifier {
 			bCopy := br
 			return &bCopy, nil
