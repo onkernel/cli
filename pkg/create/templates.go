@@ -123,87 +123,74 @@ func (tkv TemplateKeyValues) ContainsKey(key string) bool {
 }
 
 type DeployConfig struct {
-	EntryPoint        string
-	EnvVars           []string
-	InvokeCommand     string
-	RegisteredAppName string
+	EntryPoint    string
+	EnvVars       []string
+	InvokeCommand string
 }
 
 var Commands = map[string]map[string]DeployConfig{
 	LanguageTypeScript: {
 		TemplateSampleApp: {
-			EntryPoint:        "index.ts",
-			EnvVars:           []string{},
-			InvokeCommand:     `kernel invoke ts-basic get-page-title --payload '{"url": "https://www.google.com"}'`,
-			RegisteredAppName: "ts-basic",
+			EntryPoint:    "index.ts",
+			EnvVars:       []string{},
+			InvokeCommand: `kernel invoke ts-basic get-page-title --payload '{"url": "https://www.google.com"}'`,
 		},
 		TemplateAdvancedSample: {
-			EntryPoint:        "index.ts",
-			EnvVars:           []string{},
-			InvokeCommand:     "kernel invoke ts-advanced test-captcha-solver",
-			RegisteredAppName: "ts-advanced",
+			EntryPoint:    "index.ts",
+			EnvVars:       []string{},
+			InvokeCommand: "kernel invoke ts-advanced test-captcha-solver",
 		},
 		TemplateStagehand: {
-			EntryPoint:        "index.ts",
-			EnvVars:           []string{"OPENAI_API_KEY=XXX"},
-			InvokeCommand:     `kernel invoke ts-stagehand teamsize-task --payload '{"company": "Kernel"}'`,
-			RegisteredAppName: "ts-stagehand",
+			EntryPoint:    "index.ts",
+			EnvVars:       []string{"OPENAI_API_KEY=XXX"},
+			InvokeCommand: `kernel invoke ts-stagehand teamsize-task --payload '{"company": "Kernel"}'`,
 		},
 		TemplateComputerUse: {
-			EntryPoint:        "index.ts",
-			EnvVars:           []string{"ANTHROPIC_API_KEY=XXX"},
-			InvokeCommand:     `kernel invoke ts-cu cu-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'`,
-			RegisteredAppName: "ts-cu",
+			EntryPoint:    "index.ts",
+			EnvVars:       []string{"ANTHROPIC_API_KEY=XXX"},
+			InvokeCommand: `kernel invoke ts-cu cu-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'`,
 		},
 		TemplateMagnitude: {
-			EntryPoint:        "index.ts",
-			EnvVars:           []string{"ANTHROPIC_API_KEY=XXX"},
-			InvokeCommand:     `kernel invoke ts-magnitude mag-url-extract --payload '{"url": "https://en.wikipedia.org/wiki/Special:Random"}'`,
-			RegisteredAppName: "ts-magnitude",
+			EntryPoint:    "index.ts",
+			EnvVars:       []string{"ANTHROPIC_API_KEY=XXX"},
+			InvokeCommand: `kernel invoke ts-magnitude mag-url-extract --payload '{"url": "https://en.wikipedia.org/wiki/Special:Random"}'`,
 		},
 		TemplateCUA: {
-			EntryPoint:        "index.ts",
-			EnvVars:           []string{"OPENAI_API_KEY=XXX"},
-			InvokeCommand:     `kernel invoke ts-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'`,
-			RegisteredAppName: "ts-cua",
+			EntryPoint:    "index.ts",
+			EnvVars:       []string{"OPENAI_API_KEY=XXX"},
+			InvokeCommand: `kernel invoke ts-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'`,
 		},
 		TemplateGeminiCUA: {
-			EntryPoint:        "index.ts",
-			EnvVars:           []string{"GOOGLE_API_KEY=XXX", "OPENAI_API_KEY=XXX"},
-			InvokeCommand:     "kernel invoke ts-gemini-cua gemini-cua-task",
-			RegisteredAppName: "ts-gemini-cua",
+			EntryPoint:    "index.ts",
+			EnvVars:       []string{"GOOGLE_API_KEY=XXX", "OPENAI_API_KEY=XXX"},
+			InvokeCommand: "kernel invoke ts-gemini-cua gemini-cua-task",
 		},
 	},
 	LanguagePython: {
 		TemplateSampleApp: {
-			EntryPoint:        "main.py",
-			EnvVars:           []string{},
-			InvokeCommand:     `kernel invoke python-basic get-page-title --payload '{"url": "https://www.google.com"}'`,
-			RegisteredAppName: "python-basic",
+			EntryPoint:    "main.py",
+			EnvVars:       []string{},
+			InvokeCommand: `kernel invoke python-basic get-page-title --payload '{"url": "https://www.google.com"}'`,
 		},
 		TemplateAdvancedSample: {
-			EntryPoint:        "main.py",
-			EnvVars:           []string{},
-			InvokeCommand:     "kernel invoke python-advanced test-captcha-solver",
-			RegisteredAppName: "python-advanced",
+			EntryPoint:    "main.py",
+			EnvVars:       []string{},
+			InvokeCommand: "kernel invoke python-advanced test-captcha-solver",
 		},
 		TemplateBrowserUse: {
-			EntryPoint:        "main.py",
-			EnvVars:           []string{"OPENAI_API_KEY=XXX"},
-			InvokeCommand:     `kernel invoke python-bu bu-task --payload '{"task": "Compare the price of gpt-4o and DeepSeek-V3"}'`,
-			RegisteredAppName: "python-bu",
+			EntryPoint:    "main.py",
+			EnvVars:       []string{"OPENAI_API_KEY=XXX"},
+			InvokeCommand: `kernel invoke python-bu bu-task --payload '{"task": "Compare the price of gpt-4o and DeepSeek-V3"}'`,
 		},
 		TemplateComputerUse: {
-			EntryPoint:        "main.py",
-			EnvVars:           []string{"ANTHROPIC_API_KEY=XXX"},
-			InvokeCommand:     `kernel invoke python-cu cu-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'`,
-			RegisteredAppName: "python-cu",
+			EntryPoint:    "main.py",
+			EnvVars:       []string{"ANTHROPIC_API_KEY=XXX"},
+			InvokeCommand: `kernel invoke python-cu cu-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'`,
 		},
 		TemplateCUA: {
-			EntryPoint:        "main.py",
-			EnvVars:           []string{"OPENAI_API_KEY=XXX"},
-			InvokeCommand:     `kernel invoke python-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'`,
-			RegisteredAppName: "python-cua",
+			EntryPoint:    "main.py",
+			EnvVars:       []string{"OPENAI_API_KEY=XXX"},
+			InvokeCommand: `kernel invoke python-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'`,
 		},
 	},
 }
@@ -241,19 +228,4 @@ func GetInvokeSample(language, template string) string {
 	}
 
 	return config.InvokeCommand
-}
-
-// GetRegisteredAppName returns the registered app name for a given language and template
-func GetRegisteredAppName(language, template string) string {
-	langNames, ok := Commands[language]
-	if !ok {
-		return ""
-	}
-
-	config, ok := langNames[template]
-	if !ok {
-		return ""
-	}
-
-	return config.RegisteredAppName
 }
