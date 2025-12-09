@@ -14,6 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	DIR_PERM  = 0755 // rwxr-xr-x
+	FILE_PERM = 0644 // rw-r--r--
+)
+
 func TestCreateCommand(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -145,7 +150,7 @@ func TestAllTemplatesCreation(t *testing.T) {
 			appPath := filepath.Join(tmpDir, appName)
 
 			// Create app directory
-			err := os.MkdirAll(appPath, 0755)
+			err := os.MkdirAll(appPath, DIR_PERM)
 			require.NoError(t, err, "failed to create app directory")
 
 			// Copy template files without installing dependencies
@@ -350,6 +355,61 @@ func TestCreateCommand_RequiredToolMissing(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestCreateCommand_DirectoryOverwrite tests that overwriting an existing directory
+// properly removes old content and creates new content
+func TestCreateCommand_DirectoryOverwrite(t *testing.T) {
+	tmpDir := t.TempDir()
+	appName := "test-app"
+	appPath := filepath.Join(tmpDir, appName)
+
+	orgDir, err := os.Getwd()
+	require.NoError(t, err)
+
+	err = os.Chdir(tmpDir)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		os.Chdir(orgDir)
+	})
+
+	// Initialize directory with some files
+	err = os.MkdirAll(appPath, DIR_PERM)
+	require.NoError(t, err, "failed to create initial directory")
+
+	// Create some initial files that should be removed after overwrite
+	oldFile1 := filepath.Join(appPath, "old-file-1.txt")
+	oldSubDir := filepath.Join(appPath, "old-subdir")
+
+	err = os.WriteFile(oldFile1, []byte("old content 1"), FILE_PERM)
+	require.NoError(t, err, "failed to create old file 1")
+
+	err = os.MkdirAll(oldSubDir, DIR_PERM)
+	require.NoError(t, err, "failed to create old subdirectory")
+
+	// Verify initial files exist
+	assert.FileExists(t, oldFile1, "old file 1 should exist before overwrite")
+	assert.DirExists(t, oldSubDir, "old subdirectory should exist before overwrite")
+
+	// Manually remove the directory and create the new app
+	err = os.RemoveAll(appPath)
+	require.NoError(t, err, "failed to remove existing directory")
+
+	c := CreateCmd{}
+	err = c.Create(context.Background(), CreateInput{
+		Name:     appName,
+		Language: create.LanguageTypeScript,
+		Template: "sample-app",
+	})
+	require.NoError(t, err, "failed to create new app")
+
+	// Verify old files are gone
+	assert.NoFileExists(t, oldFile1, "old file 1 should not exist after overwrite")
+	assert.NoDirExists(t, oldSubDir, "old subdirectory should not exist after overwrite")
+
+	// Verify new template files exist
+	assert.FileExists(t, filepath.Join(appPath, "index.ts"), "new index.ts should exist")
 }
 
 func getTemplateInfo() []struct {

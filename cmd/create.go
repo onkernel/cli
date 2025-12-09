@@ -27,10 +27,22 @@ func (c CreateCmd) Create(ctx context.Context, ci CreateInput) error {
 		return fmt.Errorf("failed to resolve app path: %w", err)
 	}
 
-	// TODO: handle overwrite gracefully (prompt user)
-	// Check if directory already exists
+	// Check if directory already exists and prompt for overwrite
 	if _, err := os.Stat(appPath); err == nil {
-		return fmt.Errorf("directory %s already exists", ci.Name)
+		overwrite, err := create.PromptForOverwrite(ci.Name)
+		if err != nil {
+			return fmt.Errorf("failed to prompt for overwrite: %w", err)
+		}
+
+		if !overwrite {
+			pterm.Warning.Println("Operation cancelled.")
+			return nil
+		}
+
+		// Remove existing directory
+		if err := os.RemoveAll(appPath); err != nil {
+			return fmt.Errorf("failed to remove existing directory: %w", err)
+		}
 	}
 
 	if err := os.MkdirAll(appPath, 0755); err != nil {
