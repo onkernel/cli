@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/onkernel/cli/pkg/create"
+	"github.com/pterm/pterm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -234,6 +237,14 @@ func TestCreateCommand_DependencyInstallationFails(t *testing.T) {
 		os.Chdir(orgDir)
 	})
 
+	var outputBuf bytes.Buffer
+	multiWriter := io.MultiWriter(&outputBuf, os.Stdout)
+	pterm.SetDefaultOutput(multiWriter)
+
+	t.Cleanup(func() {
+		pterm.SetDefaultOutput(os.Stdout)
+	})
+
 	// Override the install command to use a command that will fail
 	originalInstallCommands := create.InstallCommands
 	create.InstallCommands = map[string]string{
@@ -252,6 +263,93 @@ func TestCreateCommand_DependencyInstallationFails(t *testing.T) {
 		Language: create.LanguageTypeScript,
 		Template: "sample-app",
 	})
+
+	output := outputBuf.String()
+
+	assert.Contains(t, output, "cd test-app", "should print cd command")
+	assert.Contains(t, output, "pnpm install", "should print pnpm install command")
+}
+
+// TestCreateCommand_RequiredToolMissing tests that the app is created
+func TestCreateCommand_RequiredToolMissing(t *testing.T) {
+	tests := []struct {
+		name     string
+		language string
+		template string
+	}{
+		{
+			name:     "typescript with missing pnpm",
+			language: create.LanguageTypeScript,
+			template: "sample-app",
+		},
+		{
+			name:     "python with missing uv",
+			language: create.LanguagePython,
+			template: "sample-app",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			appName := "test-app"
+
+			orgDir, err := os.Getwd()
+			require.NoError(t, err)
+
+			err = os.Chdir(tmpDir)
+			require.NoError(t, err)
+
+			t.Cleanup(func() {
+				os.Chdir(orgDir)
+			})
+
+			// Override the required tool to point to a non-existent command
+			originalRequiredTools := create.RequiredTools
+			create.RequiredTools = map[string]string{
+				create.LanguageTypeScript: "nonexistent-pnpm-tool",
+				create.LanguagePython:     "nonexistent-uv-tool",
+			}
+
+			// Restore original required tools after test
+			t.Cleanup(func() {
+				create.RequiredTools = originalRequiredTools
+			})
+
+			// Create the app - should succeed even though required tool is missing
+			c := CreateCmd{}
+			err = c.Create(context.Background(), CreateInput{
+				Name:     appName,
+				Language: tt.language,
+				Template: tt.template,
+			})
+
+			// Should not return an error - the command should complete successfully
+			// but skip dependency installation
+			require.NoError(t, err, "app creation should succeed even when required tool is missing")
+
+			// Verify the app directory and files were created
+			appPath := filepath.Join(tmpDir, appName)
+			assert.DirExists(t, appPath, "app directory should exist")
+
+			// Language-specific file checks
+			switch tt.language {
+			case create.LanguageTypeScript:
+				assert.FileExists(t, filepath.Join(appPath, "package.json"), "package.json should exist")
+				assert.FileExists(t, filepath.Join(appPath, "index.ts"), "index.ts should exist")
+				assert.FileExists(t, filepath.Join(appPath, "tsconfig.json"), "tsconfig.json should exist")
+
+				// node_modules should NOT exist since pnpm was not available
+				assert.NoDirExists(t, filepath.Join(appPath, "node_modules"), "node_modules should not exist when pnpm is missing")
+			case create.LanguagePython:
+				assert.FileExists(t, filepath.Join(appPath, "pyproject.toml"), "pyproject.toml should exist")
+				assert.FileExists(t, filepath.Join(appPath, "main.py"), "main.py should exist")
+
+				// .venv should NOT exist since uv was not available
+				assert.NoDirExists(t, filepath.Join(appPath, ".venv"), ".venv should not exist when uv is missing")
+			}
+		})
+	}
 }
 
 func getTemplateInfo() []struct {

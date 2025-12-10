@@ -37,7 +37,7 @@ func (c CreateCmd) Create(ctx context.Context, ci CreateInput) error {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	pterm.Println(fmt.Sprintf("\nCreating a new %s %s\n", ci.Language, ci.Template))
+	pterm.Sprintf("\nCreating a new %s %s\n", ci.Language, ci.Template)
 
 	spinner, _ := pterm.DefaultSpinner.Start("Copying template files...")
 
@@ -46,33 +46,12 @@ func (c CreateCmd) Create(ctx context.Context, ci CreateInput) error {
 		return fmt.Errorf("failed to copy template files: %w", err)
 	}
 
-	ok, _ := create.InstallDependencies(appPath, ci.Language)
-	if !ok {
-		pterm.Warning.Println("Failed to install dependencies. Please install them manually:")
-		switch ci.Language {
-		case create.LanguageTypeScript:
-			pterm.Println(fmt.Sprintf("  cd %s", ci.Name))
-			pterm.Println("  npm install")
-		case create.LanguagePython:
-			pterm.Println(fmt.Sprintf("  cd %s", ci.Name))
-			pterm.Println("  uv venv && source .venv/bin/activate && uv sync")
-		}
-		pterm.Println()
-	} else {
-		spinner.Success(fmt.Sprintf("✔ %s environment set up successfully", ci.Language))
+	nextSteps, err := create.InstallDependencies(ci.Name, appPath, ci.Language)
+	if err != nil {
+		return fmt.Errorf("failed to install dependencies: %w", err)
 	}
-
 	pterm.Success.Println("🎉 Kernel app created successfully!")
 	pterm.Println()
-
-	nextSteps := fmt.Sprintf(`Next steps:
-  brew install onkernel/tap/kernel
-  cd %s
-  kernel login  # or: export KERNEL_API_KEY=<YOUR_API_KEY>
-  kernel deploy index.ts
-  kernel invoke ts-basic get-page-title --payload '{"url": "https://www.google.com"}'
-`, ci.Name)
-
 	pterm.FgYellow.Println(nextSteps)
 
 	return nil
