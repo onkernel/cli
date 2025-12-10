@@ -120,6 +120,21 @@ func TestBrowsersList_PrintsEmptyMessage(t *testing.T) {
 	assert.Contains(t, out, "No running browsers found")
 }
 
+func TestBrowsersList_PrintsEmptyMessagePageIsNil(t *testing.T) {
+	setupStdoutCapture(t)
+
+	fake := &FakeBrowsersService{
+		ListFunc: func(ctx context.Context, query kernel.BrowserListParams, opts ...option.RequestOption) (*pagination.OffsetPagination[kernel.BrowserListResponse], error) {
+			return nil, nil
+		},
+	}
+	b := BrowsersCmd{browsers: fake}
+	_ = b.List(context.Background(), BrowsersListInput{})
+
+	out := outBuf.String()
+	assert.Contains(t, out, "No running browsers found")
+}
+
 func TestBrowsersList_PrintsTableWithRows(t *testing.T) {
 	setupStdoutCapture(t)
 

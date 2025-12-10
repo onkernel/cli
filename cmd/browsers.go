@@ -219,10 +219,13 @@ func (b BrowsersCmd) List(ctx context.Context, in BrowsersListInput) error {
 		return util.CleanedUpSdkError{Err: err}
 	}
 
-	browsers := page.Items
+	var browsers []kernel.BrowserListResponse
+	if page != nil {
+		browsers = page.Items
+	}
 
 	if in.Output == "json" {
-		if browsers == nil {
+		if len(browsers) == 0 {
 			fmt.Println("[]")
 			return nil
 		}
