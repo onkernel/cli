@@ -11,17 +11,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type CreateInput struct {
-	Name     string
-	Language string
-	Template string
-}
-
 // CreateCmd is a cobra-independent command handler for create operations
 type CreateCmd struct{}
 
 // Create executes the creating a new Kernel app logic
-func (c CreateCmd) Create(ctx context.Context, ci CreateInput) error {
+func (c CreateCmd) Create(ctx context.Context, ci create.CreateInput) error {
 	appPath, err := filepath.Abs(ci.Name)
 	if err != nil {
 		return fmt.Errorf("failed to resolve app path: %w", err)
@@ -58,7 +52,7 @@ func (c CreateCmd) Create(ctx context.Context, ci CreateInput) error {
 		return fmt.Errorf("failed to copy template files: %w", err)
 	}
 
-	nextSteps, err := create.InstallDependencies(ci.Name, appPath, ci.Language)
+	nextSteps, err := create.InstallDependencies(appPath, ci)
 	if err != nil {
 		return fmt.Errorf("failed to install dependencies: %w", err)
 	}
@@ -103,7 +97,7 @@ func runCreateApp(cmd *cobra.Command, args []string) error {
 	}
 
 	c := CreateCmd{}
-	return c.Create(cmd.Context(), CreateInput{
+	return c.Create(cmd.Context(), create.CreateInput{
 		Name:     appName,
 		Language: language,
 		Template: template,

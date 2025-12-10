@@ -22,14 +22,14 @@ const (
 func TestCreateCommand(t *testing.T) {
 	tests := []struct {
 		name        string
-		input       CreateInput
+		input       create.CreateInput
 		wantErr     bool
 		errContains string
 		validate    func(t *testing.T, appPath string)
 	}{
 		{
 			name: "create typescript sample-app",
-			input: CreateInput{
+			input: create.CreateInput{
 				Name:     "test-app",
 				Language: "typescript",
 				Template: "sample-app",
@@ -44,7 +44,7 @@ func TestCreateCommand(t *testing.T) {
 		},
 		{
 			name: "fail with invalid template",
-			input: CreateInput{
+			input: create.CreateInput{
 				Name:     "test-app",
 				Language: "typescript",
 				Template: "nonexistent",
@@ -117,7 +117,7 @@ func TestAllTemplatesWithDependencies(t *testing.T) {
 
 			// Create the app
 			c := CreateCmd{}
-			err = c.Create(context.Background(), CreateInput{
+			err = c.Create(context.Background(), create.CreateInput{
 				Name:     appName,
 				Language: tt.language,
 				Template: tt.template,
@@ -263,7 +263,7 @@ func TestCreateCommand_DependencyInstallationFails(t *testing.T) {
 
 	// Create the app - should succeed even though dependency installation fails
 	c := CreateCmd{}
-	err = c.Create(context.Background(), CreateInput{
+	err = c.Create(context.Background(), create.CreateInput{
 		Name:     appName,
 		Language: create.LanguageTypeScript,
 		Template: "sample-app",
@@ -323,7 +323,7 @@ func TestCreateCommand_RequiredToolMissing(t *testing.T) {
 
 			// Create the app - should succeed even though required tool is missing
 			c := CreateCmd{}
-			err = c.Create(context.Background(), CreateInput{
+			err = c.Create(context.Background(), create.CreateInput{
 				Name:     appName,
 				Language: tt.language,
 				Template: tt.template,
@@ -397,7 +397,7 @@ func TestCreateCommand_DirectoryOverwrite(t *testing.T) {
 	require.NoError(t, err, "failed to remove existing directory")
 
 	c := CreateCmd{}
-	err = c.Create(context.Background(), CreateInput{
+	err = c.Create(context.Background(), create.CreateInput{
 		Name:     appName,
 		Language: create.LanguageTypeScript,
 		Template: "sample-app",
@@ -474,7 +474,7 @@ func TestCreateCommand_InvalidLanguageTemplateCombinations(t *testing.T) {
 			})
 
 			c := CreateCmd{}
-			err = c.Create(context.Background(), CreateInput{
+			err = c.Create(context.Background(), create.CreateInput{
 				Name:     "test-app",
 				Language: tt.language,
 				Template: tt.template,
