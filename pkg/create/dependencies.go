@@ -8,7 +8,11 @@ import (
 )
 
 // InstallDependencies sets up project dependencies based on language
-func InstallDependencies(appName string, appPath string, language string) (string, error) {
+func InstallDependencies(appPath string, ci CreateInput) (string, error) {
+	language := ci.Language
+	template := ci.Template
+	appName := ci.Name
+
 	installCommand, ok := InstallCommands[language]
 	if !ok {
 		return "", fmt.Errorf("unsupported language: %s", language)
@@ -16,7 +20,7 @@ func InstallDependencies(appName string, appPath string, language string) (strin
 
 	requiredTool := RequiredTools[language]
 	if requiredTool != "" && !RequiredTools.CheckToolAvailable(language) {
-		return getNextStepsWithToolInstall(appName, language, requiredTool), nil
+		return getNextStepsWithToolInstall(appName, language, requiredTool, template), nil
 	}
 
 	spinner, _ := pterm.DefaultSpinner.Start(pterm.Sprintf("Setting up %s environment...", language))
@@ -36,16 +40,19 @@ func InstallDependencies(appName string, appPath string, language string) (strin
 			pterm.Println("  uv venv && source .venv/bin/activate && uv sync")
 		}
 		pterm.Println()
-		return getNextStepsStandard(appName), nil
+		return getNextStepsStandard(appName, language, template), nil
 	}
 
 	spinner.Success(pterm.Sprintf("✔ %s environment set up successfully", language))
 
-	return getNextStepsStandard(appName), nil
+	return getNextStepsStandard(appName, language, template), nil
 }
 
 // getNextStepsWithToolInstall returns next steps message including tool installation
-func getNextStepsWithToolInstall(appName string, language string, requiredTool string) string {
+func getNextStepsWithToolInstall(appName string, language string, requiredTool string, template string) string {
+	deployCommand := GetDeployCommand(language, template)
+	invokeCommand := GetInvokeSample(language, template)
+
 	pterm.Warning.Printfln(" %s is not installed or not in PATH", requiredTool)
 
 	switch language {
@@ -63,9 +70,9 @@ func getNextStepsWithToolInstall(appName string, language string, requiredTool s
   # Deploy your app:
   brew install onkernel/tap/kernel
   kernel login  # or: export KERNEL_API_KEY=<YOUR_API_KEY>
-  kernel deploy index.ts
-  kernel invoke ts-basic get-page-title --payload '{"url": "https://www.google.com"}'
-`, appName)
+  %s
+  %s
+`, appName, deployCommand, invokeCommand)
 	case LanguagePython:
 		return pterm.FgYellow.Sprintf(`Next steps:
   # Install uv (choose one):
@@ -80,21 +87,23 @@ func getNextStepsWithToolInstall(appName string, language string, requiredTool s
   # Deploy your app:
   brew install onkernel/tap/kernel
   kernel login  # or: export KERNEL_API_KEY=<YOUR_API_KEY>
-  kernel deploy index.py
-  kernel invoke py-basic get-page-title --payload '{"url": "https://www.google.com"}'
-`, appName)
+  %s
+  %s
+`, appName, deployCommand, invokeCommand)
 	default:
 		return ""
 	}
 }
 
 // getNextStepsStandard returns standard next steps message
-func getNextStepsStandard(appName string) string {
+func getNextStepsStandard(appName string, language string, template string) string {
+	deployCommand := GetDeployCommand(language, template)
+	invokeCommand := GetInvokeSample(language, template)
 	return pterm.FgYellow.Sprintf(`Next steps:
   brew install onkernel/tap/kernel
   cd %s
   kernel login  # or: export KERNEL_API_KEY=<YOUR_API_KEY>
-  kernel deploy index.ts
-  kernel invoke ts-basic get-page-title --payload '{"url": "https://www.google.com"}'
-`, appName)
+  %s
+  %s
+`, appName, deployCommand, invokeCommand)
 }

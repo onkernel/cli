@@ -122,3 +122,16 @@ func PromptForTemplate(providedTemplate string, providedLanguage string) (string
 	pterm.Warning.Printfln("Template '%s' not found. Please select from available templates.\n", providedTemplate)
 	return handleTemplatePrompt(templateKVs)
 }
+
+// PromptForOverwrite prompts the user to confirm overwriting an existing directory.
+func PromptForOverwrite(dirName string) (bool, error) {
+	overwrite, err := pterm.DefaultInteractiveConfirm.
+		WithDefaultText(fmt.Sprintf("\nDirectory %s already exists. Overwrite?", dirName)).
+		WithDefaultValue(false).
+		Show()
+	if err != nil {
+		return false, fmt.Errorf("failed to prompt for overwrite: %w", err)
+	}
+
+	return overwrite, nil
+}

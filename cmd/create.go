@@ -11,26 +11,32 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type CreateInput struct {
-	Name     string
-	Language string
-	Template string
-}
-
 // CreateCmd is a cobra-independent command handler for create operations
 type CreateCmd struct{}
 
 // Create executes the creating a new Kernel app logic
-func (c CreateCmd) Create(ctx context.Context, ci CreateInput) error {
+func (c CreateCmd) Create(ctx context.Context, ci create.CreateInput) error {
 	appPath, err := filepath.Abs(ci.Name)
 	if err != nil {
 		return fmt.Errorf("failed to resolve app path: %w", err)
 	}
 
-	// TODO: handle overwrite gracefully (prompt user)
-	// Check if directory already exists
+	// Check if directory already exists and prompt for overwrite
 	if _, err := os.Stat(appPath); err == nil {
-		return fmt.Errorf("directory %s already exists", ci.Name)
+		overwrite, err := create.PromptForOverwrite(ci.Name)
+		if err != nil {
+			return fmt.Errorf("failed to prompt for overwrite: %w", err)
+		}
+
+		if !overwrite {
+			pterm.Warning.Println("Operation cancelled.")
+			return nil
+		}
+
+		// Remove existing directory
+		if err := os.RemoveAll(appPath); err != nil {
+			return fmt.Errorf("failed to remove existing directory: %w", err)
+		}
 	}
 
 	if err := os.MkdirAll(appPath, 0755); err != nil {
@@ -45,8 +51,9 @@ func (c CreateCmd) Create(ctx context.Context, ci CreateInput) error {
 		spinner.Fail("Failed to copy template files")
 		return fmt.Errorf("failed to copy template files: %w", err)
 	}
+	spinner.Success()
 
-	nextSteps, err := create.InstallDependencies(ci.Name, appPath, ci.Language)
+	nextSteps, err := create.InstallDependencies(appPath, ci)
 	if err != nil {
 		return fmt.Errorf("failed to install dependencies: %w", err)
 	}
@@ -91,7 +98,7 @@ func runCreateApp(cmd *cobra.Command, args []string) error {
 	}
 
 	c := CreateCmd{}
-	return c.Create(cmd.Context(), CreateInput{
+	return c.Create(cmd.Context(), create.CreateInput{
 		Name:     appName,
 		Language: language,
 		Template: template,

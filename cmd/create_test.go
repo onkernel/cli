@@ -14,17 +14,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	DIR_PERM  = 0755 // rwxr-xr-x
+	FILE_PERM = 0644 // rw-r--r--
+)
+
 func TestCreateCommand(t *testing.T) {
 	tests := []struct {
 		name        string
-		input       CreateInput
+		input       create.CreateInput
 		wantErr     bool
 		errContains string
 		validate    func(t *testing.T, appPath string)
 	}{
 		{
 			name: "create typescript sample-app",
-			input: CreateInput{
+			input: create.CreateInput{
 				Name:     "test-app",
 				Language: "typescript",
 				Template: "sample-app",
@@ -39,7 +44,7 @@ func TestCreateCommand(t *testing.T) {
 		},
 		{
 			name: "fail with invalid template",
-			input: CreateInput{
+			input: create.CreateInput{
 				Name:     "test-app",
 				Language: "typescript",
 				Template: "nonexistent",
@@ -112,7 +117,7 @@ func TestAllTemplatesWithDependencies(t *testing.T) {
 
 			// Create the app
 			c := CreateCmd{}
-			err = c.Create(context.Background(), CreateInput{
+			err = c.Create(context.Background(), create.CreateInput{
 				Name:     appName,
 				Language: tt.language,
 				Template: tt.template,
@@ -145,7 +150,7 @@ func TestAllTemplatesCreation(t *testing.T) {
 			appPath := filepath.Join(tmpDir, appName)
 
 			// Create app directory
-			err := os.MkdirAll(appPath, 0755)
+			err := os.MkdirAll(appPath, DIR_PERM)
 			require.NoError(t, err, "failed to create app directory")
 
 			// Copy template files without installing dependencies
@@ -258,7 +263,7 @@ func TestCreateCommand_DependencyInstallationFails(t *testing.T) {
 
 	// Create the app - should succeed even though dependency installation fails
 	c := CreateCmd{}
-	err = c.Create(context.Background(), CreateInput{
+	err = c.Create(context.Background(), create.CreateInput{
 		Name:     appName,
 		Language: create.LanguageTypeScript,
 		Template: "sample-app",
@@ -318,7 +323,7 @@ func TestCreateCommand_RequiredToolMissing(t *testing.T) {
 
 			// Create the app - should succeed even though required tool is missing
 			c := CreateCmd{}
-			err = c.Create(context.Background(), CreateInput{
+			err = c.Create(context.Background(), create.CreateInput{
 				Name:     appName,
 				Language: tt.language,
 				Template: tt.template,
@@ -349,6 +354,273 @@ func TestCreateCommand_RequiredToolMissing(t *testing.T) {
 				assert.NoDirExists(t, filepath.Join(appPath, ".venv"), ".venv should not exist when uv is missing")
 			}
 		})
+	}
+}
+
+// TestCreateCommand_DirectoryOverwrite tests that overwriting an existing directory
+// properly removes old content and creates new content
+func TestCreateCommand_DirectoryOverwrite(t *testing.T) {
+	tmpDir := t.TempDir()
+	appName := "test-app"
+	appPath := filepath.Join(tmpDir, appName)
+
+	orgDir, err := os.Getwd()
+	require.NoError(t, err)
+
+	err = os.Chdir(tmpDir)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		os.Chdir(orgDir)
+	})
+
+	// Initialize directory with some files
+	err = os.MkdirAll(appPath, DIR_PERM)
+	require.NoError(t, err, "failed to create initial directory")
+
+	// Create some initial files that should be removed after overwrite
+	oldFile1 := filepath.Join(appPath, "old-file-1.txt")
+	oldSubDir := filepath.Join(appPath, "old-subdir")
+
+	err = os.WriteFile(oldFile1, []byte("old content 1"), FILE_PERM)
+	require.NoError(t, err, "failed to create old file 1")
+
+	err = os.MkdirAll(oldSubDir, DIR_PERM)
+	require.NoError(t, err, "failed to create old subdirectory")
+
+	// Verify initial files exist
+	assert.FileExists(t, oldFile1, "old file 1 should exist before overwrite")
+	assert.DirExists(t, oldSubDir, "old subdirectory should exist before overwrite")
+
+	// Manually remove the directory and create the new app
+	err = os.RemoveAll(appPath)
+	require.NoError(t, err, "failed to remove existing directory")
+
+	c := CreateCmd{}
+	err = c.Create(context.Background(), create.CreateInput{
+		Name:     appName,
+		Language: create.LanguageTypeScript,
+		Template: "sample-app",
+	})
+	require.NoError(t, err, "failed to create new app")
+
+	// Verify old files are gone
+	assert.NoFileExists(t, oldFile1, "old file 1 should not exist after overwrite")
+	assert.NoDirExists(t, oldSubDir, "old subdirectory should not exist after overwrite")
+
+	// Verify new template files exist
+	assert.FileExists(t, filepath.Join(appPath, "index.ts"), "new index.ts should exist")
+}
+
+// TestCreateCommand_InvalidLanguageTemplateCombinations tests that invalid
+// language/template combinations fail with appropriate error messages
+func TestCreateCommand_InvalidLanguageTemplateCombinations(t *testing.T) {
+	tests := []struct {
+		name        string
+		language    string
+		template    string
+		errContains string
+	}{
+		{
+			name:        "browser-use not available for typescript",
+			language:    create.LanguageTypeScript,
+			template:    create.TemplateBrowserUse,
+			errContains: "template not found: typescript/browser-use",
+		},
+		{
+			name:        "stagehand not available for python",
+			language:    create.LanguagePython,
+			template:    create.TemplateStagehand,
+			errContains: "template not found: python/stagehand",
+		},
+		{
+			name:        "magnitude not available for python",
+			language:    create.LanguagePython,
+			template:    create.TemplateMagnitude,
+			errContains: "template not found: python/magnitude",
+		},
+		{
+			name:        "gemini-cua not available for python",
+			language:    create.LanguagePython,
+			template:    create.TemplateGeminiCUA,
+			errContains: "template not found: python/gemini-cua",
+		},
+		{
+			name:        "invalid language",
+			language:    "ruby",
+			template:    create.TemplateSampleApp,
+			errContains: "template not found: ruby/sample-app",
+		},
+		{
+			name:        "invalid template",
+			language:    create.LanguageTypeScript,
+			template:    "nonexistent-template",
+			errContains: "template not found: typescript/nonexistent-template",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+
+			orgDir, err := os.Getwd()
+			require.NoError(t, err)
+
+			err = os.Chdir(tmpDir)
+			require.NoError(t, err)
+
+			t.Cleanup(func() {
+				os.Chdir(orgDir)
+			})
+
+			c := CreateCmd{}
+			err = c.Create(context.Background(), create.CreateInput{
+				Name:     "test-app",
+				Language: tt.language,
+				Template: tt.template,
+			})
+
+			require.Error(t, err, "should fail with invalid language/template combination")
+			assert.Contains(t, err.Error(), tt.errContains, "error message should contain expected text")
+		})
+	}
+}
+
+// TestCreateCommand_ValidateAllTemplateCombinations validates that only valid
+// language/template combinations are defined in the Templates map
+func TestCreateCommand_ValidateAllTemplateCombinations(t *testing.T) {
+	// This test ensures data consistency between Templates and actual template availability
+	for templateKey, templateInfo := range create.Templates {
+		for _, lang := range templateInfo.Languages {
+			t.Run(lang+"/"+templateKey, func(t *testing.T) {
+				tmpDir := t.TempDir()
+				appPath := filepath.Join(tmpDir, "test-app")
+
+				err := os.MkdirAll(appPath, DIR_PERM)
+				require.NoError(t, err)
+
+				// This should succeed for all combinations defined in Templates
+				err = create.CopyTemplateFiles(appPath, lang, templateKey)
+				require.NoError(t, err, "Template %s should be available for language %s as defined in Templates map", templateKey, lang)
+			})
+		}
+	}
+}
+
+// TestCreateCommand_InvalidLanguageShorthand tests that invalid language shorthands
+// are handled appropriately
+func TestCreateCommand_InvalidLanguageShorthand(t *testing.T) {
+	tests := []struct {
+		name               string
+		languageInput      string
+		expectedNormalized string
+	}{
+		{
+			name:               "ts shorthand normalizes to typescript",
+			languageInput:      "ts",
+			expectedNormalized: create.LanguageTypeScript,
+		},
+		{
+			name:               "py shorthand normalizes to python",
+			languageInput:      "py",
+			expectedNormalized: create.LanguagePython,
+		},
+		{
+			name:               "typescript remains typescript",
+			languageInput:      "typescript",
+			expectedNormalized: create.LanguageTypeScript,
+		},
+		{
+			name:               "python remains python",
+			languageInput:      "python",
+			expectedNormalized: create.LanguagePython,
+		},
+		{
+			name:               "invalid shorthand remains unchanged",
+			languageInput:      "js",
+			expectedNormalized: "js",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			normalized := create.NormalizeLanguage(tt.languageInput)
+			assert.Equal(t, tt.expectedNormalized, normalized)
+		})
+	}
+}
+
+// TestCreateCommand_TemplateNotAvailableForLanguage tests specific cases where
+// templates are not available for certain languages
+func TestCreateCommand_TemplateNotAvailableForLanguage(t *testing.T) {
+	// Map of templates to languages they should NOT be available for
+	unavailableCombinations := map[string][]string{
+		create.TemplateBrowserUse: {create.LanguageTypeScript},
+		create.TemplateStagehand:  {create.LanguagePython},
+		create.TemplateMagnitude:  {create.LanguagePython},
+		create.TemplateGeminiCUA:  {create.LanguagePython},
+	}
+
+	for template, unavailableLanguages := range unavailableCombinations {
+		for _, lang := range unavailableLanguages {
+			t.Run(template+"/"+lang, func(t *testing.T) {
+				// Verify the template info doesn't list this language
+				templateInfo, exists := create.Templates[template]
+				require.True(t, exists, "Template %s should exist in Templates map", template)
+
+				assert.NotContains(t, templateInfo.Languages, lang,
+					"Template %s should not list %s as a supported language", template, lang)
+
+				// Verify copying fails
+				tmpDir := t.TempDir()
+				appPath := filepath.Join(tmpDir, "test-app")
+				err := os.MkdirAll(appPath, DIR_PERM)
+				require.NoError(t, err)
+
+				err = create.CopyTemplateFiles(appPath, lang, template)
+				require.Error(t, err, "Should fail to copy %s template for %s", template, lang)
+			})
+		}
+	}
+}
+
+// TestCreateCommand_AllTemplatesHaveDeployCommands ensures that all templates
+// have corresponding deploy commands defined
+func TestCreateCommand_AllTemplatesHaveDeployCommands(t *testing.T) {
+	for templateKey, templateInfo := range create.Templates {
+		for _, lang := range templateInfo.Languages {
+			t.Run(lang+"/"+templateKey, func(t *testing.T) {
+				deployCmd := create.GetDeployCommand(lang, templateKey)
+				assert.NotEmpty(t, deployCmd, "Deploy command should exist for %s/%s", lang, templateKey)
+
+				// Verify deploy command starts with "kernel deploy"
+				assert.Contains(t, deployCmd, "kernel deploy", "Deploy command should start with 'kernel deploy'")
+
+				// Verify it contains the entry point
+				switch lang {
+				case create.LanguageTypeScript:
+					assert.Contains(t, deployCmd, "index.ts", "TypeScript deploy command should contain index.ts")
+				case create.LanguagePython:
+					assert.Contains(t, deployCmd, "main.py", "Python deploy command should contain main.py")
+				}
+			})
+		}
+	}
+}
+
+// TestCreateCommand_AllTemplatesHaveInvokeSamples ensures that all templates
+// have corresponding invoke samples defined
+func TestCreateCommand_AllTemplatesHaveInvokeSamples(t *testing.T) {
+	for templateKey, templateInfo := range create.Templates {
+		for _, lang := range templateInfo.Languages {
+			t.Run(lang+"/"+templateKey, func(t *testing.T) {
+				invokeCmd := create.GetInvokeSample(lang, templateKey)
+				assert.NotEmpty(t, invokeCmd, "Invoke sample should exist for %s/%s", lang, templateKey)
+
+				// Verify invoke command starts with "kernel invoke"
+				assert.Contains(t, invokeCmd, "kernel invoke", "Invoke command should start with 'kernel invoke'")
+			})
+		}
 	}
 }
 

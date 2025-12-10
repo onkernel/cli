@@ -2,6 +2,12 @@ package create
 
 import "os/exec"
 
+type CreateInput struct {
+	Name     string
+	Language string
+	Template string
+}
+
 const (
 	DefaultAppName = "my-kernel-app"
 	AppNamePrompt  = "What is the name of your project?"
