@@ -1,5 +1,7 @@
 package create
 
+import "os/exec"
+
 const (
 	DefaultAppName = "my-kernel-app"
 	AppNamePrompt  = "What is the name of your project?"
@@ -13,6 +15,23 @@ const (
 	LanguageShorthandTypeScript = "ts"
 	LanguageShorthandPython     = "py"
 )
+
+type Tools map[string]string
+
+var RequiredTools = Tools{
+	LanguageTypeScript: "pnpm",
+	LanguagePython:     "uv",
+}
+
+func (t Tools) CheckToolAvailable(tool string) bool {
+	_, err := exec.LookPath(t[tool])
+	return err == nil
+}
+
+var InstallCommands = map[string]string{
+	LanguageTypeScript: "pnpm install",
+	LanguagePython:     "uv venv",
+}
 
 // SupportedLanguages returns a list of all supported languages
 var SupportedLanguages = []string{
