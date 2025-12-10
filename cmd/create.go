@@ -37,7 +37,7 @@ func (c CreateCmd) Create(ctx context.Context, ci CreateInput) error {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	pterm.Sprintf("\nCreating a new %s %s\n", ci.Language, ci.Template)
+	pterm.Printfln("\nCreating a new %s %s", ci.Language, ci.Template)
 
 	spinner, _ := pterm.DefaultSpinner.Start("Copying template files...")
 
