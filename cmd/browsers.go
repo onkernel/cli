@@ -397,13 +397,9 @@ func buildBrowserTableData(sessionID, cdpURL, liveViewURL string, persistence ke
 
 func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 	if !in.SkipConfirm {
-		found, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+		found, err := b.browsers.Get(ctx, in.Identifier)
 		if err != nil {
 			return util.CleanedUpSdkError{Err: err}
-		}
-		if found == nil {
-			pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-			return nil
 		}
 
 		confirmMsg := fmt.Sprintf("Are you sure you want to delete browser \"%s\"?", in.Identifier)
@@ -464,10 +460,6 @@ func (b BrowsersCmd) View(ctx context.Context, in BrowsersViewInput) error {
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
 	}
-	if browser == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
-	}
 	if browser.BrowserLiveViewURL == "" {
 		if browser.Headless {
 			pterm.Warning.Println("This browser is running in headless mode and does not have a live view URL")
@@ -491,11 +483,6 @@ func (b BrowsersCmd) Get(ctx context.Context, in BrowsersGetInput) error {
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
 	}
-	if browser == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
-	}
-
 	if in.Output == "json" {
 		bs, err := json.MarshalIndent(browser, "", "  ")
 		if err != nil {
@@ -552,13 +539,9 @@ func (b BrowsersCmd) LogsStream(ctx context.Context, in BrowsersLogsStreamInput)
 		pterm.Error.Println("logs service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	params := kernel.BrowserLogStreamParams{Source: kernel.BrowserLogStreamParamsSource(in.Source)}
 	if in.Follow.Set {
@@ -658,13 +641,9 @@ func (b BrowsersCmd) ComputerClickMouse(ctx context.Context, in BrowsersComputer
 		pterm.Error.Println("computer service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	body := kernel.BrowserComputerClickMouseParams{X: in.X, Y: in.Y}
 	if in.NumClicks > 0 {
@@ -691,13 +670,9 @@ func (b BrowsersCmd) ComputerMoveMouse(ctx context.Context, in BrowsersComputerM
 		pterm.Error.Println("computer service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	body := kernel.BrowserComputerMoveMouseParams{X: in.X, Y: in.Y}
 	if len(in.HoldKeys) > 0 {
@@ -715,13 +690,9 @@ func (b BrowsersCmd) ComputerScreenshot(ctx context.Context, in BrowsersComputer
 		pterm.Error.Println("computer service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	var body kernel.BrowserComputerCaptureScreenshotParams
 	if in.HasRegion {
@@ -755,13 +726,9 @@ func (b BrowsersCmd) ComputerTypeText(ctx context.Context, in BrowsersComputerTy
 		pterm.Error.Println("computer service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	body := kernel.BrowserComputerTypeTextParams{Text: in.Text}
 	if in.Delay > 0 {
@@ -779,13 +746,9 @@ func (b BrowsersCmd) ComputerPressKey(ctx context.Context, in BrowsersComputerPr
 		pterm.Error.Println("computer service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	if len(in.Keys) == 0 {
 		pterm.Error.Println("no keys specified")
@@ -810,13 +773,9 @@ func (b BrowsersCmd) ComputerScroll(ctx context.Context, in BrowsersComputerScro
 		pterm.Error.Println("computer service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	body := kernel.BrowserComputerScrollParams{X: in.X, Y: in.Y}
 	if in.DeltaXSet {
@@ -840,13 +799,9 @@ func (b BrowsersCmd) ComputerDragMouse(ctx context.Context, in BrowsersComputerD
 		pterm.Error.Println("computer service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	if len(in.Path) < 2 {
 		pterm.Error.Println("path must include at least two points")
@@ -880,13 +835,9 @@ func (b BrowsersCmd) ComputerSetCursor(ctx context.Context, in BrowsersComputerS
 		pterm.Error.Println("computer service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	body := kernel.BrowserComputerSetCursorVisibilityParams{Hidden: in.Hidden}
 	_, err = b.computer.SetCursorVisibility(ctx, br.SessionID, body)
@@ -924,13 +875,9 @@ type BrowsersReplaysDownloadInput struct {
 }
 
 func (b BrowsersCmd) ReplaysList(ctx context.Context, in BrowsersReplaysListInput) error {
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	items, err := b.replays.List(ctx, br.SessionID)
 	if err != nil {
@@ -949,13 +896,9 @@ func (b BrowsersCmd) ReplaysList(ctx context.Context, in BrowsersReplaysListInpu
 }
 
 func (b BrowsersCmd) ReplaysStart(ctx context.Context, in BrowsersReplaysStartInput) error {
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	body := kernel.BrowserReplayStartParams{}
 	if in.Framerate > 0 {
@@ -974,13 +917,9 @@ func (b BrowsersCmd) ReplaysStart(ctx context.Context, in BrowsersReplaysStartIn
 }
 
 func (b BrowsersCmd) ReplaysStop(ctx context.Context, in BrowsersReplaysStopInput) error {
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	err = b.replays.Stop(ctx, in.ReplayID, kernel.BrowserReplayStopParams{ID: br.SessionID})
 	if err != nil {
@@ -991,13 +930,9 @@ func (b BrowsersCmd) ReplaysStop(ctx context.Context, in BrowsersReplaysStopInpu
 }
 
 func (b BrowsersCmd) ReplaysDownload(ctx context.Context, in BrowsersReplaysDownloadInput) error {
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	res, err := b.replays.Download(ctx, in.ReplayID, kernel.BrowserReplayDownloadParams{ID: br.SessionID})
 	if err != nil {
@@ -1070,13 +1005,9 @@ func (b BrowsersCmd) PlaywrightExecute(ctx context.Context, in BrowsersPlaywrigh
 		pterm.Error.Println("playwright service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	params := kernel.BrowserPlaywrightExecuteParams{Code: in.Code}
 	if in.Timeout > 0 {
@@ -1116,13 +1047,9 @@ func (b BrowsersCmd) ProcessExec(ctx context.Context, in BrowsersProcessExecInpu
 		pterm.Error.Println("process service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	params := kernel.BrowserProcessExecParams{Command: in.Command}
 	if len(in.Args) > 0 {
@@ -1178,13 +1105,9 @@ func (b BrowsersCmd) ProcessSpawn(ctx context.Context, in BrowsersProcessSpawnIn
 		pterm.Error.Println("process service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	params := kernel.BrowserProcessSpawnParams{Command: in.Command}
 	if len(in.Args) > 0 {
@@ -1216,13 +1139,9 @@ func (b BrowsersCmd) ProcessKill(ctx context.Context, in BrowsersProcessKillInpu
 		pterm.Error.Println("process service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	params := kernel.BrowserProcessKillParams{ID: br.SessionID, Signal: kernel.BrowserProcessKillParamsSignal(in.Signal)}
 	_, err = b.process.Kill(ctx, in.ProcessID, params)
@@ -1238,13 +1157,9 @@ func (b BrowsersCmd) ProcessStatus(ctx context.Context, in BrowsersProcessStatus
 		pterm.Error.Println("process service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	res, err := b.process.Status(ctx, in.ProcessID, kernel.BrowserProcessStatusParams{ID: br.SessionID})
 	if err != nil {
@@ -1260,13 +1175,9 @@ func (b BrowsersCmd) ProcessStdin(ctx context.Context, in BrowsersProcessStdinIn
 		pterm.Error.Println("process service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	_, err = b.process.Stdin(ctx, in.ProcessID, kernel.BrowserProcessStdinParams{ID: br.SessionID, DataB64: in.DataB64})
 	if err != nil {
@@ -1281,13 +1192,9 @@ func (b BrowsersCmd) ProcessStdoutStream(ctx context.Context, in BrowsersProcess
 		pterm.Error.Println("process service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	stream := b.process.StdoutStreamStreaming(ctx, in.ProcessID, kernel.BrowserProcessStdoutStreamParams{ID: br.SessionID})
 	if stream == nil {
@@ -1401,13 +1308,9 @@ func (b BrowsersCmd) FSNewDirectory(ctx context.Context, in BrowsersFSNewDirInpu
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	params := kernel.BrowserFNewDirectoryParams{Path: in.Path}
 	if in.Mode != "" {
@@ -1425,13 +1328,9 @@ func (b BrowsersCmd) FSDeleteDirectory(ctx context.Context, in BrowsersFSDeleteD
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	if err := b.fs.DeleteDirectory(ctx, br.SessionID, kernel.BrowserFDeleteDirectoryParams{Path: in.Path}); err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -1445,13 +1344,9 @@ func (b BrowsersCmd) FSDeleteFile(ctx context.Context, in BrowsersFSDeleteFileIn
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	if err := b.fs.DeleteFile(ctx, br.SessionID, kernel.BrowserFDeleteFileParams{Path: in.Path}); err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -1465,13 +1360,9 @@ func (b BrowsersCmd) FSDownloadDirZip(ctx context.Context, in BrowsersFSDownload
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	res, err := b.fs.DownloadDirZip(ctx, br.SessionID, kernel.BrowserFDownloadDirZipParams{Path: in.Path})
 	if err != nil {
@@ -1502,13 +1393,9 @@ func (b BrowsersCmd) FSFileInfo(ctx context.Context, in BrowsersFSFileInfoInput)
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	res, err := b.fs.FileInfo(ctx, br.SessionID, kernel.BrowserFFileInfoParams{Path: in.Path})
 	if err != nil {
@@ -1524,13 +1411,9 @@ func (b BrowsersCmd) FSListFiles(ctx context.Context, in BrowsersFSListFilesInpu
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	res, err := b.fs.ListFiles(ctx, br.SessionID, kernel.BrowserFListFilesParams{Path: in.Path})
 	if err != nil {
@@ -1553,13 +1436,9 @@ func (b BrowsersCmd) FSMove(ctx context.Context, in BrowsersFSMoveInput) error {
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	if err := b.fs.Move(ctx, br.SessionID, kernel.BrowserFMoveParams{SrcPath: in.SrcPath, DestPath: in.DestPath}); err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -1573,13 +1452,9 @@ func (b BrowsersCmd) FSReadFile(ctx context.Context, in BrowsersFSReadFileInput)
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	res, err := b.fs.ReadFile(ctx, br.SessionID, kernel.BrowserFReadFileParams{Path: in.Path})
 	if err != nil {
@@ -1609,13 +1484,9 @@ func (b BrowsersCmd) FSSetPermissions(ctx context.Context, in BrowsersFSSetPerms
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	params := kernel.BrowserFSetFilePermissionsParams{Path: in.Path, Mode: in.Mode}
 	if in.Owner != "" {
@@ -1636,13 +1507,9 @@ func (b BrowsersCmd) FSUpload(ctx context.Context, in BrowsersFSUploadInput) err
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	var files []kernel.BrowserFUploadParamsFile
 	var toClose []io.Closer
@@ -1698,13 +1565,9 @@ func (b BrowsersCmd) FSUploadZip(ctx context.Context, in BrowsersFSUploadZipInpu
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	f, err := os.Open(in.ZipPath)
 	if err != nil {
@@ -1724,13 +1587,9 @@ func (b BrowsersCmd) FSWriteFile(ctx context.Context, in BrowsersFSWriteFileInpu
 		pterm.Error.Println("fs service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 	var reader io.Reader
 	if in.SourcePath != "" {
@@ -1761,13 +1620,9 @@ func (b BrowsersCmd) ExtensionsUpload(ctx context.Context, in BrowsersExtensions
 		pterm.Error.Println("browsers service not available")
 		return nil
 	}
-	br, err := b.resolveBrowserByIdentifier(ctx, in.Identifier)
+	br, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
-	}
-	if br == nil {
-		pterm.Error.Printf("Browser '%s' not found\n", in.Identifier)
-		return nil
 	}
 
 	if len(in.ExtensionPaths) == 0 {
@@ -2716,13 +2571,4 @@ func truncateURL(url string, maxLen int) string {
 		return url
 	}
 	return url[:maxLen-3] + "..."
-}
-
-// resolveBrowserByIdentifier finds a browser by id. Id can be session ID or persistent ID (backward compatibility).
-func (b BrowsersCmd) resolveBrowserByIdentifier(ctx context.Context, identifier string) (*kernel.BrowserGetResponse, error) {
-	browser, err := b.browsers.Get(ctx, identifier)
-	if err != nil {
-		return nil, err
-	}
-	return browser, nil
 }
