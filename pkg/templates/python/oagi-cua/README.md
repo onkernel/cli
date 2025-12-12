@@ -48,7 +48,7 @@ Execute structured workflows with predefined steps:
 
 ```bash
 kernel invoke python-oagi-cua oagi-tasker-task \
-  -p '{"task": "Navigate to OAGI documentation", "todos": ["Go to https://agiopen.org", "Click on Documentation", "Find the API reference"]}'
+  -p '{"task": "Navigate to OAGI documentation and navigate to the What is Computer Use? section", "todos": ["Go to https://agiopen.org", "Click on the What is Computer Use? button", "Highlight point number 2 about computer use."]}'
 ```
 
 ## Model Selection Guide
