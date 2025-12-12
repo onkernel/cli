@@ -1,4 +1,23 @@
 import os
+import sys
+from types import ModuleType
+from importlib.machinery import ModuleSpec
+
+# Mock pyautogui and mouseinfo to prevent X11 connection at import time.
+# oagi imports these modules internally, but we use KernelActionHandler instead,
+# so pyautogui functionality is never actually needed.
+mock_mouseinfo = ModuleType("mouseinfo")
+mock_mouseinfo.__spec__ = ModuleSpec("mouseinfo", None)
+
+mock_pyautogui = ModuleType("pyautogui")
+mock_pyautogui.__spec__ = ModuleSpec("pyautogui", None)
+
+sys.modules["mouseinfo"] = mock_mouseinfo
+sys.modules["pyautogui"] = mock_pyautogui
+
+# Set OAGI API base URL (no .env file in deployed environment)
+os.environ.setdefault("OAGI_BASE_URL", "https://api.agiopen.org")
+
 from typing import TypedDict, List, Optional
 from kernel import App, KernelContext
 
