@@ -16,6 +16,7 @@ const (
 	TemplateGeminiCUA      = "gemini-cua"
 	TemplateBrowserUse     = "browser-use"
 	TemplateStagehand      = "stagehand"
+	TemplateOAGICUA        = "oagi-cua"
 )
 
 type TemplateInfo struct {
@@ -71,6 +72,11 @@ var Templates = map[string]TemplateInfo{
 		Name:        "Stagehand",
 		Description: "Implements the Stagehand v3 SDK",
 		Languages:   []string{LanguageTypeScript},
+	},
+	TemplateOAGICUA: {
+		Name:        "OAGI CUA",
+		Description: "Implements OpenAGI's Lux computer-use models",
+		Languages:   []string{LanguagePython},
 	},
 }
 
@@ -191,6 +197,11 @@ var Commands = map[string]map[string]DeployConfig{
 			EntryPoint:    "main.py",
 			EnvVars:       []string{"OPENAI_API_KEY=XXX"},
 			InvokeCommand: `kernel invoke python-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'`,
+		},
+		TemplateOAGICUA: {
+			EntryPoint:    "main.py",
+			EnvVars:       []string{"OAGI_API_KEY=XXX"},
+			InvokeCommand: `kernel invoke python-oagi-cua oagi-default-task --payload '{"instruction": "Navigate to https://agiopen.org"}'`,
 		},
 	},
 }
