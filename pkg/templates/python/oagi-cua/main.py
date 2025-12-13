@@ -53,16 +53,19 @@ Invoke via CLI:
 class DefaultAgentInput(TypedDict):
     instruction: str
     model: Optional[str]
+    record_replay: Optional[bool]
 
 
 class TaskerAgentInput(TypedDict):
     task: str
     todos: List[str]
+    record_replay: Optional[bool]
 
 
 class AgentOutput(TypedDict):
     success: bool
     result: str
+    replay_url: Optional[str]
 
 
 api_key = os.getenv("OAGI_API_KEY")
@@ -92,8 +95,9 @@ async def oagi_default_task(
 
     instruction = payload["instruction"]
     model = payload.get("model", "lux-actor-1")
+    record_replay = payload.get("record_replay", False)
 
-    async with KernelBrowserSession(record_replay=False) as session:
+    async with KernelBrowserSession(record_replay=record_replay) as session:
         print("Kernel browser live view url:", session.live_view_url)
 
         provider = KernelScreenshotProvider(session)
@@ -112,10 +116,12 @@ async def oagi_default_task(
             image_provider=provider,
         )
 
-        return {
-            "success": success,
-            "result": f"Task completed with model {model}. Success: {success}",
-        }
+    # After context exits, replay_view_url is available if recording was enabled
+    return {
+        "success": success,
+        "result": f"Task completed with model {model}. Success: {success}",
+        "replay_url": session.replay_view_url,
+    }
 
 
 @app.action("oagi-tasker-task")
@@ -141,8 +147,9 @@ async def oagi_tasker_task(
 
     task = payload["task"]
     todos = payload["todos"]
+    record_replay = payload.get("record_replay", False)
 
-    async with KernelBrowserSession(record_replay=False) as session:
+    async with KernelBrowserSession(record_replay=record_replay) as session:
         print("Kernel browser live view url:", session.live_view_url)
 
         provider = KernelScreenshotProvider(session)
@@ -158,13 +165,15 @@ async def oagi_tasker_task(
         print(f"\nExecuting task: {task}")
         print(f"Steps: {todos}\n")
 
-        result = await agent.execute(
+        success = await agent.execute(
             instruction="",
             action_handler=handler,
             image_provider=provider,
         )
 
-        return {
-            "success": result,
-            "result": f"TaskerAgent completed. Task: {task}. Success: {result}",
-        }
+    # After context exits, replay_view_url is available if recording was enabled
+    return {
+        "success": success,
+        "result": f"TaskerAgent completed. Task: {task}. Success: {success}",
+        "replay_url": session.replay_view_url,
+    }
