@@ -35,11 +35,11 @@ Execute high-level tasks with optional model selection:
 ```bash
 # Default model (lux-actor-1)
 kernel invoke python-oagi-cua oagi-default-task \
-  -p '{"instruction": "Navigate to https://agiopen.org and find the pricing page"}'
+  -p '{"instruction": "Navigate to https://agiopen.org and click the What is Computer Use? button"}'
 
 # With specific model
 kernel invoke python-oagi-cua oagi-default-task \
-  -p '{"instruction": "Compare prices on two websites", "model": "lux-thinker-1"}'
+  -p '{"instruction": "Navigate to https://developer.agiopen.org/docs and find the Lux model pricing page.", "model": "lux-thinker-1"}'
 ```
 
 ### TaskerAgent
@@ -50,6 +50,19 @@ Execute structured workflows with predefined steps:
 kernel invoke python-oagi-cua oagi-tasker-task \
   -p '{"task": "Navigate to OAGI documentation and navigate to the What is Computer Use? section", "todos": ["Go to https://agiopen.org", "Click on the What is Computer Use? button", "Highlight point number 2 about computer use."]}'
 ```
+
+## Recording Replays
+
+> **Note:** Replay recording is only available to Kernel users on paid plans.
+
+Both actions support optional video replay recording. Add `"record_replay": "True"` to your payload to capture a video of the browser session:
+
+```bash
+kernel invoke python-oagi-cua oagi-default-task \
+  -p '{"instruction": "Navigate to https://agiopen.org", "record_replay": "True"}'
+```
+
+When enabled, the response will include a `replay_url` field with a link to view the recorded session.
 
 ## Model Selection Guide
 

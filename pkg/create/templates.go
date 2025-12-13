@@ -201,7 +201,7 @@ var Commands = map[string]map[string]DeployConfig{
 		TemplateOAGICUA: {
 			EntryPoint:    "main.py",
 			EnvVars:       []string{"OAGI_API_KEY=XXX"},
-			InvokeCommand: `kernel invoke python-oagi-cua oagi-default-task --payload '{"instruction": "Navigate to https://agiopen.org"}'`,
+			InvokeCommand: `kernel invoke python-oagi-cua oagi-default-task -p '{"instruction": "Navigate to https://agiopen.org and click the What is Computer Use? button", "record_replay": "True"}'`,
 		},
 	},
 }
