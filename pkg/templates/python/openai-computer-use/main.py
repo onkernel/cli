@@ -17,8 +17,8 @@ Returns:
 Invoke this via CLI:
     kernel login  # or: export KERNEL_API_KEY=<your_api_key>
     kernel deploy main.py -e OPENAI_API_KEY=XXXXX --force
-    kernel invoke python-cua cua-task -p '{"task":"go to https://news.ycombinator.com and list top 5 articles"}'
-    kernel logs python-cua -f # Open in separate tab
+    kernel invoke python-openai-cua cua-task -p '{"task":"go to https://news.ycombinator.com and list top 5 articles"}'
+    kernel logs python-openai-cua -f # Open in separate tab
 """
 
 class CuaInput(TypedDict):
@@ -32,7 +32,7 @@ if not api_key:
     raise ValueError("OPENAI_API_KEY is not set")
 
 client = Kernel()
-app = kernel.App("python-cua")
+app = kernel.App("python-openai-cua")
 
 @app.action("cua-task")
 async def cua_task(

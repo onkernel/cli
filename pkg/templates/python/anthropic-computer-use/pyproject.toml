@@ -1,5 +1,5 @@
 [project]
-name = "python-cu"
+name = "python-anthropic-cua"
 version = "0.1.0"
 description = "Kernel reference app for Anthropic Computer Use"
 requires-python = ">=3.9"

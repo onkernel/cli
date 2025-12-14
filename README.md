@@ -119,9 +119,10 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
   - `advanced-sample` - Sample apps using advanced Kernel configs
   - `stagehand` - Template with Stagehand SDK (TypeScript only)
   - `browser-use` - Template with Browser Use SDK (Python only)
-  - `computer-use` - Anthropic Computer Use prompt loop
-  - `cua` - OpenAI Computer Using Agent (CUA) sample
-  - `gemini-cua` - Google Gemini CUA sample (TypeScript only)
+  - `anthropic-computer-use` - Anthropic Computer Use prompt loop
+  - `openai-computer-use` - OpenAI Computer Use Agent sample
+  - `gemini-computer-use` - Gemini Computer Use Agent sample (TypeScript only)
+  - `openagi-computer-use` - OpenAGI Lux computer-use models (Python only)
   - `magnitude` - Magnitude framework sample (TypeScript only)
 
 ### App Deployment
@@ -393,7 +394,7 @@ kernel create --name my-scraper --language python --template browser-use
 kernel create --name my-agent --language ts --template stagehand
 
 # Create a Python Computer Use app
-kernel create --name my-cu-app --language py --template computer-use
+kernel create --name my-cu-app --language py --template anthropic-computer-use
 ```
 
 ### Deploy with environment variables

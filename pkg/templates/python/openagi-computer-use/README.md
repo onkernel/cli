@@ -1,4 +1,4 @@
-# Kernel Python Sample App - OAGI CUA
+# Kernel Python Sample App - OpenAGI Computer Use
 
 This is a Kernel application that demonstrates using OpenAGI's Lux computer-use models for browser automation.
 
@@ -34,11 +34,11 @@ Execute high-level tasks with optional model selection:
 
 ```bash
 # Default model (lux-actor-1)
-kernel invoke python-oagi-cua oagi-default-task \
+kernel invoke python-openagi-cua openagi-default-task \
   -p '{"instruction": "Navigate to https://agiopen.org and click the What is Computer Use? button"}'
 
 # With specific model
-kernel invoke python-oagi-cua oagi-default-task \
+kernel invoke python-openagi-cua openagi-default-task \
   -p '{"instruction": "Navigate to https://developer.agiopen.org/docs and find the Lux model pricing page.", "model": "lux-thinker-1"}'
 ```
 
@@ -47,7 +47,7 @@ kernel invoke python-oagi-cua oagi-default-task \
 Execute structured workflows with predefined steps:
 
 ```bash
-kernel invoke python-oagi-cua oagi-tasker-task \
+kernel invoke python-openagi-cua openagi-tasker-task \
   -p '{"task": "Navigate to OAGI documentation and navigate to the What is Computer Use? section", "todos": ["Go to https://agiopen.org", "Click on the What is Computer Use? button", "Highlight point number 2 about computer use."]}'
 ```
 
@@ -58,7 +58,7 @@ kernel invoke python-oagi-cua oagi-tasker-task \
 Both actions support optional video replay recording. Add `"record_replay": "True"` to your payload to capture a video of the browser session:
 
 ```bash
-kernel invoke python-oagi-cua oagi-default-task \
+kernel invoke python-openagi-cua openagi-default-task \
   -p '{"instruction": "Navigate to https://agiopen.org", "record_replay": "True"}'
 ```
 

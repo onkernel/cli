@@ -1,5 +1,5 @@
 [project]
-name = "python-oagi-cua"
+name = "python-openagi-cua"
 version = "0.1.0"
 description = "Kernel sample app for OpenAGI Lux computer-use models"
 readme = "README.md"

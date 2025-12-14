@@ -31,8 +31,8 @@ from oagi import AsyncDefaultAgent, TaskerAgent
 Example app that runs agents using OpenAGI's Lux computer-use models.
 
 Two actions are available:
-1. oagi-default-task: Uses AsyncDefaultAgent for high-level tasks
-2. oagi-tasker-task: Uses TaskerAgent for structured workflows with predefined steps
+1. openagi-default-task: Uses AsyncDefaultAgent for high-level tasks
+2. openagi-tasker-task: Uses TaskerAgent for structured workflows with predefined steps
 
 Args:
     ctx: Kernel context containing invocation information
@@ -43,10 +43,10 @@ Invoke via CLI:
     kernel deploy main.py -e OAGI_API_KEY=XXXXX --force
 
     # AsyncDefaultAgent example:
-    kernel invoke python-oagi-cua oagi-default-task -p '{"instruction":"Navigate to https://agiopen.org"}'
+    kernel invoke python-openagi-cua openagi-default-task -p '{"instruction":"Navigate to https://agiopen.org"}'
 
     # TaskerAgent example:
-    kernel invoke python-oagi-cua oagi-tasker-task -p '{"task":"Navigate to OAGI homepage","todos":["Go to https://agiopen.org","Click on What is Computer Use"]}'
+    kernel invoke python-openagi-cua openagi-tasker-task -p '{"task":"Navigate to OAGI homepage","todos":["Go to https://agiopen.org","Click on What is Computer Use"]}'
 """
 
 
@@ -72,10 +72,10 @@ api_key = os.getenv("OAGI_API_KEY")
 if not api_key:
     raise ValueError("OAGI_API_KEY is not set")
 
-app = App("python-oagi-cua")
+app = App("python-openagi-cua")
 
 
-@app.action("oagi-default-task")
+@app.action("openagi-default-task")
 async def oagi_default_task(
     ctx: KernelContext,
     payload: DefaultAgentInput,
@@ -124,7 +124,7 @@ async def oagi_default_task(
     }
 
 
-@app.action("oagi-tasker-task")
+@app.action("openagi-tasker-task")
 async def oagi_tasker_task(
     ctx: KernelContext,
     payload: TaskerAgentInput,

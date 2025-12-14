@@ -20,7 +20,7 @@ if not api_key:
     raise ValueError("ANTHROPIC_API_KEY is not set")
 
 client = Kernel()
-app = kernel.App("python-cu")
+app = kernel.App("python-anthropic-cua")
 
 @app.action("cu-task")
 async def cu_task(

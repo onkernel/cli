@@ -8,15 +8,15 @@ import (
 
 // Template key constants
 const (
-	TemplateSampleApp      = "sample-app"
-	TemplateAdvancedSample = "advanced-sample"
-	TemplateComputerUse    = "computer-use"
-	TemplateCUA            = "cua"
-	TemplateMagnitude      = "magnitude"
-	TemplateGeminiCUA      = "gemini-cua"
-	TemplateBrowserUse     = "browser-use"
-	TemplateStagehand      = "stagehand"
-	TemplateOAGICUA        = "oagi-cua"
+	TemplateSampleApp             = "sample-app"
+	TemplateAdvancedSample        = "advanced-sample"
+	TemplateAnthropicComputerUse  = "anthropic-computer-use"
+	TemplateOpenAIComputerUse     = "openai-computer-use"
+	TemplateMagnitude             = "magnitude"
+	TemplateGeminiComputerUse     = "gemini-computer-use"
+	TemplateBrowserUse            = "browser-use"
+	TemplateStagehand             = "stagehand"
+	TemplateOpenAGIComputerUse    = "openagi-computer-use"
 )
 
 type TemplateInfo struct {
@@ -43,13 +43,13 @@ var Templates = map[string]TemplateInfo{
 		Description: "Implements sample actions with advanced Kernel configs",
 		Languages:   []string{LanguageTypeScript, LanguagePython},
 	},
-	TemplateComputerUse: {
-		Name:        "Computer Use",
+	TemplateAnthropicComputerUse: {
+		Name:        "Anthropic Computer Use",
 		Description: "Implements the Anthropic Computer Use SDK",
 		Languages:   []string{LanguageTypeScript, LanguagePython},
 	},
-	TemplateCUA: {
-		Name:        "CUA Sample",
+	TemplateOpenAIComputerUse: {
+		Name:        "OpenAI Computer Use",
 		Description: "Implements a Computer Use Agent (OpenAI CUA) sample",
 		Languages:   []string{LanguageTypeScript, LanguagePython},
 	},
@@ -58,8 +58,8 @@ var Templates = map[string]TemplateInfo{
 		Description: "Implements the Magnitude.run SDK",
 		Languages:   []string{LanguageTypeScript},
 	},
-	TemplateGeminiCUA: {
-		Name:        "Gemini CUA",
+	TemplateGeminiComputerUse: {
+		Name:        "Gemini Computer Use",
 		Description: "Implements Gemini 2.5 Computer Use Agent",
 		Languages:   []string{LanguageTypeScript},
 	},
@@ -73,8 +73,8 @@ var Templates = map[string]TemplateInfo{
 		Description: "Implements the Stagehand v3 SDK",
 		Languages:   []string{LanguageTypeScript},
 	},
-	TemplateOAGICUA: {
-		Name:        "OAGI CUA",
+	TemplateOpenAGIComputerUse: {
+		Name:        "OpenAGI Computer Use",
 		Description: "Implements OpenAGI's Lux computer-use models",
 		Languages:   []string{LanguagePython},
 	},
@@ -151,22 +151,22 @@ var Commands = map[string]map[string]DeployConfig{
 			EnvVars:       []string{"OPENAI_API_KEY=XXX"},
 			InvokeCommand: `kernel invoke ts-stagehand teamsize-task --payload '{"company": "Kernel"}'`,
 		},
-		TemplateComputerUse: {
+		TemplateAnthropicComputerUse: {
 			EntryPoint:    "index.ts",
 			EnvVars:       []string{"ANTHROPIC_API_KEY=XXX"},
-			InvokeCommand: `kernel invoke ts-cu cu-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'`,
+			InvokeCommand: `kernel invoke ts-anthropic-cua cu-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'`,
 		},
 		TemplateMagnitude: {
 			EntryPoint:    "index.ts",
 			EnvVars:       []string{"ANTHROPIC_API_KEY=XXX"},
 			InvokeCommand: `kernel invoke ts-magnitude mag-url-extract --payload '{"url": "https://en.wikipedia.org/wiki/Special:Random"}'`,
 		},
-		TemplateCUA: {
+		TemplateOpenAIComputerUse: {
 			EntryPoint:    "index.ts",
 			EnvVars:       []string{"OPENAI_API_KEY=XXX"},
-			InvokeCommand: `kernel invoke ts-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'`,
+			InvokeCommand: `kernel invoke ts-openai-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'`,
 		},
-		TemplateGeminiCUA: {
+		TemplateGeminiComputerUse: {
 			EntryPoint:    "index.ts",
 			EnvVars:       []string{"GOOGLE_API_KEY=XXX", "OPENAI_API_KEY=XXX"},
 			InvokeCommand: "kernel invoke ts-gemini-cua gemini-cua-task",
@@ -188,20 +188,20 @@ var Commands = map[string]map[string]DeployConfig{
 			EnvVars:       []string{"OPENAI_API_KEY=XXX"},
 			InvokeCommand: `kernel invoke python-bu bu-task --payload '{"task": "Compare the price of gpt-4o and DeepSeek-V3"}'`,
 		},
-		TemplateComputerUse: {
+		TemplateAnthropicComputerUse: {
 			EntryPoint:    "main.py",
 			EnvVars:       []string{"ANTHROPIC_API_KEY=XXX"},
-			InvokeCommand: `kernel invoke python-cu cu-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'`,
+			InvokeCommand: `kernel invoke python-anthropic-cua cu-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'`,
 		},
-		TemplateCUA: {
+		TemplateOpenAIComputerUse: {
 			EntryPoint:    "main.py",
 			EnvVars:       []string{"OPENAI_API_KEY=XXX"},
-			InvokeCommand: `kernel invoke python-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'`,
+			InvokeCommand: `kernel invoke python-openai-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'`,
 		},
-		TemplateOAGICUA: {
+		TemplateOpenAGIComputerUse: {
 			EntryPoint:    "main.py",
 			EnvVars:       []string{"OAGI_API_KEY=XXX"},
-			InvokeCommand: `kernel invoke python-oagi-cua oagi-default-task -p '{"instruction": "Navigate to https://agiopen.org and click the What is Computer Use? button", "record_replay": "True"}'`,
+			InvokeCommand: `kernel invoke python-openagi-cua openagi-default-task -p '{"instruction": "Navigate to https://agiopen.org and click the What is Computer Use? button", "record_replay": "True"}'`,
 		},
 	},
 }

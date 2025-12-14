@@ -4,7 +4,7 @@ import { chromium } from 'playwright';
 
 const kernel = new Kernel();
 
-const app = kernel.app('ts-cu');
+const app = kernel.app('ts-anthropic-cua');
 
 interface QueryInput {
   query: string;

@@ -1,4 +1,4 @@
-# Kernel TypScript Sample App - Computer Use
+# Kernel TypeScript Sample App - Anthropic Computer Use
 
 This is a simple Kernel application that implements a prompt loop using Anthropic Computer Use.
 

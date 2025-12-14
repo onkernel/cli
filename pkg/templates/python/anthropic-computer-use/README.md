@@ -1,4 +1,4 @@
-# Kernel Python Sample App - Computer Use
+# Kernel Python Sample App - Anthropic Computer Use
 
 This is a simple Kernel application that implements a prompt loop using Anthropic Computer Use.
 

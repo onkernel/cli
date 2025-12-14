@@ -1,5 +1,5 @@
 {
-  "name": "ts-cu",
+  "name": "ts-anthropic-cua",
   "module": "index.ts",
   "type": "module",
   "private": true,
