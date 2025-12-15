@@ -45,12 +45,12 @@ var Templates = map[string]TemplateInfo{
 	},
 	TemplateAnthropicComputerUse: {
 		Name:        "Anthropic Computer Use",
-		Description: "Implements the Anthropic Computer Use SDK",
+		Description: "Implements an Anthropic computer use agent",
 		Languages:   []string{LanguageTypeScript, LanguagePython},
 	},
 	TemplateOpenAIComputerUse: {
 		Name:        "OpenAI Computer Use",
-		Description: "Implements a Computer Use Agent (OpenAI CUA) sample",
+		Description: "Implements an OpenAI computer use agent",
 		Languages:   []string{LanguageTypeScript, LanguagePython},
 	},
 	TemplateMagnitude: {
@@ -60,7 +60,7 @@ var Templates = map[string]TemplateInfo{
 	},
 	TemplateGeminiComputerUse: {
 		Name:        "Gemini Computer Use",
-		Description: "Implements Gemini 2.5 Computer Use Agent",
+		Description: "Implements a Gemini computer use agent",
 		Languages:   []string{LanguageTypeScript},
 	},
 	TemplateBrowserUse: {
@@ -75,7 +75,7 @@ var Templates = map[string]TemplateInfo{
 	},
 	TemplateOpenAGIComputerUse: {
 		Name:        "OpenAGI Computer Use",
-		Description: "Implements OpenAGI's Lux computer-use models",
+		Description: "Implements an OpenAGI computer use agent",
 		Languages:   []string{LanguagePython},
 	},
 }
