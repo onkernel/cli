@@ -8,15 +8,15 @@ import (
 
 // Template key constants
 const (
-	TemplateSampleApp             = "sample-app"
-	TemplateAdvancedSample        = "advanced-sample"
-	TemplateAnthropicComputerUse  = "anthropic-computer-use"
-	TemplateOpenAIComputerUse     = "openai-computer-use"
-	TemplateMagnitude             = "magnitude"
-	TemplateGeminiComputerUse     = "gemini-computer-use"
-	TemplateBrowserUse            = "browser-use"
-	TemplateStagehand             = "stagehand"
-	TemplateOpenAGIComputerUse    = "openagi-computer-use"
+	TemplateSampleApp            = "sample-app"
+	TemplateAdvancedSample       = "advanced-sample"
+	TemplateAnthropicComputerUse = "anthropic-computer-use"
+	TemplateOpenAIComputerUse    = "openai-computer-use"
+	TemplateMagnitude            = "magnitude"
+	TemplateGeminiComputerUse    = "gemini-computer-use"
+	TemplateBrowserUse           = "browser-use"
+	TemplateStagehand            = "stagehand"
+	TemplateOpenAGIComputerUse   = "openagi-computer-use"
 )
 
 type TemplateInfo struct {
@@ -154,7 +154,7 @@ var Commands = map[string]map[string]DeployConfig{
 		TemplateAnthropicComputerUse: {
 			EntryPoint:    "index.ts",
 			EnvVars:       []string{"ANTHROPIC_API_KEY=XXX"},
-			InvokeCommand: `kernel invoke ts-anthropic-cua cu-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'`,
+			InvokeCommand: `kernel invoke ts-anthropic-cua cua-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'`,
 		},
 		TemplateMagnitude: {
 			EntryPoint:    "index.ts",
@@ -191,7 +191,7 @@ var Commands = map[string]map[string]DeployConfig{
 		TemplateAnthropicComputerUse: {
 			EntryPoint:    "main.py",
 			EnvVars:       []string{"ANTHROPIC_API_KEY=XXX"},
-			InvokeCommand: `kernel invoke python-anthropic-cua cu-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'`,
+			InvokeCommand: `kernel invoke python-anthropic-cua cua-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'`,
 		},
 		TemplateOpenAIComputerUse: {
 			EntryPoint:    "main.py",

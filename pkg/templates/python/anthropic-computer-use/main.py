@@ -22,8 +22,8 @@ if not api_key:
 client = Kernel()
 app = kernel.App("python-anthropic-cua")
 
-@app.action("cu-task")
-async def cu_task(
+@app.action("cua-task")
+async def cua_task(
     ctx: kernel.KernelContext,
     payload: QueryInput,
 ) -> QueryOutput:

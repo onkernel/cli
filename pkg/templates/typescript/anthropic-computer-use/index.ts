@@ -23,7 +23,7 @@ if (!ANTHROPIC_API_KEY) {
 }
 
 app.action<QueryInput, QueryOutput>(
-  'cu-task',
+  'cua-task',
   async (ctx: KernelContext, payload?: QueryInput): Promise<QueryOutput> => {
     if (!payload?.query) {
       throw new Error('Query is required');
