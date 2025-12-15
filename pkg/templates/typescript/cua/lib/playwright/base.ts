@@ -1,6 +1,6 @@
-import utils from '../utils';
+import type { Browser, Page, Request, Response, Route } from 'playwright-core';
 import sharp from 'sharp';
-import type { Browser, Page, Route, Request, Response } from 'playwright';
+import utils from '../utils';
 
 // CUA key -> Playwright key mapping
 const KEY_MAP: Record<string, string> = {

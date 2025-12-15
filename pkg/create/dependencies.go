@@ -68,7 +68,6 @@ func getNextStepsWithToolInstall(appName string, language string, requiredTool s
   pnpm install
 
   # Deploy your app:
-  brew install onkernel/tap/kernel
   kernel login  # or: export KERNEL_API_KEY=<YOUR_API_KEY>
   %s
   %s
@@ -85,7 +84,6 @@ func getNextStepsWithToolInstall(appName string, language string, requiredTool s
   uv venv && source .venv/bin/activate && uv sync
 
   # Deploy your app:
-  brew install onkernel/tap/kernel
   kernel login  # or: export KERNEL_API_KEY=<YOUR_API_KEY>
   %s
   %s
@@ -100,7 +98,6 @@ func getNextStepsStandard(appName string, language string, template string) stri
 	deployCommand := GetDeployCommand(language, template)
 	invokeCommand := GetInvokeSample(language, template)
 	return pterm.FgYellow.Sprintf(`Next steps:
-  brew install onkernel/tap/kernel
   cd %s
   kernel login  # or: export KERNEL_API_KEY=<YOUR_API_KEY>
   %s

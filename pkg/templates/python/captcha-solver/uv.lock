@@ -153,6 +153,29 @@ wheels = [
 ]
 
 [[package]]
+name = "kernel-python-advanced"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "kernel" },
+    { name = "playwright" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "mypy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "kernel", specifier = ">=0.23.0" },
+    { name = "playwright", specifier = ">=1.57.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "mypy", specifier = ">=1.19.0" }]
+
+[[package]]
 name = "librt"
 version = "0.7.4"
 source = { registry = "https://pypi.org/simple" }
@@ -414,29 +437,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/95/03/1fd98d5841cd7964a
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9b/4d/b9add7c84060d4c1906abe9a7e5359f2a60f7a9a4f67268b2766673427d8/pyee-13.0.0-py3-none-any.whl", hash = "sha256:48195a3cddb3b1515ce0695ed76036b5ccc2ef3a9f963ff9f77aec0139845498", size = 15730, upload-time = "2025-03-17T18:53:14.532Z" },
 ]
-
-[[package]]
-name = "python-basic"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "kernel" },
-    { name = "playwright" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "mypy" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "kernel", specifier = ">=0.23.0" },
-    { name = "playwright", specifier = ">=1.57.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "mypy", specifier = ">=1.19.0" }]
 
 [[package]]
 name = "sniffio"
