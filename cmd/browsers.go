@@ -10,10 +10,13 @@ import (
 	"math/big"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/onkernel/cli/pkg/termimg"
 	"github.com/onkernel/cli/pkg/util"
@@ -173,6 +176,8 @@ type BrowsersDeleteInput struct {
 
 type BrowsersViewInput struct {
 	Identifier string
+	Live       bool
+	Interval   time.Duration
 }
 
 type BrowsersGetInput struct {
@@ -457,6 +462,11 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 }
 
 func (b BrowsersCmd) View(ctx context.Context, in BrowsersViewInput) error {
+	// If live view requested, run the live view loop
+	if in.Live {
+		return b.LiveView(ctx, in)
+	}
+
 	browser, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -472,6 +482,102 @@ func (b BrowsersCmd) View(ctx context.Context, in BrowsersViewInput) error {
 
 	fmt.Println(browser.BrowserLiveViewURL)
 	return nil
+}
+
+// LiveView displays a continuously updating view of the browser in the terminal.
+func (b BrowsersCmd) LiveView(ctx context.Context, in BrowsersViewInput) error {
+	if b.computer == nil {
+		pterm.Error.Println("computer service not available")
+		return nil
+	}
+
+	// Check terminal supports inline images
+	if !termimg.IsSupported() {
+		pterm.Error.Printf("Terminal does not support inline images (detected: %s). Try using iTerm2, Kitty, or Ghostty.\n", termimg.DetectTerminal())
+		return nil
+	}
+
+	// Verify browser exists and get session ID
+	browser, err := b.browsers.Get(ctx, in.Identifier)
+	if err != nil {
+		return util.CleanedUpSdkError{Err: err}
+	}
+
+	// Set default interval if not specified
+	interval := in.Interval
+	if interval == 0 {
+		interval = 100 * time.Millisecond
+	}
+
+	// Set up signal handling for graceful exit
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
+
+	// Create a cancellable context
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Handle signals in a goroutine
+	go func() {
+		<-sigChan
+		cancel()
+	}()
+
+	// Hide cursor and set up cleanup
+	termimg.HideCursor(os.Stdout)
+	defer termimg.CleanupLiveView(os.Stdout, false)
+
+	// Clear screen initially
+	termimg.ClearScreen(os.Stdout)
+
+	pterm.Info.Println("Live view started. Press Ctrl+C to exit.")
+	fmt.Println() // Add space before image
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	// Capture and display first frame immediately
+	if err := b.captureAndDisplayFrame(ctx, browser.SessionID); err != nil {
+		// If first frame fails, show error and exit
+		pterm.Error.Printf("Failed to capture screenshot: %v\n", err)
+		return nil
+	}
+
+	// Main loop
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			if err := b.captureAndDisplayFrame(ctx, browser.SessionID); err != nil {
+				// Log error but continue trying
+				// The browser session may have ended
+				if ctx.Err() != nil {
+					return nil
+				}
+				// Browser session likely ended
+				pterm.Warning.Println("\nBrowser session ended or screenshot failed")
+				return nil
+			}
+		}
+	}
+}
+
+// captureAndDisplayFrame captures a screenshot and displays it in the terminal.
+func (b BrowsersCmd) captureAndDisplayFrame(ctx context.Context, sessionID string) error {
+	res, err := b.computer.CaptureScreenshot(ctx, sessionID, kernel.BrowserComputerCaptureScreenshotParams{})
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	imgData, err := io.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+
+	return termimg.ClearAndDisplayImage(os.Stdout, imgData)
 }
 
 func (b BrowsersCmd) Get(ctx context.Context, in BrowsersGetInput) error {
@@ -1756,7 +1862,7 @@ var browsersDeleteCmd = &cobra.Command{
 
 var browsersViewCmd = &cobra.Command{
 	Use:   "view <id>",
-	Short: "Get the live view URL for a browser",
+	Short: "Get the live view URL for a browser, or show a live terminal view",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runBrowsersView,
 }
@@ -1778,6 +1884,10 @@ func init() {
 
 	// get flags
 	browsersGetCmd.Flags().StringP("output", "o", "", "Output format: json for raw API response")
+
+	// view flags
+	browsersViewCmd.Flags().Bool("live", false, "Show live terminal view of browser (requires iTerm2, Kitty, or Ghostty)")
+	browsersViewCmd.Flags().Duration("interval", 100*time.Millisecond, "Refresh interval for live view")
 
 	browsersCmd.AddCommand(browsersListCmd)
 	browsersCmd.AddCommand(browsersCreateCmd)
@@ -2161,10 +2271,16 @@ func runBrowsersView(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 
 	identifier := args[0]
+	live, _ := cmd.Flags().GetBool("live")
+	interval, _ := cmd.Flags().GetDuration("interval")
 
-	in := BrowsersViewInput{Identifier: identifier}
+	in := BrowsersViewInput{
+		Identifier: identifier,
+		Live:       live,
+		Interval:   interval,
+	}
 	svc := client.Browsers
-	b := BrowsersCmd{browsers: &svc}
+	b := BrowsersCmd{browsers: &svc, computer: &svc.Computer}
 	return b.View(cmd.Context(), in)
 }
 
