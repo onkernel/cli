@@ -34,7 +34,7 @@ type TemplateKeyValues []TemplateKeyValue
 var Templates = map[string]TemplateInfo{
 	TemplateSampleApp: {
 		Name:        "Sample App",
-		Description: "Implements basic Kernel apps",
+		Description: "Implements a basic Kernel app",
 		Languages:   []string{LanguageTypeScript, LanguagePython},
 	},
 	TemplateCaptchaSolver: {
@@ -87,6 +87,13 @@ func GetSupportedTemplatesForLanguage(language string) TemplateKeyValues {
 	}
 
 	sort.Slice(templates, func(i, j int) bool {
+		// Put computer-use first, then sort alphabetically
+		if templates[i].Key == TemplateComputerUse {
+			return true
+		}
+		if templates[j].Key == TemplateComputerUse {
+			return false
+		}
 		return templates[i].Key < templates[j].Key
 	})
 
