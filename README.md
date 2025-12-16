@@ -179,6 +179,8 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 - `kernel browsers delete <id>` - Delete a browser
   - `-y, --yes` - Skip confirmation prompt
 - `kernel browsers view <id>` - Get live view URL for a browser
+  - `--live` - Show live terminal view of browser (requires iTerm2, Kitty, or Ghostty)
+  - `--interval <duration>` - Refresh interval for live view (default: 100ms)
 
 ### Browser Pools
 
@@ -302,7 +304,8 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
   - `--y <coordinate>` - Y coordinate (required)
   - `--hold-key <key>` - Modifier keys to hold (repeatable)
 - `kernel browsers computer screenshot <id>` - Capture a screenshot
-  - `--to <path>` - Output file path for the PNG image (required)
+  - `--to <path>` - Output file path for the PNG image
+  - `--display` - Display screenshot inline in terminal (requires iTerm2, Kitty, or Ghostty)
   - `--x <coordinate>` - Top-left X for region capture (optional)
   - `--y <coordinate>` - Top-left Y for region capture (optional)
   - `--width <pixels>` - Region width (optional)
@@ -459,6 +462,12 @@ kernel browsers delete browser123 --yes
 # Get live view URL
 kernel browsers view browser123
 
+# Show live view in terminal (iTerm2, Kitty, or Ghostty) - press Ctrl+C to exit
+kernel browsers view browser123 --live
+
+# Show live view with custom refresh rate
+kernel browsers view browser123 --live --interval 200ms
+
 # Stream browser logs
 kernel browsers logs stream my-browser --source supervisor --follow --supervisor-process chromium
 
@@ -483,11 +492,17 @@ kernel browsers computer click-mouse my-browser --x 100 --y 200 --num-clicks 2 -
 # Move the mouse to coordinates (500, 300)
 kernel browsers computer move-mouse my-browser --x 500 --y 300
 
-# Take a full screenshot
+# Take a full screenshot and save to file
 kernel browsers computer screenshot my-browser --to screenshot.png
 
 # Take a screenshot of a specific region
 kernel browsers computer screenshot my-browser --to region.png --x 0 --y 0 --width 800 --height 600
+
+# Display screenshot inline in terminal (iTerm2, Kitty, or Ghostty)
+kernel browsers computer screenshot my-browser --display
+
+# Display and save screenshot
+kernel browsers computer screenshot my-browser --display --to screenshot.png
 
 # Type text in the browser
 kernel browsers computer type my-browser --text "Hello, World!"
