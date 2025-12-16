@@ -1060,6 +1060,41 @@ func TestBrowsersComputerScreenshot_SavesFile(t *testing.T) {
 	assert.Equal(t, "pngDATA", string(data))
 }
 
+func TestBrowsersComputerScreenshot_RequiresOutputOption(t *testing.T) {
+	setupStdoutCapture(t)
+	fakeBrowsers := newFakeBrowsersServiceWithSimpleGet()
+	fakeComp := &FakeComputerService{CaptureScreenshotFunc: func(ctx context.Context, id string, body kernel.BrowserComputerCaptureScreenshotParams, opts ...option.RequestOption) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"image/png"}}, Body: io.NopCloser(strings.NewReader("pngDATA"))}, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, computer: fakeComp}
+	// Neither --to nor --display specified
+	_ = b.ComputerScreenshot(context.Background(), BrowsersComputerScreenshotInput{Identifier: "id"})
+	out := outBuf.String()
+	assert.Contains(t, out, "specify --to to save to a file, --display to show inline, or both")
+}
+
+func TestBrowsersComputerScreenshot_DisplayAndSave(t *testing.T) {
+	setupStdoutCapture(t)
+	// Set iTerm2 env var to enable display
+	origTermProgram := os.Getenv("TERM_PROGRAM")
+	defer os.Setenv("TERM_PROGRAM", origTermProgram)
+	os.Setenv("TERM_PROGRAM", "iTerm.app")
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "shot.png")
+	fakeBrowsers := newFakeBrowsersServiceWithSimpleGet()
+	fakeComp := &FakeComputerService{CaptureScreenshotFunc: func(ctx context.Context, id string, body kernel.BrowserComputerCaptureScreenshotParams, opts ...option.RequestOption) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"image/png"}}, Body: io.NopCloser(strings.NewReader("pngDATA"))}, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, computer: fakeComp}
+	// Both --display and --to specified
+	_ = b.ComputerScreenshot(context.Background(), BrowsersComputerScreenshotInput{Identifier: "id", To: outPath, Display: true})
+	// File should be saved
+	data, err := os.ReadFile(outPath)
+	assert.NoError(t, err)
+	assert.Equal(t, "pngDATA", string(data))
+}
+
 func TestBrowsersComputerPressKey_PrintsSuccess(t *testing.T) {
 	setupStdoutCapture(t)
 	fakeBrowsers := newFakeBrowsersServiceWithSimpleGet()

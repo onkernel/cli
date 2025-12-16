@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/onkernel/cli/pkg/termimg"
 	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/onkernel/kernel-go-sdk/option"
@@ -595,6 +596,7 @@ type BrowsersComputerScreenshotInput struct {
 	Height     int64
 	To         string
 	HasRegion  bool
+	Display    bool
 }
 
 type BrowsersComputerTypeTextInput struct {
@@ -703,21 +705,43 @@ func (b BrowsersCmd) ComputerScreenshot(ctx context.Context, in BrowsersComputer
 		return util.CleanedUpSdkError{Err: err}
 	}
 	defer res.Body.Close()
-	if in.To == "" {
-		pterm.Error.Println("--to is required to save the screenshot")
-		return nil
-	}
-	f, err := os.Create(in.To)
+
+	// Read the image data into memory (needed for both display and save)
+	imgData, err := io.ReadAll(res.Body)
 	if err != nil {
-		pterm.Error.Printf("Failed to create file: %v\n", err)
+		pterm.Error.Printf("Failed to read screenshot data: %v\n", err)
 		return nil
 	}
-	defer f.Close()
-	if _, err := io.Copy(f, res.Body); err != nil {
-		pterm.Error.Printf("Failed to write file: %v\n", err)
+
+	// Must specify at least one output option
+	if in.To == "" && !in.Display {
+		pterm.Error.Println("specify --to to save to a file, --display to show inline, or both")
 		return nil
 	}
-	pterm.Success.Printf("Saved screenshot to %s\n", in.To)
+
+	// Display inline in terminal if requested
+	if in.Display {
+		if err := termimg.DisplayImage(os.Stdout, imgData); err != nil {
+			pterm.Error.Printf("Failed to display screenshot: %v\n", err)
+			return nil
+		}
+	}
+
+	// Save to file if requested
+	if in.To != "" {
+		f, err := os.Create(in.To)
+		if err != nil {
+			pterm.Error.Printf("Failed to create file: %v\n", err)
+			return nil
+		}
+		defer f.Close()
+		if _, err := f.Write(imgData); err != nil {
+			pterm.Error.Printf("Failed to write file: %v\n", err)
+			return nil
+		}
+		pterm.Success.Printf("Saved screenshot to %s\n", in.To)
+	}
+
 	return nil
 }
 
@@ -1904,7 +1928,7 @@ func init() {
 	computerScreenshot.Flags().Int64("width", 0, "Region width")
 	computerScreenshot.Flags().Int64("height", 0, "Region height")
 	computerScreenshot.Flags().String("to", "", "Output file path for the PNG image")
-	_ = computerScreenshot.MarkFlagRequired("to")
+	computerScreenshot.Flags().Bool("display", false, "Display screenshot inline in terminal (iTerm2/Kitty)")
 
 	computerType := &cobra.Command{Use: "type <id>", Short: "Type text on the browser instance", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerTypeText}
 	computerType.Flags().String("text", "", "Text to type")
@@ -2459,6 +2483,7 @@ func runBrowsersComputerScreenshot(cmd *cobra.Command, args []string) error {
 	w, _ := cmd.Flags().GetInt64("width")
 	h, _ := cmd.Flags().GetInt64("height")
 	to, _ := cmd.Flags().GetString("to")
+	display, _ := cmd.Flags().GetBool("display")
 	bx := cmd.Flags().Changed("x")
 	by := cmd.Flags().Changed("y")
 	bw := cmd.Flags().Changed("width")
@@ -2475,7 +2500,7 @@ func runBrowsersComputerScreenshot(cmd *cobra.Command, args []string) error {
 		}
 	}
 	b := BrowsersCmd{browsers: &svc, computer: &svc.Computer}
-	return b.ComputerScreenshot(cmd.Context(), BrowsersComputerScreenshotInput{Identifier: args[0], X: x, Y: y, Width: w, Height: h, To: to, HasRegion: useRegion})
+	return b.ComputerScreenshot(cmd.Context(), BrowsersComputerScreenshotInput{Identifier: args[0], X: x, Y: y, Width: w, Height: h, To: to, HasRegion: useRegion, Display: display})
 }
 
 func runBrowsersComputerTypeText(cmd *cobra.Command, args []string) error {
