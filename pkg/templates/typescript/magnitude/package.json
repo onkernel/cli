@@ -3,12 +3,13 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
-  "peerDependencies": {
-    "typescript": "^5"
-  },
   "dependencies": {
-    "@onkernel/sdk": "^0.22.0",
+    "@onkernel/sdk": "^0.23.0",
     "magnitude-core": "^0.3.0",
-    "zod": "^4.1.13"
+    "zod": "^4.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.17",
+    "typescript": "^5.9.3"
   }
 }

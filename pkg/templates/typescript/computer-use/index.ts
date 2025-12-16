@@ -1,6 +1,6 @@
 import { Kernel, type KernelContext } from '@onkernel/sdk';
+import { chromium } from 'playwright-core';
 import { samplingLoop } from './loop';
-import { chromium } from 'playwright';
 
 const kernel = new Kernel();
 
@@ -78,6 +78,7 @@ app.action<QueryInput, QueryOutput>(
       throw error;
     } finally {
       await browser.close();
+      await kernel.browsers.deleteByID(kernelBrowser.session_id);
     }
   },
 );

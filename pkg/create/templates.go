@@ -8,14 +8,14 @@ import (
 
 // Template key constants
 const (
-	TemplateSampleApp      = "sample-app"
-	TemplateAdvancedSample = "advanced-sample"
-	TemplateComputerUse    = "computer-use"
-	TemplateCUA            = "cua"
-	TemplateMagnitude      = "magnitude"
-	TemplateGeminiCUA      = "gemini-cua"
-	TemplateBrowserUse     = "browser-use"
-	TemplateStagehand      = "stagehand"
+	TemplateSampleApp     = "sample-app"
+	TemplateCaptchaSolver = "captcha-solver"
+	TemplateComputerUse   = "computer-use"
+	TemplateCUA           = "cua"
+	TemplateMagnitude     = "magnitude"
+	TemplateGeminiCUA     = "gemini-cua"
+	TemplateBrowserUse    = "browser-use"
+	TemplateStagehand     = "stagehand"
 )
 
 type TemplateInfo struct {
@@ -34,12 +34,12 @@ type TemplateKeyValues []TemplateKeyValue
 var Templates = map[string]TemplateInfo{
 	TemplateSampleApp: {
 		Name:        "Sample App",
-		Description: "Implements basic Kernel apps",
+		Description: "Implements a basic Kernel app",
 		Languages:   []string{LanguageTypeScript, LanguagePython},
 	},
-	TemplateAdvancedSample: {
-		Name:        "Advanced Sample",
-		Description: "Implements sample actions with advanced Kernel configs",
+	TemplateCaptchaSolver: {
+		Name:        "CAPTCHA Solver",
+		Description: "Demo of Kernel's auto-CAPTCHA solving capability",
 		Languages:   []string{LanguageTypeScript, LanguagePython},
 	},
 	TemplateComputerUse: {
@@ -87,6 +87,13 @@ func GetSupportedTemplatesForLanguage(language string) TemplateKeyValues {
 	}
 
 	sort.Slice(templates, func(i, j int) bool {
+		// Put computer-use first, then sort alphabetically
+		if templates[i].Key == TemplateComputerUse {
+			return true
+		}
+		if templates[j].Key == TemplateComputerUse {
+			return false
+		}
 		return templates[i].Key < templates[j].Key
 	})
 
@@ -124,7 +131,7 @@ func (tkv TemplateKeyValues) ContainsKey(key string) bool {
 
 type DeployConfig struct {
 	EntryPoint    string
-	EnvVars       []string
+	NeedsEnvFile  bool
 	InvokeCommand string
 }
 
@@ -132,64 +139,64 @@ var Commands = map[string]map[string]DeployConfig{
 	LanguageTypeScript: {
 		TemplateSampleApp: {
 			EntryPoint:    "index.ts",
-			EnvVars:       []string{},
+			NeedsEnvFile:  false,
 			InvokeCommand: `kernel invoke ts-basic get-page-title --payload '{"url": "https://www.google.com"}'`,
 		},
-		TemplateAdvancedSample: {
+		TemplateCaptchaSolver: {
 			EntryPoint:    "index.ts",
-			EnvVars:       []string{},
-			InvokeCommand: "kernel invoke ts-advanced test-captcha-solver",
+			NeedsEnvFile:  false,
+			InvokeCommand: "kernel invoke ts-captcha-solver test-captcha-solver",
 		},
 		TemplateStagehand: {
 			EntryPoint:    "index.ts",
-			EnvVars:       []string{"OPENAI_API_KEY=XXX"},
+			NeedsEnvFile:  true,
 			InvokeCommand: `kernel invoke ts-stagehand teamsize-task --payload '{"company": "Kernel"}'`,
 		},
 		TemplateComputerUse: {
 			EntryPoint:    "index.ts",
-			EnvVars:       []string{"ANTHROPIC_API_KEY=XXX"},
+			NeedsEnvFile:  true,
 			InvokeCommand: `kernel invoke ts-cu cu-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'`,
 		},
 		TemplateMagnitude: {
 			EntryPoint:    "index.ts",
-			EnvVars:       []string{"ANTHROPIC_API_KEY=XXX"},
+			NeedsEnvFile:  true,
 			InvokeCommand: `kernel invoke ts-magnitude mag-url-extract --payload '{"url": "https://en.wikipedia.org/wiki/Special:Random"}'`,
 		},
 		TemplateCUA: {
 			EntryPoint:    "index.ts",
-			EnvVars:       []string{"OPENAI_API_KEY=XXX"},
+			NeedsEnvFile:  true,
 			InvokeCommand: `kernel invoke ts-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'`,
 		},
 		TemplateGeminiCUA: {
 			EntryPoint:    "index.ts",
-			EnvVars:       []string{"GOOGLE_API_KEY=XXX", "OPENAI_API_KEY=XXX"},
+			NeedsEnvFile:  true,
 			InvokeCommand: "kernel invoke ts-gemini-cua gemini-cua-task",
 		},
 	},
 	LanguagePython: {
 		TemplateSampleApp: {
 			EntryPoint:    "main.py",
-			EnvVars:       []string{},
+			NeedsEnvFile:  false,
 			InvokeCommand: `kernel invoke python-basic get-page-title --payload '{"url": "https://www.google.com"}'`,
 		},
-		TemplateAdvancedSample: {
+		TemplateCaptchaSolver: {
 			EntryPoint:    "main.py",
-			EnvVars:       []string{},
-			InvokeCommand: "kernel invoke python-advanced test-captcha-solver",
+			NeedsEnvFile:  false,
+			InvokeCommand: "kernel invoke python-captcha-solver test-captcha-solver",
 		},
 		TemplateBrowserUse: {
 			EntryPoint:    "main.py",
-			EnvVars:       []string{"OPENAI_API_KEY=XXX"},
+			NeedsEnvFile:  true,
 			InvokeCommand: `kernel invoke python-bu bu-task --payload '{"task": "Compare the price of gpt-4o and DeepSeek-V3"}'`,
 		},
 		TemplateComputerUse: {
 			EntryPoint:    "main.py",
-			EnvVars:       []string{"ANTHROPIC_API_KEY=XXX"},
+			NeedsEnvFile:  true,
 			InvokeCommand: `kernel invoke python-cu cu-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'`,
 		},
 		TemplateCUA: {
 			EntryPoint:    "main.py",
-			EnvVars:       []string{"OPENAI_API_KEY=XXX"},
+			NeedsEnvFile:  true,
 			InvokeCommand: `kernel invoke python-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'`,
 		},
 	},
@@ -208,8 +215,8 @@ func GetDeployCommand(language, template string) string {
 	}
 
 	cmd := "kernel deploy " + config.EntryPoint
-	for _, env := range config.EnvVars {
-		cmd += " --env " + env
+	if config.NeedsEnvFile {
+		cmd += " --env-file .env"
 	}
 
 	return cmd

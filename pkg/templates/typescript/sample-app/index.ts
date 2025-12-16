@@ -1,5 +1,5 @@
 import { Kernel, type KernelContext } from "@onkernel/sdk";
-import { chromium } from "playwright";
+import { chromium } from "playwright-core";
 
 const kernel = new Kernel();
 

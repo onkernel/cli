@@ -3,13 +3,14 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
-  "peerDependencies": {
-    "typescript": "^5"
-  },
   "dependencies": {
-    "@onkernel/sdk": "^0.22.0",
-    "playwright": "^1.57.0",
     "@anthropic-ai/sdk": "^0.71.2",
-    "luxon": "^3.7.2"
+    "@onkernel/sdk": "^0.23.0",
+    "luxon": "^3.7.2",
+    "playwright-core": "^1.57.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.17",
+    "typescript": "^5.9.3"
   }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "ts-basic",
+  "name": "ts-captcha-solver",
   "module": "index.ts",
   "type": "module",
   "private": true,

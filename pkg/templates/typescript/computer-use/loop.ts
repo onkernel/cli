@@ -1,13 +1,13 @@
 import { Anthropic } from '@anthropic-ai/sdk';
 import { DateTime } from 'luxon';
-import type { Page } from 'playwright';
-import type { BetaMessageParam, BetaTextBlock } from './types/beta';
-import { ToolCollection, DEFAULT_TOOL_VERSION, TOOL_GROUPS_BY_VERSION, type ToolVersion } from './tools/collection';
-import { responseToParams, maybeFilterToNMostRecentImages, injectPromptCaching, PROMPT_CACHING_BETA_FLAG } from './utils/message-processing';
-import { makeApiToolResult } from './utils/tool-results';
+import type { Page } from 'playwright-core';
+import { DEFAULT_TOOL_VERSION, TOOL_GROUPS_BY_VERSION, ToolCollection, type ToolVersion } from './tools/collection';
 import { ComputerTool20241022, ComputerTool20250124 } from './tools/computer';
 import type { ActionParams } from './tools/types/computer';
 import { Action } from './tools/types/computer';
+import type { BetaMessageParam, BetaTextBlock } from './types/beta';
+import { injectPromptCaching, maybeFilterToNMostRecentImages, PROMPT_CACHING_BETA_FLAG, responseToParams } from './utils/message-processing';
+import { makeApiToolResult } from './utils/tool-results';
 
 // System prompt optimized for the environment
 const SYSTEM_PROMPT = `<SYSTEM_CAPABILITY>
@@ -71,7 +71,7 @@ export async function samplingLoop({
   const selectedVersion = toolVersion || DEFAULT_TOOL_VERSION;
   const toolGroup = TOOL_GROUPS_BY_VERSION[selectedVersion];
   const toolCollection = new ToolCollection(...toolGroup.tools.map((Tool: typeof ComputerTool20241022 | typeof ComputerTool20250124) => new Tool(playwrightPage)));
-  
+
   const system: BetaTextBlock = {
     type: 'text',
     text: `${SYSTEM_PROMPT}${systemPromptSuffix ? ' ' + systemPromptSuffix : ''}`,
@@ -79,7 +79,7 @@ export async function samplingLoop({
 
   while (true) {
     const betas: string[] = toolGroup.beta_flag ? [toolGroup.beta_flag] : [];
-    
+
     if (tokenEfficientToolsBeta) {
       betas.push('token-efficient-tools-2025-02-19');
     }
@@ -88,7 +88,7 @@ export async function samplingLoop({
 
     const client = new Anthropic({ apiKey, maxRetries: 4 });
     const enablePromptCaching = true;
-    
+
     if (enablePromptCaching) {
       betas.push(PROMPT_CACHING_BETA_FLAG);
       injectPromptCaching(messages);
@@ -122,7 +122,7 @@ export async function samplingLoop({
     });
 
     const responseParams = responseToParams(response);
-    
+
     const loggableContent = responseParams.map(block => {
       if (block.type === 'tool_use') {
         return {
@@ -137,7 +137,7 @@ export async function samplingLoop({
     console.log('Stop reason:', response.stop_reason);
     console.log(loggableContent);
     console.log("===")
-    
+
     messages.push({
       role: 'assistant',
       content: responseParams,
@@ -150,7 +150,7 @@ export async function samplingLoop({
 
     const toolResultContent = [];
     let hasToolUse = false;
-    
+
     for (const contentBlock of responseParams) {
       if (contentBlock.type === 'tool_use' && contentBlock.name && contentBlock.input && typeof contentBlock.input === 'object') {
         const input = contentBlock.input as ToolUseInput;
@@ -162,7 +162,7 @@ export async function samplingLoop({
               Object.entries(input).filter(([key]) => key !== 'action')
             )
           };
-          
+
           try {
             const result = await toolCollection.run(
               contentBlock.name,
