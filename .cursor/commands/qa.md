@@ -8,8 +8,9 @@ You will build the CLI, create all template variations, deploy them, and provide
 
 ## Step 1: Build the CLI
 
+From the cli repository root:
+
 ```bash
-cd /Users/rafaelgarcia/code/onkernel/cli
 make build
 ```
 
@@ -47,20 +48,20 @@ Use the built CLI binary with non-interactive flags. The command format is:
 
 Here are all valid language + template combinations:
 
-| Language    | Template         | Folder Name              | Needs Env File | Required Env Vars                    |
-|-------------|------------------|--------------------------|----------------|--------------------------------------|
-| typescript  | sample-app       | ts-sample-app            | No             | -                                    |
-| typescript  | captcha-solver   | ts-captcha-solver        | No             | -                                    |
-| typescript  | stagehand        | ts-stagehand             | Yes            | OPENAI_API_KEY                       |
-| typescript  | computer-use     | ts-computer-use          | Yes            | ANTHROPIC_API_KEY                    |
-| typescript  | magnitude        | ts-magnitude             | Yes            | ANTHROPIC_API_KEY                    |
-| typescript  | cua              | ts-cua                   | Yes            | OPENAI_API_KEY                       |
-| typescript  | gemini-cua       | ts-gemini-cua            | Yes            | GOOGLE_API_KEY, OPENAI_API_KEY       |
-| python      | sample-app       | py-sample-app            | No             | -                                    |
-| python      | captcha-solver   | py-captcha-solver        | No             | -                                    |
-| python      | browser-use      | py-browser-use           | Yes            | OPENAI_API_KEY                       |
-| python      | computer-use     | py-computer-use          | Yes            | ANTHROPIC_API_KEY                    |
-| python      | cua              | py-cua                   | Yes            | OPENAI_API_KEY                       |
+| Language   | Template       | Folder Name       | Needs Env File | Required Env Vars              |
+| ---------- | -------------- | ----------------- | -------------- | ------------------------------ |
+| typescript | sample-app     | ts-sample-app     | No             | -                              |
+| typescript | captcha-solver | ts-captcha-solver | No             | -                              |
+| typescript | stagehand      | ts-stagehand      | Yes            | OPENAI_API_KEY                 |
+| typescript | computer-use   | ts-computer-use   | Yes            | ANTHROPIC_API_KEY              |
+| typescript | magnitude      | ts-magnitude      | Yes            | ANTHROPIC_API_KEY              |
+| typescript | cua            | ts-cua            | Yes            | OPENAI_API_KEY                 |
+| typescript | gemini-cua     | ts-gemini-cua     | Yes            | GOOGLE_API_KEY, OPENAI_API_KEY |
+| python     | sample-app     | py-sample-app     | No             | -                              |
+| python     | captcha-solver | py-captcha-solver | No             | -                              |
+| python     | browser-use    | py-browser-use    | Yes            | OPENAI_API_KEY                 |
+| python     | computer-use   | py-computer-use   | Yes            | ANTHROPIC_API_KEY              |
+| python     | cua            | py-cua            | Yes            | OPENAI_API_KEY                 |
 
 ### Create Commands
 
@@ -116,6 +117,7 @@ cd py-captcha-solver && ../bin/kernel deploy main.py && cd ..
 For each of these, **STOP and ask the human** for the required API key(s), then create the `.env` file and deploy:
 
 **ts-stagehand** (needs OPENAI_API_KEY):
+
 ```bash
 cd ts-stagehand
 echo "OPENAI_API_KEY=<value from human>" > .env
@@ -124,6 +126,7 @@ cd ..
 ```
 
 **ts-computer-use** (needs ANTHROPIC_API_KEY):
+
 ```bash
 cd ts-computer-use
 echo "ANTHROPIC_API_KEY=<value from human>" > .env
@@ -132,6 +135,7 @@ cd ..
 ```
 
 **ts-magnitude** (needs ANTHROPIC_API_KEY):
+
 ```bash
 cd ts-magnitude
 echo "ANTHROPIC_API_KEY=<value from human>" > .env
@@ -140,6 +144,7 @@ cd ..
 ```
 
 **ts-cua** (needs OPENAI_API_KEY):
+
 ```bash
 cd ts-cua
 echo "OPENAI_API_KEY=<value from human>" > .env
@@ -148,6 +153,7 @@ cd ..
 ```
 
 **ts-gemini-cua** (needs GOOGLE_API_KEY and OPENAI_API_KEY):
+
 ```bash
 cd ts-gemini-cua
 cat > .env << EOF
@@ -159,6 +165,7 @@ cd ..
 ```
 
 **py-browser-use** (needs OPENAI_API_KEY):
+
 ```bash
 cd py-browser-use
 echo "OPENAI_API_KEY=<value from human>" > .env
@@ -167,6 +174,7 @@ cd ..
 ```
 
 **py-computer-use** (needs ANTHROPIC_API_KEY):
+
 ```bash
 cd py-computer-use
 echo "ANTHROPIC_API_KEY=<value from human>" > .env
@@ -175,6 +183,7 @@ cd ..
 ```
 
 **py-cua** (needs OPENAI_API_KEY):
+
 ```bash
 cd py-cua
 echo "OPENAI_API_KEY=<value from human>" > .env
@@ -222,4 +231,3 @@ After QA is complete, the human can remove the QA directory:
 cd ..
 rm -rf "$QA_DIR"
 ```
-
