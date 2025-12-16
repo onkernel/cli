@@ -503,9 +503,9 @@ func (b BrowsersCmd) LiveView(ctx context.Context, in BrowsersViewInput) error {
 		return util.CleanedUpSdkError{Err: err}
 	}
 
-	// Set default interval if not specified
+	// Set default interval if not specified or invalid
 	interval := in.Interval
-	if interval == 0 {
+	if interval <= 0 {
 		interval = 100 * time.Millisecond
 	}
 
@@ -828,8 +828,13 @@ func (b BrowsersCmd) ComputerScreenshot(ctx context.Context, in BrowsersComputer
 	// Display inline in terminal if requested
 	if in.Display {
 		if err := termimg.DisplayImage(os.Stdout, imgData); err != nil {
-			pterm.Error.Printf("Failed to display screenshot: %v\n", err)
-			return nil
+			// If --to was also specified, warn but continue to save the file
+			if in.To != "" {
+				pterm.Warning.Printf("Failed to display screenshot: %v\n", err)
+			} else {
+				pterm.Error.Printf("Failed to display screenshot: %v\n", err)
+				return nil
+			}
 		}
 	}
 
