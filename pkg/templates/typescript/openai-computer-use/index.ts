@@ -1,8 +1,8 @@
-import 'dotenv/config';
 import { Kernel, type KernelContext } from '@onkernel/sdk';
+import 'dotenv/config';
+import type { ResponseItem, ResponseOutputMessage } from 'openai/resources/responses/responses';
 import { Agent } from './lib/agent';
 import computers from './lib/computers';
-import type { ResponseOutputMessage, ResponseItem } from 'openai/resources/responses/responses';
 
 interface CuaInput {
   task: string;
@@ -40,11 +40,15 @@ app.action<CuaInput, CuaOutput>(
     const start = Date.now();
     if (!payload?.task) throw new Error('task is required');
 
-    try {
-      const kb = await kernel.browsers.create({ invocation_id: ctx.invocation_id });
-      console.log('> Kernel browser live view url:', kb.browser_live_view_url);
+    const kb = await kernel.browsers.create({ invocation_id: ctx.invocation_id });
+    console.log('> Kernel browser live view url:', kb.browser_live_view_url);
 
+    try {
       const { computer } = await computers.create({ type: 'kernel', cdp_ws_url: kb.cdp_ws_url });
+
+      // Navigate to DuckDuckGo as starting page (less likely to trigger captchas than Google)
+      await computer.goto('https://duckduckgo.com');
+
       const agent = new Agent({
         model: 'computer-use-preview',
         computer,
@@ -102,6 +106,8 @@ app.action<CuaInput, CuaOutput>(
         elapsed,
         answer: null,
       };
+    } finally {
+      await kernel.browsers.deleteByID(kb.session_id);
     }
   },
 );

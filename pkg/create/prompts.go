@@ -100,6 +100,7 @@ func handleTemplatePrompt(templateKVs TemplateKeyValues) (string, error) {
 	template, err := pterm.DefaultInteractiveSelect.
 		WithOptions(templateKVs.GetTemplateDisplayValues()).
 		WithDefaultText(TemplatePrompt).
+		WithMaxHeight(len(templateKVs)).
 		Show()
 	if err != nil {
 		return "", err

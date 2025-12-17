@@ -1,6 +1,6 @@
-import type { Page } from 'playwright';
-import { Action, ToolError } from './types/computer';
+import type { Page } from 'playwright-core';
 import type { ActionParams, BaseAnthropicTool, ToolResult } from './types/computer';
+import { Action, ToolError } from './types/computer';
 import { KeyboardUtils } from './utils/keyboard';
 import { ActionValidator } from './utils/validator';
 
@@ -137,15 +137,15 @@ export class ComputerTool implements BaseAnthropicTool {
   }
 
   async call(params: ActionParams): Promise<ToolResult> {
-    const { 
-      action, 
-      text, 
-      coordinate, 
+    const {
+      action,
+      text,
+      coordinate,
       scrollDirection: scrollDirectionParam,
       scroll_amount,
       scrollAmount,
-      duration, 
-      ...kwargs 
+      duration,
+      ...kwargs
     } = params;
 
     ActionValidator.validateActionParams(params, this.mouseActions, this.keyboardActions);
@@ -161,11 +161,11 @@ export class ComputerTool implements BaseAnthropicTool {
         const rect = range?.getBoundingClientRect();
         return rect ? { x: rect.x, y: rect.y } : null;
       });
-      
+
       if (!position) {
         throw new ToolError('Failed to get cursor position');
       }
-      
+
       return { output: `X=${position.x},Y=${position.y}` };
     }
 
@@ -191,11 +191,11 @@ export class ComputerTool implements BaseAnthropicTool {
       }
 
       const pageDimensions = await this.page.evaluate(() => {
-	      return { h: window.innerHeight, w: window.innerWidth };
+        return { h: window.innerHeight, w: window.innerWidth };
       });
       const pagePartitions = 25;
       const scrollFactor = (scrollAmountValue || 10) / pagePartitions;
-      
+
       if (scrollDirection === 'down' || scrollDirection === 'up') {
         const amount = pageDimensions.h * scrollFactor;
         console.log(`Scrolling ${amount.toFixed(2)} pixels ${scrollDirection}`);
@@ -205,7 +205,7 @@ export class ComputerTool implements BaseAnthropicTool {
         console.log(`Scrolling ${amount.toFixed(2)} pixels ${scrollDirection}`);
         await this.page.mouse.wheel(scrollDirection === 'right' ? amount : -amount, 0);
       }
-      
+
       await this.page.waitForTimeout(500);
       return await this.screenshot();
     }

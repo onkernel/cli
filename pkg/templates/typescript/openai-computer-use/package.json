@@ -5,14 +5,14 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@onkernel/sdk": "^0.22.0",
+    "@onkernel/sdk": "^0.23.0",
     "dotenv": "^17.2.3",
-    "openai": "^6.10.0",
-    "playwright": "^1.57.0",
+    "openai": "^6.13.0",
+    "playwright-core": "^1.57.0",
     "sharp": "^0.34.5"
   },
   "devDependencies": {
-    "@types/node": "^24.10.1",
+    "@types/node": "^22.15.17",
     "typescript": "^5.9.3"
   }
 }

@@ -1,11 +1,12 @@
+import asyncio
+import datetime
 import os
 from typing import TypedDict
+
 import kernel
-from kernel import Kernel
-from computers.default import KernelPlaywrightBrowser
 from agent import Agent
-import datetime
-import asyncio
+from computers.default import KernelPlaywrightBrowser
+from kernel import Kernel
 
 """
 Example app that runs an agent using openai CUA
@@ -21,11 +22,14 @@ Invoke this via CLI:
     kernel logs python-openai-cua -f # Open in separate tab
 """
 
+
 class CuaInput(TypedDict):
     task: str
 
+
 class CuaOutput(TypedDict):
     result: str
+
 
 api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
@@ -33,6 +37,7 @@ if not api_key:
 
 client = Kernel()
 app = kernel.App("python-openai-cua")
+
 
 @app.action("cua-task")
 async def cua_task(
@@ -52,6 +57,8 @@ async def cua_task(
 
     def run_agent():
         with KernelPlaywrightBrowser({"cdp_ws_url": cdp_ws_url}) as computer:
+            # Navigate to DuckDuckGo as starting page (less likely to trigger captchas than Google)
+            computer.goto("https://duckduckgo.com")
 
             # messages to provide to the agent
             items = [
@@ -59,17 +66,17 @@ async def cua_task(
                     "role": "system",
                     "content": f"- Current date and time: {datetime.datetime.utcnow().isoformat()} ({datetime.datetime.utcnow().strftime('%A')})",
                 },
-                {
-                    "role": "user",
-                    "content": payload["task"]
-                }
+                {"role": "user", "content": payload["task"]},
             ]
 
             # setup the agent
             agent = Agent(
                 computer=computer,
-                tools=[], # can provide additional tools to the agent
-                acknowledge_safety_check_callback=lambda message: (print(f"> agent : safety check message (skipping): {message}") or True) # safety check function , now defaults to true
+                tools=[],  # can provide additional tools to the agent
+                acknowledge_safety_check_callback=lambda message: (
+                    print(f"> agent : safety check message (skipping): {message}")
+                    or True
+                ),  # safety check function , now defaults to true
             )
 
             # run the agent
@@ -83,7 +90,12 @@ async def cua_task(
                 raise ValueError("No response from agent")
             # The content may be a list of blocks, get the first text block
             content = response_items[-1]["content"]
-            if isinstance(content, list) and content and isinstance(content[0], dict) and "text" in content[0]:
+            if (
+                isinstance(content, list)
+                and content
+                and isinstance(content[0], dict)
+                and "text" in content[0]
+            ):
                 result = content[0]["text"]
             elif isinstance(content, str):
                 result = content
@@ -91,4 +103,7 @@ async def cua_task(
                 result = str(content)
             return {"result": result}
 
-    return await asyncio.to_thread(run_agent)
+    try:
+        return await asyncio.to_thread(run_agent)
+    finally:
+        await asyncio.to_thread(client.browsers.delete_by_id, kernel_browser.session_id)
