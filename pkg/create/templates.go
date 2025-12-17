@@ -213,6 +213,7 @@ var Commands = map[string]map[string]DeployConfig{
 		},
 		TemplateOpenAIComputerUse: {
 			EntryPoint:    "main.py",
+			NeedsEnvFile:  true,
 			InvokeCommand: `kernel invoke python-openai-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'`,
 		},
 		TemplateOpenAGIComputerUse: {
