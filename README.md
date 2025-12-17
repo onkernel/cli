@@ -116,7 +116,7 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
 - `--language <language>`, `-l` - Sepecify app language: `typescript`, or `python`
 - `--template <template>`, `-t` - Template to use:
   - `sample-app` - Basic template with Playwright integration
-  - `advanced-sample` - Sample apps using advanced Kernel configs
+  - `captcha-solver` - Template demonstrating Kernel's auto-CAPTCHA solver
   - `stagehand` - Template with Stagehand SDK (TypeScript only)
   - `browser-use` - Template with Browser Use SDK (Python only)
   - `anthropic-computer-use` - Anthropic Computer Use prompt loop
