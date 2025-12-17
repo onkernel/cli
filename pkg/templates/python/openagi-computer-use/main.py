@@ -15,7 +15,13 @@ mock_pyautogui.__spec__ = ModuleSpec("pyautogui", None)
 sys.modules["mouseinfo"] = mock_mouseinfo
 sys.modules["pyautogui"] = mock_pyautogui
 
-# Set OAGI API base URL (no .env file in deployed environment)
+# Load local env vars from a .env file when running locally.
+# In deployed environments this is typically a no-op.
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Set OAGI API base URL (can be overridden via environment variables).
 os.environ.setdefault("OAGI_BASE_URL", "https://api.agiopen.org")
 
 from typing import TypedDict, List, Optional

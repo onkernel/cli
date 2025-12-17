@@ -23,7 +23,8 @@ Best for structured workflows with predefined steps (todos).
 2. Deploy the app:
 ```bash
 kernel login
-kernel deploy main.py -e OAGI_API_KEY=your_api_key --force
+cp .env.example .env
+kernel deploy main.py --env-file .env
 ```
 
 ## Usage
