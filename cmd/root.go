@@ -11,6 +11,7 @@ import (
 
 	"github.com/charmbracelet/fang"
 	"github.com/charmbracelet/lipgloss/v2"
+	"github.com/onkernel/cli/cmd/mcp"
 	"github.com/onkernel/cli/cmd/proxies"
 	"github.com/onkernel/cli/pkg/auth"
 	"github.com/onkernel/cli/pkg/update"
@@ -89,7 +90,7 @@ func isAuthExempt(cmd *cobra.Command) bool {
 
 	// Check if the top-level command is in the exempt list
 	switch topLevel.Name() {
-	case "login", "logout", "auth", "help", "completion", "create":
+	case "login", "logout", "auth", "help", "completion", "create", "mcp":
 		return true
 	}
 
@@ -139,6 +140,7 @@ func init() {
 	rootCmd.AddCommand(proxies.ProxiesCmd)
 	rootCmd.AddCommand(extensionsCmd)
 	rootCmd.AddCommand(createCmd)
+	rootCmd.AddCommand(mcp.MCPCmd)
 
 	rootCmd.PersistentPostRunE = func(cmd *cobra.Command, args []string) error {
 		// running synchronously so we never slow the command
