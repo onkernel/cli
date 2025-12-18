@@ -2062,12 +2062,9 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 		pterm.Info.Printf("Acquiring browser from pool %s...\n", pool)
 		poolSvc := client.BrowserPools
 
-		req := kernel.BrowserPoolAcquireRequestParam{}
+		acquireParams := kernel.BrowserPoolAcquireParams{}
 		if cmd.Flags().Changed("timeout") && timeout > 0 {
-			req.AcquireTimeoutSeconds = kernel.Int(int64(timeout))
-		}
-		acquireParams := kernel.BrowserPoolAcquireParams{
-			BrowserPoolAcquireRequest: req,
+			acquireParams.AcquireTimeoutSeconds = kernel.Int(int64(timeout))
 		}
 
 		resp, err := (&poolSvc).Acquire(cmd.Context(), pool, acquireParams)
