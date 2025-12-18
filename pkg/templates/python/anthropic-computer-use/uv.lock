@@ -572,7 +572,7 @@ wheels = [
 ]
 
 [[package]]
-name = "python-cu"
+name = "python-anthropic-cua"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

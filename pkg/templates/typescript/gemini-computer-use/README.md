@@ -1,4 +1,4 @@
-# Kernel TypeScript SDK + Stagehand + Gemini Computer Use Agent
+# Kernel TypeScript Sample App - Gemini Computer Use
 
 A Kernel application that demonstrates Computer Use Agent (CUA) capabilities using Google's Gemini 2.5 model with Stagehand for browser automation.
 

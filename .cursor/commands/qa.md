@@ -48,20 +48,21 @@ Use the built CLI binary with non-interactive flags. The command format is:
 
 Here are all valid language + template combinations:
 
-| Language   | Template       | Folder Name       | Needs Env File | Required Env Vars              |
-| ---------- | -------------- | ----------------- | -------------- | ------------------------------ |
-| typescript | sample-app     | ts-sample-app     | No             | -                              |
-| typescript | captcha-solver | ts-captcha-solver | No             | -                              |
-| typescript | stagehand      | ts-stagehand      | Yes            | OPENAI_API_KEY                 |
-| typescript | computer-use   | ts-computer-use   | Yes            | ANTHROPIC_API_KEY              |
-| typescript | magnitude      | ts-magnitude      | Yes            | ANTHROPIC_API_KEY              |
-| typescript | cua            | ts-cua            | Yes            | OPENAI_API_KEY                 |
-| typescript | gemini-cua     | ts-gemini-cua     | Yes            | GOOGLE_API_KEY, OPENAI_API_KEY |
-| python     | sample-app     | py-sample-app     | No             | -                              |
-| python     | captcha-solver | py-captcha-solver | No             | -                              |
-| python     | browser-use    | py-browser-use    | Yes            | OPENAI_API_KEY                 |
-| python     | computer-use   | py-computer-use   | Yes            | ANTHROPIC_API_KEY              |
-| python     | cua            | py-cua            | Yes            | OPENAI_API_KEY                 |
+| Language   | Template               | Folder Name       | Deployed App Name     | Needs Env File | Required Env Vars              |
+| ---------- | ---------------------- | ----------------- | --------------------- | -------------- | ------------------------------ |
+| typescript | sample-app             | ts-sample-app     | ts-basic              | No             | -                              |
+| typescript | captcha-solver         | ts-captcha-solver | ts-captcha-solver     | No             | -                              |
+| typescript | stagehand              | ts-stagehand      | ts-stagehand          | Yes            | OPENAI_API_KEY                 |
+| typescript | anthropic-computer-use | ts-anthropic-cua  | ts-anthropic-cua      | Yes            | ANTHROPIC_API_KEY              |
+| typescript | magnitude              | ts-magnitude      | ts-magnitude          | Yes            | ANTHROPIC_API_KEY              |
+| typescript | openai-computer-use    | ts-openai-cua     | ts-openai-cua         | Yes            | OPENAI_API_KEY                 |
+| typescript | gemini-computer-use    | ts-gemini-cua     | ts-gemini-cua         | Yes            | GOOGLE_API_KEY, OPENAI_API_KEY |
+| python     | sample-app             | py-sample-app     | python-basic          | No             | -                              |
+| python     | captcha-solver         | py-captcha-solver | python-captcha-solver | No             | -                              |
+| python     | browser-use            | py-browser-use    | python-bu             | Yes            | OPENAI_API_KEY                 |
+| python     | anthropic-computer-use | py-anthropic-cua  | python-anthropic-cua  | Yes            | ANTHROPIC_API_KEY              |
+| python     | openai-computer-use    | py-openai-cua     | python-openai-cua     | Yes            | OPENAI_API_KEY                 |
+| python     | openagi-computer-use   | py-openagi-cua    | python-openagi-cua    | Yes            | OAGI_API_KEY                   |
 
 ### Create Commands
 
@@ -72,17 +73,18 @@ Run each of these (they are non-interactive when all flags are provided):
 ../bin/kernel create -n ts-sample-app -l typescript -t sample-app
 ../bin/kernel create -n ts-captcha-solver -l typescript -t captcha-solver
 ../bin/kernel create -n ts-stagehand -l typescript -t stagehand
-../bin/kernel create -n ts-computer-use -l typescript -t computer-use
+../bin/kernel create -n ts-anthropic-cua -l typescript -t anthropic-computer-use
 ../bin/kernel create -n ts-magnitude -l typescript -t magnitude
-../bin/kernel create -n ts-cua -l typescript -t cua
-../bin/kernel create -n ts-gemini-cua -l typescript -t gemini-cua
+../bin/kernel create -n ts-openai-cua -l typescript -t openai-computer-use
+../bin/kernel create -n ts-gemini-cua -l typescript -t gemini-computer-use
 
 # Python templates
 ../bin/kernel create -n py-sample-app -l python -t sample-app
 ../bin/kernel create -n py-captcha-solver -l python -t captcha-solver
 ../bin/kernel create -n py-browser-use -l python -t browser-use
-../bin/kernel create -n py-computer-use -l python -t computer-use
-../bin/kernel create -n py-cua -l python -t cua
+../bin/kernel create -n py-anthropic-cua -l python -t anthropic-computer-use
+../bin/kernel create -n py-openai-cua -l python -t openai-computer-use
+../bin/kernel create -n py-openagi-cua -l python -t openagi-computer-use
 ```
 
 ## Step 5: Deploy Each Template
@@ -125,10 +127,10 @@ echo "OPENAI_API_KEY=<value from human>" > .env
 cd ..
 ```
 
-**ts-computer-use** (needs ANTHROPIC_API_KEY):
+**ts-anthropic-cua** (needs ANTHROPIC_API_KEY):
 
 ```bash
-cd ts-computer-use
+cd ts-anthropic-cua
 echo "ANTHROPIC_API_KEY=<value from human>" > .env
 ../bin/kernel deploy index.ts --env-file .env
 cd ..
@@ -143,10 +145,10 @@ echo "ANTHROPIC_API_KEY=<value from human>" > .env
 cd ..
 ```
 
-**ts-cua** (needs OPENAI_API_KEY):
+**ts-openai-cua** (needs OPENAI_API_KEY):
 
 ```bash
-cd ts-cua
+cd ts-openai-cua
 echo "OPENAI_API_KEY=<value from human>" > .env
 ../bin/kernel deploy index.ts --env-file .env
 cd ..
@@ -173,20 +175,29 @@ echo "OPENAI_API_KEY=<value from human>" > .env
 cd ..
 ```
 
-**py-computer-use** (needs ANTHROPIC_API_KEY):
+**py-anthropic-cua** (needs ANTHROPIC_API_KEY):
 
 ```bash
-cd py-computer-use
+cd py-anthropic-cua
 echo "ANTHROPIC_API_KEY=<value from human>" > .env
 ../bin/kernel deploy main.py --env-file .env
 cd ..
 ```
 
-**py-cua** (needs OPENAI_API_KEY):
+**py-openai-cua** (needs OPENAI_API_KEY):
 
 ```bash
-cd py-cua
+cd py-openai-cua
 echo "OPENAI_API_KEY=<value from human>" > .env
+../bin/kernel deploy main.py --env-file .env
+cd ..
+```
+
+**py-openagi-cua** (needs OAGI_API_KEY):
+
+```bash
+cd py-openagi-cua
+echo "OAGI_API_KEY=<value from human>" > .env
 ../bin/kernel deploy main.py --env-file .env
 cd ..
 ```
@@ -200,28 +211,67 @@ Once all deployments are complete, present the human with these invoke commands 
 kernel invoke ts-basic get-page-title --payload '{"url": "https://www.google.com"}'
 kernel invoke ts-captcha-solver test-captcha-solver
 kernel invoke ts-stagehand teamsize-task --payload '{"company": "Kernel"}'
-kernel invoke ts-cu cu-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'
+kernel invoke ts-anthropic-cua cua-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'
 kernel invoke ts-magnitude mag-url-extract --payload '{"url": "https://en.wikipedia.org/wiki/Special:Random"}'
-kernel invoke ts-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'
+kernel invoke ts-openai-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'
 kernel invoke ts-gemini-cua gemini-cua-task
 
 # Python apps
 kernel invoke python-basic get-page-title --payload '{"url": "https://www.google.com"}'
 kernel invoke python-captcha-solver test-captcha-solver
 kernel invoke python-bu bu-task --payload '{"task": "Compare the price of gpt-4o and DeepSeek-V3"}'
-kernel invoke python-cu cu-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'
-kernel invoke python-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'
+kernel invoke python-anthropic-cua cua-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'
+kernel invoke python-openai-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'
+kernel invoke python-openagi-cua openagi-default-task -p '{"instruction": "Navigate to https://agiopen.org and click the What is Computer Use? button"}'
 ```
+
+## Step 7: Automated Runtime Testing (Optional)
+
+**STOP and ask the human:** "Would you like me to automatically invoke all 13 templates and report back on their runtime status?"
+
+If the human agrees, invoke each template and collect results. Present findings in this format:
+
+### Testing Guidelines
+
+- **Timeout:** Cancel each invocation after 90 seconds if it has not completed. Mark the status as `TIMEOUT` in the results table.
+- **Parallel execution:** You may run multiple invocations in parallel to speed up testing.
+- **Error handling:** Capture any runtime errors and include them in the Notes column.
+
+### Test Results
+
+| Template          | App Name              | Status  | Notes |
+| ----------------- | --------------------- | ------- | ----- |
+| ts-sample-app     | ts-basic              |         |       |
+| ts-captcha-solver | ts-captcha-solver     |         |       |
+| ts-stagehand      | ts-stagehand          |         |       |
+| ts-anthropic-cua  | ts-anthropic-cua      |         |       |
+| ts-magnitude      | ts-magnitude          |         |       |
+| ts-openai-cua     | ts-openai-cua         |         |       |
+| ts-gemini-cua     | ts-gemini-cua         |         |       |
+| py-sample-app     | python-basic          |         |       |
+| py-captcha-solver | python-captcha-solver |         |       |
+| py-browser-use    | python-bu             |         |       |
+| py-anthropic-cua  | python-anthropic-cua  |         |       |
+| py-openai-cua     | python-openai-cua     |         |       |
+| py-openagi-cua    | python-openagi-cua    |         |       |
+
+Status values:
+- **SUCCESS**: App started and returned a result
+- **FAILED**: App encountered a runtime error
+- **TIMEOUT**: App did not complete within 90 seconds (cancelled)
+
+Notes should include brief error messages for failures or confirmation of successful output.
 
 ## Summary Checklist
 
 - [ ] Built CLI with `make build`
 - [ ] Created QA directory
 - [ ] Got KERNEL_API_KEY from human
-- [ ] Created all 12 template variations
-- [ ] Got required API keys from human (OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY)
-- [ ] Deployed all 12 apps
+- [ ] Created all 13 template variations
+- [ ] Got required API keys from human (OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY, OAGI_API_KEY)
+- [ ] Deployed all 13 apps
 - [ ] Provided invoke commands to human for manual testing
+- [ ] (Optional) Ran automated runtime testing and reviewed results
 
 ## Cleanup
 

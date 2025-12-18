@@ -1,5 +1,5 @@
 [project]
-name = "python-cua"
+name = "python-openai-cua"
 version = "0.1.0"
 description = "Kernel sample app for CUA"
 readme = "README.md"

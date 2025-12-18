@@ -4,7 +4,7 @@ import { samplingLoop } from './loop';
 
 const kernel = new Kernel();
 
-const app = kernel.app('ts-cu');
+const app = kernel.app('ts-anthropic-cua');
 
 interface QueryInput {
   query: string;
@@ -23,7 +23,7 @@ if (!ANTHROPIC_API_KEY) {
 }
 
 app.action<QueryInput, QueryOutput>(
-  'cu-task',
+  'cua-task',
   async (ctx: KernelContext, payload?: QueryInput): Promise<QueryOutput> => {
     if (!payload?.query) {
       throw new Error('Query is required');

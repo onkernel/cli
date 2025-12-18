@@ -8,14 +8,15 @@ import (
 
 // Template key constants
 const (
-	TemplateSampleApp     = "sample-app"
-	TemplateCaptchaSolver = "captcha-solver"
-	TemplateComputerUse   = "computer-use"
-	TemplateCUA           = "cua"
-	TemplateMagnitude     = "magnitude"
-	TemplateGeminiCUA     = "gemini-cua"
-	TemplateBrowserUse    = "browser-use"
-	TemplateStagehand     = "stagehand"
+	TemplateSampleApp            = "sample-app"
+	TemplateCaptchaSolver        = "captcha-solver"
+	TemplateAnthropicComputerUse = "anthropic-computer-use"
+	TemplateOpenAIComputerUse    = "openai-computer-use"
+	TemplateMagnitude            = "magnitude"
+	TemplateGeminiComputerUse    = "gemini-computer-use"
+	TemplateBrowserUse           = "browser-use"
+	TemplateStagehand            = "stagehand"
+	TemplateOpenAGIComputerUse   = "openagi-computer-use"
 )
 
 type TemplateInfo struct {
@@ -42,14 +43,14 @@ var Templates = map[string]TemplateInfo{
 		Description: "Demo of Kernel's auto-CAPTCHA solving capability",
 		Languages:   []string{LanguageTypeScript, LanguagePython},
 	},
-	TemplateComputerUse: {
-		Name:        "Computer Use",
-		Description: "Implements the Anthropic Computer Use SDK",
+	TemplateAnthropicComputerUse: {
+		Name:        "Anthropic Computer Use",
+		Description: "Implements an Anthropic computer use agent",
 		Languages:   []string{LanguageTypeScript, LanguagePython},
 	},
-	TemplateCUA: {
-		Name:        "CUA Sample",
-		Description: "Implements a Computer Use Agent (OpenAI CUA) sample",
+	TemplateOpenAIComputerUse: {
+		Name:        "OpenAI Computer Use",
+		Description: "Implements an OpenAI computer use agent",
 		Languages:   []string{LanguageTypeScript, LanguagePython},
 	},
 	TemplateMagnitude: {
@@ -57,9 +58,9 @@ var Templates = map[string]TemplateInfo{
 		Description: "Implements the Magnitude.run SDK",
 		Languages:   []string{LanguageTypeScript},
 	},
-	TemplateGeminiCUA: {
-		Name:        "Gemini CUA",
-		Description: "Implements Gemini 2.5 Computer Use Agent",
+	TemplateGeminiComputerUse: {
+		Name:        "Gemini Computer Use",
+		Description: "Implements a Gemini computer use agent",
 		Languages:   []string{LanguageTypeScript},
 	},
 	TemplateBrowserUse: {
@@ -71,6 +72,11 @@ var Templates = map[string]TemplateInfo{
 		Name:        "Stagehand",
 		Description: "Implements the Stagehand v3 SDK",
 		Languages:   []string{LanguageTypeScript},
+	},
+	TemplateOpenAGIComputerUse: {
+		Name:        "OpenAGI Computer Use",
+		Description: "Implements an OpenAGI computer use agent",
+		Languages:   []string{LanguagePython},
 	},
 }
 
@@ -87,12 +93,23 @@ func GetSupportedTemplatesForLanguage(language string) TemplateKeyValues {
 	}
 
 	sort.Slice(templates, func(i, j int) bool {
-		// Put computer-use first, then sort alphabetically
-		if templates[i].Key == TemplateComputerUse {
-			return true
+		// Put computer-use templates first (Anthropic/OpenAI/Gemini), then sort alphabetically.
+		priority := func(key string) int {
+			switch key {
+			case TemplateAnthropicComputerUse:
+				return 0
+			case TemplateOpenAIComputerUse:
+				return 1
+			case TemplateGeminiComputerUse:
+				return 2
+			default:
+				return 10
+			}
 		}
-		if templates[j].Key == TemplateComputerUse {
-			return false
+
+		pi, pj := priority(templates[i].Key), priority(templates[j].Key)
+		if pi != pj {
+			return pi < pj
 		}
 		return templates[i].Key < templates[j].Key
 	})
@@ -152,22 +169,22 @@ var Commands = map[string]map[string]DeployConfig{
 			NeedsEnvFile:  true,
 			InvokeCommand: `kernel invoke ts-stagehand teamsize-task --payload '{"company": "Kernel"}'`,
 		},
-		TemplateComputerUse: {
+		TemplateAnthropicComputerUse: {
 			EntryPoint:    "index.ts",
 			NeedsEnvFile:  true,
-			InvokeCommand: `kernel invoke ts-cu cu-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'`,
+			InvokeCommand: `kernel invoke ts-anthropic-cua cua-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'`,
 		},
 		TemplateMagnitude: {
 			EntryPoint:    "index.ts",
 			NeedsEnvFile:  true,
 			InvokeCommand: `kernel invoke ts-magnitude mag-url-extract --payload '{"url": "https://en.wikipedia.org/wiki/Special:Random"}'`,
 		},
-		TemplateCUA: {
+		TemplateOpenAIComputerUse: {
 			EntryPoint:    "index.ts",
 			NeedsEnvFile:  true,
-			InvokeCommand: `kernel invoke ts-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'`,
+			InvokeCommand: `kernel invoke ts-openai-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'`,
 		},
-		TemplateGeminiCUA: {
+		TemplateGeminiComputerUse: {
 			EntryPoint:    "index.ts",
 			NeedsEnvFile:  true,
 			InvokeCommand: "kernel invoke ts-gemini-cua gemini-cua-task",
@@ -189,15 +206,20 @@ var Commands = map[string]map[string]DeployConfig{
 			NeedsEnvFile:  true,
 			InvokeCommand: `kernel invoke python-bu bu-task --payload '{"task": "Compare the price of gpt-4o and DeepSeek-V3"}'`,
 		},
-		TemplateComputerUse: {
+		TemplateAnthropicComputerUse: {
 			EntryPoint:    "main.py",
 			NeedsEnvFile:  true,
-			InvokeCommand: `kernel invoke python-cu cu-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'`,
+			InvokeCommand: `kernel invoke python-anthropic-cua cua-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'`,
 		},
-		TemplateCUA: {
+		TemplateOpenAIComputerUse: {
 			EntryPoint:    "main.py",
 			NeedsEnvFile:  true,
-			InvokeCommand: `kernel invoke python-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'`,
+			InvokeCommand: `kernel invoke python-openai-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'`,
+		},
+		TemplateOpenAGIComputerUse: {
+			EntryPoint:    "main.py",
+			NeedsEnvFile:  true,
+			InvokeCommand: `kernel invoke python-openagi-cua openagi-default-task -p '{"instruction": "Navigate to https://agiopen.org and click the What is Computer Use? button", "record_replay": "True"}'`,
 		},
 	},
 }
