@@ -136,6 +136,17 @@ func stripJSONComments(data []byte) []byte {
 			continue
 		}
 
+		// Check multi-line comment first - skip all content including quotes
+		if inMultiLineComment {
+			if i+1 < len(content) && char == '*' && content[i+1] == '/' {
+				inMultiLineComment = false
+				i += 2
+				continue
+			}
+			i++
+			continue
+		}
+
 		if char == '\\' && inString {
 			escapeNext = true
 			result.WriteByte(char)
@@ -152,16 +163,6 @@ func stripJSONComments(data []byte) []byte {
 
 		if inString {
 			result.WriteByte(char)
-			i++
-			continue
-		}
-
-		if inMultiLineComment {
-			if i+1 < len(content) && char == '*' && content[i+1] == '/' {
-				inMultiLineComment = false
-				i += 2
-				continue
-			}
 			i++
 			continue
 		}
