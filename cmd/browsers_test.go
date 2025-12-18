@@ -357,6 +357,108 @@ func TestBrowsersView_PrintsErrorOnGetFailure(t *testing.T) {
 	assert.Contains(t, err.Error(), "get error")
 }
 
+func TestBrowsersLiveView_RequiresComputerService(t *testing.T) {
+	setupStdoutCapture(t)
+
+	fake := &FakeBrowsersService{
+		GetFunc: func(ctx context.Context, id string, opts ...option.RequestOption) (*kernel.BrowserGetResponse, error) {
+			return &kernel.BrowserGetResponse{SessionID: "abc"}, nil
+		},
+	}
+	// No computer service
+	b := BrowsersCmd{browsers: fake, computer: nil}
+	_ = b.View(context.Background(), BrowsersViewInput{Identifier: "abc", Live: true})
+
+	out := outBuf.String()
+	assert.Contains(t, out, "computer service not available")
+}
+
+func TestBrowsersLiveView_RequiresTerminalSupport(t *testing.T) {
+	setupStdoutCapture(t)
+
+	// Unset terminal env vars to simulate unsupported terminal
+	origTermProgram := os.Getenv("TERM_PROGRAM")
+	origKittyID := os.Getenv("KITTY_WINDOW_ID")
+	defer func() {
+		os.Setenv("TERM_PROGRAM", origTermProgram)
+		os.Setenv("KITTY_WINDOW_ID", origKittyID)
+	}()
+	os.Unsetenv("TERM_PROGRAM")
+	os.Unsetenv("KITTY_WINDOW_ID")
+
+	fake := &FakeBrowsersService{
+		GetFunc: func(ctx context.Context, id string, opts ...option.RequestOption) (*kernel.BrowserGetResponse, error) {
+			return &kernel.BrowserGetResponse{SessionID: "abc"}, nil
+		},
+	}
+	fakeComp := &FakeComputerService{}
+	b := BrowsersCmd{browsers: fake, computer: fakeComp}
+	_ = b.View(context.Background(), BrowsersViewInput{Identifier: "abc", Live: true})
+
+	out := outBuf.String()
+	assert.Contains(t, out, "Terminal does not support inline images")
+}
+
+func TestBrowsersLiveView_ExitsOnCancelledContext(t *testing.T) {
+	setupStdoutCapture(t)
+
+	// Set up terminal support
+	origTermProgram := os.Getenv("TERM_PROGRAM")
+	origKittyID := os.Getenv("KITTY_WINDOW_ID")
+	defer func() {
+		os.Setenv("TERM_PROGRAM", origTermProgram)
+		os.Setenv("KITTY_WINDOW_ID", origKittyID)
+	}()
+	os.Setenv("TERM_PROGRAM", "ghostty")
+	os.Unsetenv("KITTY_WINDOW_ID")
+
+	fake := &FakeBrowsersService{
+		GetFunc: func(ctx context.Context, id string, opts ...option.RequestOption) (*kernel.BrowserGetResponse, error) {
+			return &kernel.BrowserGetResponse{SessionID: "abc"}, nil
+		},
+	}
+
+	screenshotCount := 0
+	fakeComp := &FakeComputerService{
+		CaptureScreenshotFunc: func(ctx context.Context, id string, body kernel.BrowserComputerCaptureScreenshotParams, opts ...option.RequestOption) (*http.Response, error) {
+			screenshotCount++
+			// Return a simple PNG-like response
+			return &http.Response{
+				StatusCode: 200,
+				Header:     http.Header{"Content-Type": []string{"image/png"}},
+				Body:       io.NopCloser(strings.NewReader("fake-png-data")),
+			}, nil
+		},
+	}
+
+	b := BrowsersCmd{browsers: fake, computer: fakeComp}
+
+	// Create a context that we'll cancel immediately after first frame
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Run in goroutine and cancel after a short delay
+	done := make(chan struct{})
+	go func() {
+		_ = b.View(ctx, BrowsersViewInput{Identifier: "abc", Live: true, Interval: 50 * time.Millisecond})
+		close(done)
+	}()
+
+	// Wait a bit for first frame, then cancel
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+
+	// Wait for view to exit
+	select {
+	case <-done:
+		// Success - view exited
+	case <-time.After(2 * time.Second):
+		t.Fatal("LiveView did not exit after context cancellation")
+	}
+
+	// Should have captured at least one screenshot
+	assert.GreaterOrEqual(t, screenshotCount, 1)
+}
+
 func TestBrowsersGet_PrintsDetails(t *testing.T) {
 	setupStdoutCapture(t)
 
@@ -1055,6 +1157,41 @@ func TestBrowsersComputerScreenshot_SavesFile(t *testing.T) {
 	}}
 	b := BrowsersCmd{browsers: fakeBrowsers, computer: fakeComp}
 	_ = b.ComputerScreenshot(context.Background(), BrowsersComputerScreenshotInput{Identifier: "id", X: 0, Y: 0, Width: 10, Height: 10, To: outPath})
+	data, err := os.ReadFile(outPath)
+	assert.NoError(t, err)
+	assert.Equal(t, "pngDATA", string(data))
+}
+
+func TestBrowsersComputerScreenshot_RequiresOutputOption(t *testing.T) {
+	setupStdoutCapture(t)
+	fakeBrowsers := newFakeBrowsersServiceWithSimpleGet()
+	fakeComp := &FakeComputerService{CaptureScreenshotFunc: func(ctx context.Context, id string, body kernel.BrowserComputerCaptureScreenshotParams, opts ...option.RequestOption) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"image/png"}}, Body: io.NopCloser(strings.NewReader("pngDATA"))}, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, computer: fakeComp}
+	// Neither --to nor --display specified
+	_ = b.ComputerScreenshot(context.Background(), BrowsersComputerScreenshotInput{Identifier: "id"})
+	out := outBuf.String()
+	assert.Contains(t, out, "specify --to to save to a file, --display to show inline, or both")
+}
+
+func TestBrowsersComputerScreenshot_DisplayAndSave(t *testing.T) {
+	setupStdoutCapture(t)
+	// Set iTerm2 env var to enable display
+	origTermProgram := os.Getenv("TERM_PROGRAM")
+	defer os.Setenv("TERM_PROGRAM", origTermProgram)
+	os.Setenv("TERM_PROGRAM", "iTerm.app")
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "shot.png")
+	fakeBrowsers := newFakeBrowsersServiceWithSimpleGet()
+	fakeComp := &FakeComputerService{CaptureScreenshotFunc: func(ctx context.Context, id string, body kernel.BrowserComputerCaptureScreenshotParams, opts ...option.RequestOption) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"image/png"}}, Body: io.NopCloser(strings.NewReader("pngDATA"))}, nil
+	}}
+	b := BrowsersCmd{browsers: fakeBrowsers, computer: fakeComp}
+	// Both --display and --to specified
+	_ = b.ComputerScreenshot(context.Background(), BrowsersComputerScreenshotInput{Identifier: "id", To: outPath, Display: true})
+	// File should be saved
 	data, err := os.ReadFile(outPath)
 	assert.NoError(t, err)
 	assert.Equal(t, "pngDATA", string(data))

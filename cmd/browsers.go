@@ -10,11 +10,15 @@ import (
 	"math/big"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
+	"github.com/onkernel/cli/pkg/termimg"
 	"github.com/onkernel/cli/pkg/util"
 	"github.com/onkernel/kernel-go-sdk"
 	"github.com/onkernel/kernel-go-sdk/option"
@@ -172,6 +176,8 @@ type BrowsersDeleteInput struct {
 
 type BrowsersViewInput struct {
 	Identifier string
+	Live       bool
+	Interval   time.Duration
 }
 
 type BrowsersGetInput struct {
@@ -456,6 +462,11 @@ func (b BrowsersCmd) Delete(ctx context.Context, in BrowsersDeleteInput) error {
 }
 
 func (b BrowsersCmd) View(ctx context.Context, in BrowsersViewInput) error {
+	// If live view requested, run the live view loop
+	if in.Live {
+		return b.LiveView(ctx, in)
+	}
+
 	browser, err := b.browsers.Get(ctx, in.Identifier)
 	if err != nil {
 		return util.CleanedUpSdkError{Err: err}
@@ -471,6 +482,102 @@ func (b BrowsersCmd) View(ctx context.Context, in BrowsersViewInput) error {
 
 	fmt.Println(browser.BrowserLiveViewURL)
 	return nil
+}
+
+// LiveView displays a continuously updating view of the browser in the terminal.
+func (b BrowsersCmd) LiveView(ctx context.Context, in BrowsersViewInput) error {
+	if b.computer == nil {
+		pterm.Error.Println("computer service not available")
+		return nil
+	}
+
+	// Check terminal supports inline images
+	if !termimg.IsSupported() {
+		pterm.Error.Printf("Terminal does not support inline images (detected: %s). Try using iTerm2, Kitty, or Ghostty.\n", termimg.DetectTerminal())
+		return nil
+	}
+
+	// Verify browser exists and get session ID
+	browser, err := b.browsers.Get(ctx, in.Identifier)
+	if err != nil {
+		return util.CleanedUpSdkError{Err: err}
+	}
+
+	// Set default interval if not specified or invalid
+	interval := in.Interval
+	if interval <= 0 {
+		interval = 100 * time.Millisecond
+	}
+
+	// Set up signal handling for graceful exit
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
+
+	// Create a cancellable context
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Handle signals in a goroutine
+	go func() {
+		<-sigChan
+		cancel()
+	}()
+
+	// Hide cursor and set up cleanup
+	termimg.HideCursor(os.Stdout)
+	defer termimg.CleanupLiveView(os.Stdout, false)
+
+	// Clear screen initially
+	termimg.ClearScreen(os.Stdout)
+
+	pterm.Info.Println("Live view started. Press Ctrl+C to exit.")
+	fmt.Println() // Add space before image
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	// Capture and display first frame immediately
+	if err := b.captureAndDisplayFrame(ctx, browser.SessionID); err != nil {
+		// If first frame fails, show error and exit
+		pterm.Error.Printf("Failed to capture screenshot: %v\n", err)
+		return nil
+	}
+
+	// Main loop
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			if err := b.captureAndDisplayFrame(ctx, browser.SessionID); err != nil {
+				// Log error but continue trying
+				// The browser session may have ended
+				if ctx.Err() != nil {
+					return nil
+				}
+				// Browser session likely ended
+				pterm.Warning.Println("\nBrowser session ended or screenshot failed")
+				return nil
+			}
+		}
+	}
+}
+
+// captureAndDisplayFrame captures a screenshot and displays it in the terminal.
+func (b BrowsersCmd) captureAndDisplayFrame(ctx context.Context, sessionID string) error {
+	res, err := b.computer.CaptureScreenshot(ctx, sessionID, kernel.BrowserComputerCaptureScreenshotParams{})
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	imgData, err := io.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+
+	return termimg.ClearAndDisplayImage(os.Stdout, imgData)
 }
 
 func (b BrowsersCmd) Get(ctx context.Context, in BrowsersGetInput) error {
@@ -595,6 +702,7 @@ type BrowsersComputerScreenshotInput struct {
 	Height     int64
 	To         string
 	HasRegion  bool
+	Display    bool
 }
 
 type BrowsersComputerTypeTextInput struct {
@@ -703,21 +811,48 @@ func (b BrowsersCmd) ComputerScreenshot(ctx context.Context, in BrowsersComputer
 		return util.CleanedUpSdkError{Err: err}
 	}
 	defer res.Body.Close()
-	if in.To == "" {
-		pterm.Error.Println("--to is required to save the screenshot")
-		return nil
-	}
-	f, err := os.Create(in.To)
+
+	// Read the image data into memory (needed for both display and save)
+	imgData, err := io.ReadAll(res.Body)
 	if err != nil {
-		pterm.Error.Printf("Failed to create file: %v\n", err)
+		pterm.Error.Printf("Failed to read screenshot data: %v\n", err)
 		return nil
 	}
-	defer f.Close()
-	if _, err := io.Copy(f, res.Body); err != nil {
-		pterm.Error.Printf("Failed to write file: %v\n", err)
+
+	// Must specify at least one output option
+	if in.To == "" && !in.Display {
+		pterm.Error.Println("specify --to to save to a file, --display to show inline, or both")
 		return nil
 	}
-	pterm.Success.Printf("Saved screenshot to %s\n", in.To)
+
+	// Display inline in terminal if requested
+	if in.Display {
+		if err := termimg.DisplayImage(os.Stdout, imgData); err != nil {
+			// If --to was also specified, warn but continue to save the file
+			if in.To != "" {
+				pterm.Warning.Printf("Failed to display screenshot: %v\n", err)
+			} else {
+				pterm.Error.Printf("Failed to display screenshot: %v\n", err)
+				return nil
+			}
+		}
+	}
+
+	// Save to file if requested
+	if in.To != "" {
+		f, err := os.Create(in.To)
+		if err != nil {
+			pterm.Error.Printf("Failed to create file: %v\n", err)
+			return nil
+		}
+		defer f.Close()
+		if _, err := f.Write(imgData); err != nil {
+			pterm.Error.Printf("Failed to write file: %v\n", err)
+			return nil
+		}
+		pterm.Success.Printf("Saved screenshot to %s\n", in.To)
+	}
+
 	return nil
 }
 
@@ -1732,7 +1867,7 @@ var browsersDeleteCmd = &cobra.Command{
 
 var browsersViewCmd = &cobra.Command{
 	Use:   "view <id>",
-	Short: "Get the live view URL for a browser",
+	Short: "Get the live view URL for a browser, or show a live terminal view",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runBrowsersView,
 }
@@ -1754,6 +1889,10 @@ func init() {
 
 	// get flags
 	browsersGetCmd.Flags().StringP("output", "o", "", "Output format: json for raw API response")
+
+	// view flags
+	browsersViewCmd.Flags().Bool("live", false, "Show live terminal view of browser (requires iTerm2, Kitty, or Ghostty)")
+	browsersViewCmd.Flags().Duration("interval", 100*time.Millisecond, "Refresh interval for live view")
 
 	browsersCmd.AddCommand(browsersListCmd)
 	browsersCmd.AddCommand(browsersCreateCmd)
@@ -1904,7 +2043,7 @@ func init() {
 	computerScreenshot.Flags().Int64("width", 0, "Region width")
 	computerScreenshot.Flags().Int64("height", 0, "Region height")
 	computerScreenshot.Flags().String("to", "", "Output file path for the PNG image")
-	_ = computerScreenshot.MarkFlagRequired("to")
+	computerScreenshot.Flags().Bool("display", false, "Display screenshot inline in terminal (iTerm2/Kitty)")
 
 	computerType := &cobra.Command{Use: "type <id>", Short: "Type text on the browser instance", Args: cobra.ExactArgs(1), RunE: runBrowsersComputerTypeText}
 	computerType.Flags().String("text", "", "Text to type")
@@ -2137,10 +2276,16 @@ func runBrowsersView(cmd *cobra.Command, args []string) error {
 	client := getKernelClient(cmd)
 
 	identifier := args[0]
+	live, _ := cmd.Flags().GetBool("live")
+	interval, _ := cmd.Flags().GetDuration("interval")
 
-	in := BrowsersViewInput{Identifier: identifier}
+	in := BrowsersViewInput{
+		Identifier: identifier,
+		Live:       live,
+		Interval:   interval,
+	}
 	svc := client.Browsers
-	b := BrowsersCmd{browsers: &svc}
+	b := BrowsersCmd{browsers: &svc, computer: &svc.Computer}
 	return b.View(cmd.Context(), in)
 }
 
@@ -2459,6 +2604,7 @@ func runBrowsersComputerScreenshot(cmd *cobra.Command, args []string) error {
 	w, _ := cmd.Flags().GetInt64("width")
 	h, _ := cmd.Flags().GetInt64("height")
 	to, _ := cmd.Flags().GetString("to")
+	display, _ := cmd.Flags().GetBool("display")
 	bx := cmd.Flags().Changed("x")
 	by := cmd.Flags().Changed("y")
 	bw := cmd.Flags().Changed("width")
@@ -2475,7 +2621,7 @@ func runBrowsersComputerScreenshot(cmd *cobra.Command, args []string) error {
 		}
 	}
 	b := BrowsersCmd{browsers: &svc, computer: &svc.Computer}
-	return b.ComputerScreenshot(cmd.Context(), BrowsersComputerScreenshotInput{Identifier: args[0], X: x, Y: y, Width: w, Height: h, To: to, HasRegion: useRegion})
+	return b.ComputerScreenshot(cmd.Context(), BrowsersComputerScreenshotInput{Identifier: args[0], X: x, Y: y, Width: w, Height: h, To: to, HasRegion: useRegion, Display: display})
 }
 
 func runBrowsersComputerTypeText(cmd *cobra.Command, args []string) error {
