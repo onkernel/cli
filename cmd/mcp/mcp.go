@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -26,13 +27,13 @@ var MCPCmd = &cobra.Command{
 type Target string
 
 const (
-	TargetCursor    Target = "cursor"
-	TargetClaude    Target = "claude"
+	TargetCursor     Target = "cursor"
+	TargetClaude     Target = "claude"
 	TargetClaudeCode Target = "claude-code"
-	TargetWindsurf  Target = "windsurf"
-	TargetVSCode    Target = "vscode"
-	TargetGoose     Target = "goose"
-	TargetZed       Target = "zed"
+	TargetWindsurf   Target = "windsurf"
+	TargetVSCode     Target = "vscode"
+	TargetGoose      Target = "goose"
+	TargetZed        Target = "zed"
 )
 
 // KernelMCPURL is the URL for the Kernel MCP server
@@ -67,33 +68,37 @@ func getConfigPath(target Target) (string, error) {
 	case TargetCursor:
 		return filepath.Join(homeDir, ".cursor", "mcp.json"), nil
 	case TargetClaude:
-		if runtime.GOOS == "darwin" {
+		switch runtime.GOOS {
+		case "darwin":
 			return filepath.Join(homeDir, "Library", "Application Support", "Claude", "claude_desktop_config.json"), nil
-		} else if runtime.GOOS == "windows" {
+		case "windows":
 			appData := os.Getenv("APPDATA")
 			if appData == "" {
 				appData = filepath.Join(homeDir, "AppData", "Roaming")
 			}
 			return filepath.Join(appData, "Claude", "claude_desktop_config.json"), nil
+		default:
+			// Linux - Claude Desktop doesn't officially support Linux, but use XDG config
+			return filepath.Join(homeDir, ".config", "Claude", "claude_desktop_config.json"), nil
 		}
-		// Linux - Claude Desktop doesn't officially support Linux, but use XDG config
-		return filepath.Join(homeDir, ".config", "Claude", "claude_desktop_config.json"), nil
 	case TargetClaudeCode:
 		// Claude Code uses the ~/.claude.json file
 		return filepath.Join(homeDir, ".claude.json"), nil
 	case TargetWindsurf:
 		return filepath.Join(homeDir, ".codeium", "windsurf", "mcp_config.json"), nil
 	case TargetVSCode:
-		if runtime.GOOS == "darwin" {
+		switch runtime.GOOS {
+		case "darwin":
 			return filepath.Join(homeDir, "Library", "Application Support", "Code", "User", "settings.json"), nil
-		} else if runtime.GOOS == "windows" {
+		case "windows":
 			appData := os.Getenv("APPDATA")
 			if appData == "" {
 				appData = filepath.Join(homeDir, "AppData", "Roaming")
 			}
 			return filepath.Join(appData, "Code", "User", "settings.json"), nil
+		default:
+			return filepath.Join(homeDir, ".config", "Code", "User", "settings.json"), nil
 		}
-		return filepath.Join(homeDir, ".config", "Code", "User", "settings.json"), nil
 	case TargetGoose:
 		return filepath.Join(homeDir, ".config", "goose", "config.yaml"), nil
 	case TargetZed:
@@ -111,6 +116,81 @@ type MCPServerConfig struct {
 	Type    string   `json:"type,omitempty"`
 }
 
+// stripJSONComments removes single-line (//) and multi-line (/* */) comments from JSON
+// It properly handles strings to avoid removing // or /* */ that appear inside string literals
+func stripJSONComments(data []byte) []byte {
+	content := string(data)
+	var result strings.Builder
+	i := 0
+	inString := false
+	inMultiLineComment := false
+	escapeNext := false
+
+	for i < len(content) {
+		char := content[i]
+
+		if escapeNext {
+			result.WriteByte(char)
+			escapeNext = false
+			i++
+			continue
+		}
+
+		if char == '\\' && inString {
+			escapeNext = true
+			result.WriteByte(char)
+			i++
+			continue
+		}
+
+		if char == '"' {
+			inString = !inString
+			result.WriteByte(char)
+			i++
+			continue
+		}
+
+		if inString {
+			result.WriteByte(char)
+			i++
+			continue
+		}
+
+		if inMultiLineComment {
+			if i+1 < len(content) && char == '*' && content[i+1] == '/' {
+				inMultiLineComment = false
+				i += 2
+				continue
+			}
+			i++
+			continue
+		}
+
+		if i+1 < len(content) && char == '/' && content[i+1] == '/' {
+			// Single-line comment - skip to end of line
+			for i < len(content) && content[i] != '\n' {
+				i++
+			}
+			if i < len(content) {
+				result.WriteByte('\n')
+				i++
+			}
+			continue
+		}
+
+		if i+1 < len(content) && char == '/' && content[i+1] == '*' {
+			inMultiLineComment = true
+			i += 2
+			continue
+		}
+
+		result.WriteByte(char)
+		i++
+	}
+
+	return []byte(result.String())
+}
+
 // readJSONFile reads and parses a JSON config file
 func readJSONFile(path string) (map[string]interface{}, error) {
 	data, err := os.ReadFile(path)
@@ -125,6 +205,9 @@ func readJSONFile(path string) (map[string]interface{}, error) {
 	if len(data) == 0 {
 		return make(map[string]interface{}), nil
 	}
+
+	// Strip comments to support JSON5 format (used by Zed)
+	data = stripJSONComments(data)
 
 	var config map[string]interface{}
 	if err := json.Unmarshal(data, &config); err != nil {
