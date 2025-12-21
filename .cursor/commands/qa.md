@@ -56,7 +56,7 @@ Here are all valid language + template combinations:
 | typescript | anthropic-computer-use | ts-anthropic-cua  | ts-anthropic-cua      | Yes            | ANTHROPIC_API_KEY              |
 | typescript | magnitude              | ts-magnitude      | ts-magnitude          | Yes            | ANTHROPIC_API_KEY              |
 | typescript | openai-computer-use    | ts-openai-cua     | ts-openai-cua         | Yes            | OPENAI_API_KEY                 |
-| typescript | gemini-computer-use    | ts-gemini-cua     | ts-gemini-cua         | Yes            | GOOGLE_API_KEY, OPENAI_API_KEY |
+| typescript | gemini-computer-use    | ts-gemini-cua     | ts-gemini-cua         | Yes            | GOOGLE_API_KEY                 |
 | python     | sample-app             | py-sample-app     | python-basic          | No             | -                              |
 | python     | captcha-solver         | py-captcha-solver | python-captcha-solver | No             | -                              |
 | python     | browser-use            | py-browser-use    | python-bu             | Yes            | OPENAI_API_KEY                 |
@@ -154,14 +154,11 @@ echo "OPENAI_API_KEY=<value from human>" > .env
 cd ..
 ```
 
-**ts-gemini-cua** (needs GOOGLE_API_KEY and OPENAI_API_KEY):
+**ts-gemini-cua** (needs GOOGLE_API_KEY):
 
 ```bash
 cd ts-gemini-cua
-cat > .env << EOF
-GOOGLE_API_KEY=<value from human>
-OPENAI_API_KEY=<value from human>
-EOF
+echo "GOOGLE_API_KEY=<value from human>" > .env
 ../bin/kernel deploy index.ts --env-file .env
 cd ..
 ```
@@ -214,7 +211,7 @@ kernel invoke ts-stagehand teamsize-task --payload '{"company": "Kernel"}'
 kernel invoke ts-anthropic-cua cua-task --payload '{"query": "Return the first url of a search result for NYC restaurant reviews Pete Wells"}'
 kernel invoke ts-magnitude mag-url-extract --payload '{"url": "https://en.wikipedia.org/wiki/Special:Random"}'
 kernel invoke ts-openai-cua cua-task --payload '{"task": "Go to https://news.ycombinator.com and get the top 5 articles"}'
-kernel invoke ts-gemini-cua gemini-cua-task
+kernel invoke ts-gemini-cua gemini-cua-task --payload '{"startingUrl": "https://www.magnitasks.com/", "instruction": "Click the Tasks option in the left-side bar, and move the 5 items in the To Do and In Progress items to the Done section of the Kanban board? You are done successfully when the items are moved."}'
 
 # Python apps
 kernel invoke python-basic get-page-title --payload '{"url": "https://www.google.com"}'
@@ -232,8 +229,6 @@ kernel invoke python-openagi-cua openagi-default-task -p '{"instruction": "Navig
 If the human agrees, invoke each template and collect results. Present findings in this format:
 
 ### Testing Guidelines
-
-- **Timeout:** Cancel each invocation after 90 seconds if it has not completed. Mark the status as `TIMEOUT` in the results table.
 - **Parallel execution:** You may run multiple invocations in parallel to speed up testing.
 - **Error handling:** Capture any runtime errors and include them in the Notes column.
 
@@ -258,7 +253,6 @@ If the human agrees, invoke each template and collect results. Present findings 
 Status values:
 - **SUCCESS**: App started and returned a result
 - **FAILED**: App encountered a runtime error
-- **TIMEOUT**: App did not complete within 90 seconds (cancelled)
 
 Notes should include brief error messages for failures or confirmation of successful output.
 
