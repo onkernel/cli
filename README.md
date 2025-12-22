@@ -121,7 +121,7 @@ Create an API key from the [Kernel dashboard](https://dashboard.onkernel.com).
   - `browser-use` - Template with Browser Use SDK (Python only)
   - `anthropic-computer-use` - Anthropic Computer Use prompt loop
   - `openai-computer-use` - OpenAI Computer Use Agent sample
-  - `gemini-computer-use` - Gemini Computer Use Agent sample (TypeScript only)
+  - `gemini-computer-use` - Implements a Gemini computer use agent (TypeScript only)
   - `openagi-computer-use` - OpenAGI Lux computer-use models (Python only)
   - `magnitude` - Magnitude framework sample (TypeScript only)
 

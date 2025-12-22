@@ -7,29 +7,32 @@ const kernel = new Kernel({
 
 const app = kernel.app('ts-gemini-cua');
 
+interface CuaTaskInput {
+  startingUrl?: string;
+  instruction?: string;
+}
+
 interface SearchQueryOutput {
   success: boolean;
   result: string;
   error?: string;
 }
 
-// API Keys for LLM providers
+// API Key for LLM provider
 // - GOOGLE_API_KEY: Required for Gemini 2.5 Computer Use Agent
-// - OPENAI_API_KEY: Required for Stagehand's GPT-4o model
 // Set via environment variables or `kernel deploy <filename> --env-file .env`
 // See https://docs.onkernel.com/launch/deploy#environment-variables
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-
-if (!OPENAI_API_KEY) {
-  throw new Error('OPENAI_API_KEY is not set');
-}
 
 if (!GOOGLE_API_KEY) {
   throw new Error('GOOGLE_API_KEY is not set');
 }
 
-async function runStagehandTask(invocationId?: string): Promise<SearchQueryOutput> {
+async function runStagehandTask(
+  invocationId?: string,
+  startingUrl: string = "https://www.magnitasks.com/",
+  instruction: string = "Click the Tasks option in the left-side bar, and move the 5 items in the 'To Do' and 'In Progress' items to the 'Done' section of the Kanban board? You are done successfully when the items are moved."
+): Promise<SearchQueryOutput> {
   // Executes a Computer Use Agent (CUA) task using Gemini 2.5 and Stagehand
 
   const browserOptions = {
@@ -49,11 +52,7 @@ async function runStagehandTask(invocationId?: string): Promise<SearchQueryOutpu
   const stagehand = new Stagehand({
     env: "LOCAL",
     verbose: 1,
-    domSettleTimeoutMs: 30_000,
-    modelName: "gpt-4o",
-    modelClientOptions: {
-      apiKey: OPENAI_API_KEY
-    },
+    domSettleTimeout: 30_000,
     localBrowserLaunchOptions: {
       cdpUrl: kernelBrowser.cdp_ws_url
     }
@@ -64,24 +63,21 @@ async function runStagehandTask(invocationId?: string): Promise<SearchQueryOutpu
   // Your Stagehand implementation here
   /////////////////////////////////////
   try {
-    const page = stagehand.page;
+    const page = stagehand.context.pages()[0];
 
     const agent = stagehand.agent({
-      provider: "google",
-      model: "gemini-2.5-computer-use-preview-10-2025",
-      instructions: `You are a helpful assistant that can use a web browser.
+      cua: true,
+      model: {
+        modelName: "google/gemini-2.5-computer-use-preview-10-2025",
+        apiKey: GOOGLE_API_KEY,
+      },
+      systemPrompt: `You are a helpful assistant that can use a web browser.
       You are currently on the following page: ${page.url()}.
       Do not ask follow up questions, the user will trust your judgement.`,
-      options: {
-        apiKey: GOOGLE_API_KEY,
-      }
     });
 
-    // Navigate to YCombinator's website
-    await page.goto("https://www.ycombinator.com/companies");
-
-    // Define the instructions for the CUA agent
-    const instruction = "Find Kernel's company page on the YCombinator website and write a blog post about their product offering.";
+    // Navigate to the starting website
+    await page.goto(startingUrl);
 
     // Execute the instruction
     const result = await agent.execute({
@@ -105,10 +101,14 @@ async function runStagehandTask(invocationId?: string): Promise<SearchQueryOutpu
 
 // Register Kernel action handler for remote invocation
 // Invoked via: kernel invoke ts-gemini-cua gemini-cua-task
-app.action<void, SearchQueryOutput>(
+app.action<CuaTaskInput, SearchQueryOutput>(
   'gemini-cua-task',
-  async (ctx: KernelContext): Promise<SearchQueryOutput> => {
-    return runStagehandTask(ctx.invocation_id);
+  async (ctx: KernelContext, payload?: CuaTaskInput): Promise<SearchQueryOutput> => {
+    return runStagehandTask(
+      ctx.invocation_id,
+      payload?.startingUrl,
+      payload?.instruction
+    );
   },
 );
 
