@@ -199,6 +199,7 @@ func orgEntitlementRows(entitlements *kernel.OrgEntitlements) pterm.TableData {
 		{"Feature", "Health check maximum (seconds)", fmt.Sprintf("%d", features.ManagedAuth.HealthCheckIntervalMaxSeconds)},
 		{"Feature", "Credentials", fmt.Sprintf("%t", features.Credentials.Enabled)},
 		{"Feature", "Credential providers", fmt.Sprintf("%t", features.CredentialProviders.Enabled)},
+		{"Feature", "Vaults", fmt.Sprintf("%t", features.Vaults.Enabled)},
 		{"Feature", "Managed proxies", fmt.Sprintf("%t", features.ManagedProxies.Enabled)},
 		{"Feature", "Custom proxies", fmt.Sprintf("%t", features.CustomProxies.Enabled)},
 		{"Feature", "Proxy bypass hosts", fmt.Sprintf("%t", features.ProxyBypassHosts.Enabled)},

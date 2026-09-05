@@ -384,32 +384,33 @@ func formatTags(tags kernel.Tags) string {
 
 // Inputs for each command
 type BrowsersCreateInput struct {
-	TimeoutSeconds     int
-	Stealth            BoolFlag
-	Headless           BoolFlag
-	GPU                BoolFlag
-	Memory             string
-	InvocationID       string
-	Kiosk              BoolFlag
-	ProfileID          string
-	ProfileName        string
-	ProfileSaveChanges BoolFlag
-	ProxyID            string
-	ProxyName          string
-	ProxyMode          string
-	Region             string
-	PrivateHosts       []string
-	StartURL           string
-	Extensions         []string
-	Vaults             []string
-	Viewport           string
-	Telemetry          string
-	TelemetryExport    string
-	ChromePolicy       string
-	ChromePolicyFile   string
-	Name               string
-	Tags               map[string]string
-	Output             string
+	TimeoutSeconds      int
+	Stealth             BoolFlag
+	Headless            BoolFlag
+	GPU                 BoolFlag
+	Memory              string
+	InvocationID        string
+	Kiosk               BoolFlag
+	ProfileID           string
+	ProfileName         string
+	ProfileSaveChanges  BoolFlag
+	ProxyID             string
+	ProxyName           string
+	ProxyMode           string
+	Region              string
+	PrivateHosts        []string
+	StartURL            string
+	Extensions          []string
+	Vaults              []string
+	Viewport            string
+	Telemetry           string
+	TelemetryCdpExclude string
+	TelemetryExport     string
+	ChromePolicy        string
+	ChromePolicyFile    string
+	Name                string
+	Tags                map[string]string
+	Output              string
 }
 
 type BrowsersDeleteInput struct {
@@ -684,24 +685,6 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 		}
 	}
 
-	// Map vaults (IDs or names) into params.Vaults. Links are immutable once the
-	// session is created.
-	if len(in.Vaults) > 0 {
-		for _, vault := range in.Vaults {
-			val := strings.TrimSpace(vault)
-			if val == "" {
-				continue
-			}
-			item := kernel.VaultReferenceParam{}
-			if cuidRegex.MatchString(val) {
-				item.ID = kernel.Opt(val)
-			} else {
-				item.Name = kernel.Opt(val)
-			}
-			params.Vaults = append(params.Vaults, item)
-		}
-	}
-
 	// Add viewport if specified
 	if in.Viewport != "" {
 		width, height, refreshRate, err := parseViewport(in.Viewport)
@@ -761,7 +744,7 @@ func (b BrowsersCmd) Create(ctx context.Context, in BrowsersCreateInput) error {
 		}
 		PrintTableNoPad(rows, true)
 	}
-	if in.Telemetry != "" || in.TelemetryExport != "" {
+	if in.Telemetry != "" || in.TelemetryCdpExclude != "" || in.TelemetryExport != "" {
 		printTelemetrySummary(browser.Telemetry)
 	}
 	return nil
@@ -3143,7 +3126,6 @@ func init() {
 	browsersCreateCmd.Flags().StringSlice("private-host", nil, "Destinations the browser reaches directly through its own network instead of Kernel-managed egress, for private hosts on a VPN or tunnel the session joins (repeat or comma-separated, max 32). Accepts hostname patterns ('*.example.ts.net'), IPs ('10.1.30.63', '[fd00::1]'), and private CIDRs ('100.64.0.0/10'). Replaces the default private ranges (RFC1918, 100.64.0.0/10, fc00::/7); omit to keep them. Fixed once the session is created")
 	browsersCreateCmd.Flags().String("start-url", "", "Initial page to open on launch")
 	browsersCreateCmd.Flags().StringSlice("extension", []string{}, "Extension IDs or names to load (repeatable; may be passed multiple times or comma-separated)")
-	browsersCreateCmd.Flags().StringSlice("vault", []string{}, "Vault IDs or names to link to the session (repeatable; may be passed multiple times or comma-separated). Fixed once the session is created")
 	browsersCreateCmd.Flags().String("viewport", "", "Browser viewport size (e.g., 1920x1080@25). Supported: 2560x1440@10, 1920x1080@25, 1920x1200@25, 1440x900@25, 1024x768@60, 1200x800@60, 1280x800@60")
 	browsersCreateCmd.Flags().Bool("viewport-interactive", false, "Interactively select viewport size from list")
 	browsersCreateCmd.Flags().StringArray("vault", nil, "Project-owned vault ID or name to attach at creation (repeatable, max 20; incompatible with pools)")
@@ -3401,32 +3383,33 @@ func runBrowsersCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	in := BrowsersCreateInput{
-		TimeoutSeconds:     timeout,
-		Stealth:            BoolFlag{Set: cmd.Flags().Changed("stealth"), Value: stealthVal},
-		Headless:           BoolFlag{Set: cmd.Flags().Changed("headless"), Value: headlessVal},
-		GPU:                BoolFlag{Set: cmd.Flags().Changed("gpu"), Value: gpuVal},
-		Memory:             memory,
-		InvocationID:       invocationID,
-		Kiosk:              BoolFlag{Set: cmd.Flags().Changed("kiosk"), Value: kioskVal},
-		ProfileID:          profileID,
-		ProfileName:        profileName,
-		ProfileSaveChanges: BoolFlag{Set: cmd.Flags().Changed("save-changes"), Value: saveChanges},
-		ProxyID:            proxyID,
-		ProxyName:          proxyName,
-		ProxyMode:          proxyMode,
-		Region:             region,
-		PrivateHosts:       privateHosts,
-		StartURL:           startURL,
-		Extensions:         extensions,
-		Vaults:             vaults,
-		Viewport:           viewport,
-		Telemetry:          telemetry,
-		TelemetryExport:    telemetryExport,
-		ChromePolicy:       chromePolicy,
-		ChromePolicyFile:   chromePolicyFile,
-		Name:               name,
-		Tags:               tags,
-		Output:             output,
+		TimeoutSeconds:      timeout,
+		Stealth:             BoolFlag{Set: cmd.Flags().Changed("stealth"), Value: stealthVal},
+		Headless:            BoolFlag{Set: cmd.Flags().Changed("headless"), Value: headlessVal},
+		GPU:                 BoolFlag{Set: cmd.Flags().Changed("gpu"), Value: gpuVal},
+		Memory:              memory,
+		InvocationID:        invocationID,
+		Kiosk:               BoolFlag{Set: cmd.Flags().Changed("kiosk"), Value: kioskVal},
+		ProfileID:           profileID,
+		ProfileName:         profileName,
+		ProfileSaveChanges:  BoolFlag{Set: cmd.Flags().Changed("save-changes"), Value: saveChanges},
+		ProxyID:             proxyID,
+		ProxyName:           proxyName,
+		ProxyMode:           proxyMode,
+		Region:              region,
+		PrivateHosts:        privateHosts,
+		StartURL:            startURL,
+		Extensions:          extensions,
+		Vaults:              vaults,
+		Viewport:            viewport,
+		Telemetry:           telemetry,
+		TelemetryCdpExclude: telemetryCdpExclude,
+		TelemetryExport:     telemetryExport,
+		ChromePolicy:        chromePolicy,
+		ChromePolicyFile:    chromePolicyFile,
+		Name:                name,
+		Tags:                tags,
+		Output:              output,
 	}
 
 	svc := client.Browsers

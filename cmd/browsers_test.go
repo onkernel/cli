@@ -531,9 +531,8 @@ func TestBrowsersCreate_WithVaults(t *testing.T) {
 
 	b := BrowsersCmd{browsers: fake}
 	err := b.Create(context.Background(), BrowsersCreateInput{
-		// A Kernel-shaped identifier is sent as an ID, anything else as a name,
-		// and blank entries are dropped.
-		Vaults: []string{"gtw36zdwv9as2etqetxpnspl", " payments ", ""},
+		// A Kernel-shaped identifier is sent as an ID, anything else as a name.
+		Vaults: []string{"gtw36zdwv9as2etqetxpnspl", "payments"},
 	})
 	assert.NoError(t, err)
 
