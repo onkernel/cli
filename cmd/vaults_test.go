@@ -3,540 +3,527 @@ package cmd
 import (
 	"context"
 	"encoding/json"
-	"os"
-	"path/filepath"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/kernel/cli/pkg/interactive"
+	"github.com/kernel/cli/pkg/util"
 	kernel "github.com/kernel/kernel-go-sdk"
 	"github.com/kernel/kernel-go-sdk/option"
-	"github.com/kernel/kernel-go-sdk/packages/pagination"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// FakeVaultsService implements VaultsService
-type FakeVaultsService struct {
-	GetFunc    func(ctx context.Context, idOrName string, opts ...option.RequestOption) (*kernel.Vault, error)
-	ListFunc   func(ctx context.Context, query kernel.VaultListParams, opts ...option.RequestOption) (*pagination.OffsetPagination[kernel.Vault], error)
-	DeleteFunc func(ctx context.Context, idOrName string, opts ...option.RequestOption) error
-	UpsertFunc func(ctx context.Context, body kernel.VaultUpsertParams, opts ...option.RequestOption) (*kernel.Vault, error)
-}
+const linkWalletSpecFixture = `{"authorization":{"method":"oauth","client":{"type":"kernel_managed"}}}`
 
-func (f *FakeVaultsService) Get(ctx context.Context, idOrName string, opts ...option.RequestOption) (*kernel.Vault, error) {
-	if f.GetFunc != nil {
-		return f.GetFunc(ctx, idOrName, opts...)
-	}
-	return &kernel.Vault{ID: "v1", Name: idOrName, CreatedAt: time.Unix(0, 0), UpdatedAt: time.Unix(0, 0)}, nil
-}
+const vaultFixture = `{"id":"vault-1","name":"checkout","created_at":"2026-09-01T00:00:00Z","updated_at":"2026-09-01T00:00:00Z"}`
+const requestedCardFixture = `{"id":"item-1","key":"order-1","type":"card","spec":{"provider":"link","wallet":"wallet-1","payment_method_id":"pm-1","amount":1234,"currency":"usd","merchant_name":"Example Shop","merchant_url":"https://shop.example","context":"Purchase description"},"state":{"provider":"link","status":"requested"},"available_operations":[{"type":"authorize","description":"Use only after explicit user approval."}],"available_expansions":[]}`
+const connectedWalletFixture = `{"id":"wallet-id","key":"wallet-1","type":"wallet","spec":{"provider":"link","authorization":{"method":"oauth","client":{"type":"kernel_managed"}}},"state":{"provider":"link","status":"connected"},"available_operations":[],"available_expansions":[{"type":"payment_methods","description":"Select a payment method explicitly."}]}`
 
-func (f *FakeVaultsService) List(ctx context.Context, query kernel.VaultListParams, opts ...option.RequestOption) (*pagination.OffsetPagination[kernel.Vault], error) {
-	if f.ListFunc != nil {
-		return f.ListFunc(ctx, query, opts...)
-	}
-	return &pagination.OffsetPagination[kernel.Vault]{Items: []kernel.Vault{}}, nil
-}
-
-func (f *FakeVaultsService) Delete(ctx context.Context, idOrName string, opts ...option.RequestOption) error {
-	if f.DeleteFunc != nil {
-		return f.DeleteFunc(ctx, idOrName, opts...)
-	}
-	return nil
-}
-
-func (f *FakeVaultsService) Upsert(ctx context.Context, body kernel.VaultUpsertParams, opts ...option.RequestOption) (*kernel.Vault, error) {
-	if f.UpsertFunc != nil {
-		return f.UpsertFunc(ctx, body, opts...)
-	}
-	return &kernel.Vault{ID: "v1", Name: body.Name, CreatedAt: time.Unix(0, 0), UpdatedAt: time.Unix(0, 0)}, nil
-}
-
-// FakeVaultItemsService implements VaultItemsService
-type FakeVaultItemsService struct {
-	GetFunc              func(ctx context.Context, key string, params kernel.VaultItemGetParams, opts ...option.RequestOption) (*kernel.VaultItemUnion, error)
-	UpdateFunc           func(ctx context.Context, key string, params kernel.VaultItemUpdateParams, opts ...option.RequestOption) (*kernel.VaultItemUnion, error)
-	ListFunc             func(ctx context.Context, idOrName string, opts ...option.RequestOption) (*[]kernel.VaultItemUnion, error)
-	DeleteFunc           func(ctx context.Context, key string, body kernel.VaultItemDeleteParams, opts ...option.RequestOption) error
-	EventsFunc           func(ctx context.Context, key string, params kernel.VaultItemEventsParams, opts ...option.RequestOption) (*[]kernel.VaultItemEvent, error)
-	PerformOperationFunc func(ctx context.Context, key string, params kernel.VaultItemPerformOperationParams, opts ...option.RequestOption) (*kernel.VaultItemUnion, error)
-	UpsertFunc           func(ctx context.Context, key string, params kernel.VaultItemUpsertParams, opts ...option.RequestOption) (*kernel.VaultItemUnion, error)
-}
-
-func (f *FakeVaultItemsService) Get(ctx context.Context, key string, params kernel.VaultItemGetParams, opts ...option.RequestOption) (*kernel.VaultItemUnion, error) {
-	if f.GetFunc != nil {
-		return f.GetFunc(ctx, key, params, opts...)
-	}
-	return &kernel.VaultItemUnion{ID: "i1", Key: key, Type: "wallet"}, nil
-}
-
-func (f *FakeVaultItemsService) Update(ctx context.Context, key string, params kernel.VaultItemUpdateParams, opts ...option.RequestOption) (*kernel.VaultItemUnion, error) {
-	if f.UpdateFunc != nil {
-		return f.UpdateFunc(ctx, key, params, opts...)
-	}
-	return &kernel.VaultItemUnion{ID: "i1", Key: key, Type: "card"}, nil
-}
-
-func (f *FakeVaultItemsService) List(ctx context.Context, idOrName string, opts ...option.RequestOption) (*[]kernel.VaultItemUnion, error) {
-	if f.ListFunc != nil {
-		return f.ListFunc(ctx, idOrName, opts...)
-	}
-	items := []kernel.VaultItemUnion{}
-	return &items, nil
-}
-
-func (f *FakeVaultItemsService) Delete(ctx context.Context, key string, body kernel.VaultItemDeleteParams, opts ...option.RequestOption) error {
-	if f.DeleteFunc != nil {
-		return f.DeleteFunc(ctx, key, body, opts...)
-	}
-	return nil
-}
-
-func (f *FakeVaultItemsService) Events(ctx context.Context, key string, params kernel.VaultItemEventsParams, opts ...option.RequestOption) (*[]kernel.VaultItemEvent, error) {
-	if f.EventsFunc != nil {
-		return f.EventsFunc(ctx, key, params, opts...)
-	}
-	events := []kernel.VaultItemEvent{}
-	return &events, nil
-}
-
-func (f *FakeVaultItemsService) PerformOperation(ctx context.Context, key string, params kernel.VaultItemPerformOperationParams, opts ...option.RequestOption) (*kernel.VaultItemUnion, error) {
-	if f.PerformOperationFunc != nil {
-		return f.PerformOperationFunc(ctx, key, params, opts...)
-	}
-	return &kernel.VaultItemUnion{ID: "i1", Key: key, Type: "card"}, nil
-}
-
-func (f *FakeVaultItemsService) Upsert(ctx context.Context, key string, params kernel.VaultItemUpsertParams, opts ...option.RequestOption) (*kernel.VaultItemUnion, error) {
-	if f.UpsertFunc != nil {
-		return f.UpsertFunc(ctx, key, params, opts...)
-	}
-	return &kernel.VaultItemUnion{ID: "i1", Key: key, Type: "wallet"}, nil
-}
-
-// vaultItemFromJSON builds a VaultItemUnion the way the SDK does, so tests
-// exercise the same union field population the API responses produce.
-func vaultItemFromJSON(t *testing.T, raw string) kernel.VaultItemUnion {
+func vaultTestClient(t *testing.T, handler http.HandlerFunc) kernel.Client {
 	t.Helper()
-	var item kernel.VaultItemUnion
-	require.NoError(t, json.Unmarshal([]byte(raw), &item))
-	return item
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+	return kernel.NewClient(option.WithBaseURL(server.URL), option.WithAPIKey("test"))
 }
 
-func TestVaultsList_Empty(t *testing.T) {
-	buf := capturePtermOutput(t)
-	v := VaultsCmd{vaults: &FakeVaultsService{}}
-	require.NoError(t, v.List(context.Background(), VaultsListInput{Page: 1, PerPage: 20}))
-	assert.Contains(t, buf.String(), "No vaults found")
-}
-
-func TestVaultsList_PaginationFooter(t *testing.T) {
-	buf := capturePtermOutput(t)
-	// Three vaults for a page size of two: the extra item is what signals that
-	// another page exists, and must not be displayed.
-	rows := []kernel.Vault{
-		{ID: "v1", Name: "alpha", CreatedAt: time.Unix(0, 0), UpdatedAt: time.Unix(0, 0)},
-		{ID: "v2", Name: "beta", CreatedAt: time.Unix(0, 0), UpdatedAt: time.Unix(0, 0)},
-		{ID: "v3", Name: "gamma", CreatedAt: time.Unix(0, 0), UpdatedAt: time.Unix(0, 0)},
+func executeVaultCommand(t *testing.T, client kernel.Client, args ...string) (string, string, error) {
+	t.Helper()
+	root := &cobra.Command{Use: "kernel", SilenceErrors: true, SilenceUsage: true}
+	root.PersistentFlags().String("project", "", "Project")
+	root.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		project, _ := cmd.Flags().GetString("project")
+		scoped := client
+		scoped.Vaults = kernel.NewVaultService(append(client.Options, option.WithProject(resolveProjectSelection(project)))...)
+		cmd.SetContext(context.WithValue(cmd.Context(), util.KernelClientKey, scoped))
+		return nil
 	}
-	var got kernel.VaultListParams
-	fake := &FakeVaultsService{ListFunc: func(ctx context.Context, query kernel.VaultListParams, opts ...option.RequestOption) (*pagination.OffsetPagination[kernel.Vault], error) {
-		got = query
-		return &pagination.OffsetPagination[kernel.Vault]{Items: rows}, nil
-	}}
-	v := VaultsCmd{vaults: fake}
-	require.NoError(t, v.List(context.Background(), VaultsListInput{Page: 2, PerPage: 2}))
-
-	assert.Equal(t, int64(3), got.Limit.Value, "requests one extra item to detect the next page")
-	assert.Equal(t, int64(2), got.Offset.Value)
-
-	out := buf.String()
-	assert.Contains(t, out, "alpha")
-	assert.Contains(t, out, "beta")
-	assert.NotContains(t, out, "gamma", "the extra item is trimmed before display")
-	assert.Contains(t, out, "Page: 2  Per-page: 2  Items this page: 2  Has more: yes")
-	assert.Contains(t, out, "Next: kernel vaults list --page 3 --per-page 2")
-}
-
-func TestVaultsList_DefaultsPageAndPerPage(t *testing.T) {
-	_ = capturePtermOutput(t)
-	var got kernel.VaultListParams
-	fake := &FakeVaultsService{ListFunc: func(ctx context.Context, query kernel.VaultListParams, opts ...option.RequestOption) (*pagination.OffsetPagination[kernel.Vault], error) {
-		got = query
-		return &pagination.OffsetPagination[kernel.Vault]{Items: []kernel.Vault{}}, nil
-	}}
-	v := VaultsCmd{vaults: fake}
-	require.NoError(t, v.List(context.Background(), VaultsListInput{}))
-
-	assert.Equal(t, int64(21), got.Limit.Value, "defaults to 20 per page plus the lookahead item")
-	assert.Equal(t, int64(0), got.Offset.Value)
-}
-
-func TestVaultsCreate_RequiresName(t *testing.T) {
-	_ = capturePtermOutput(t)
-	v := VaultsCmd{vaults: &FakeVaultsService{}}
-	err := v.Create(context.Background(), VaultsCreateInput{Name: "  "})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--name is required")
-}
-
-func TestVaultsCreate_PassesName(t *testing.T) {
+	root.AddCommand(newVaultsCommand())
+	root.SetArgs(args)
 	buf := capturePtermOutput(t)
-	var got kernel.VaultUpsertParams
-	fake := &FakeVaultsService{UpsertFunc: func(ctx context.Context, body kernel.VaultUpsertParams, opts ...option.RequestOption) (*kernel.Vault, error) {
-		got = body
-		return &kernel.Vault{ID: "v1", Name: body.Name, CreatedAt: time.Unix(0, 0), UpdatedAt: time.Unix(0, 0)}, nil
-	}}
-	v := VaultsCmd{vaults: fake}
-	require.NoError(t, v.Create(context.Background(), VaultsCreateInput{Name: "payments"}))
-
-	assert.Equal(t, "payments", got.Name)
-	out := buf.String()
-	assert.Contains(t, out, "v1")
-	assert.Contains(t, out, "payments")
+	var err error
+	stdout := captureStdout(t, func() { err = root.Execute() })
+	return stdout, buf.String(), err
 }
 
-func TestVaultsDelete_FailsFastWhenNonInteractive(t *testing.T) {
-	_ = capturePtermOutput(t)
-	fake := &FakeVaultsService{DeleteFunc: func(ctx context.Context, idOrName string, opts ...option.RequestOption) error {
-		t.Fatal("delete must not be called without confirmation")
-		return nil
-	}}
-	v := VaultsCmd{vaults: fake, prompter: interactive.NewPrompterWithTerminal(false)}
-
-	err := v.Delete(context.Background(), VaultsDeleteInput{Identifier: "payments"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "delete vault 'payments'")
-	assert.Contains(t, err.Error(), "--yes")
-}
-
-func TestVaultsDelete_SkipConfirm(t *testing.T) {
-	buf := capturePtermOutput(t)
-	var deleted string
-	fake := &FakeVaultsService{DeleteFunc: func(ctx context.Context, idOrName string, opts ...option.RequestOption) error {
-		deleted = idOrName
-		return nil
-	}}
-	v := VaultsCmd{vaults: fake, prompter: interactive.NewPrompterWithTerminal(false)}
-
-	require.NoError(t, v.Delete(context.Background(), VaultsDeleteInput{Identifier: "payments", SkipConfirm: true}))
-	assert.Equal(t, "payments", deleted)
-	assert.Contains(t, buf.String(), "Deleted vault: payments")
-}
-
-func TestVaultItemsDelete_FailsFastWhenNonInteractive(t *testing.T) {
-	_ = capturePtermOutput(t)
-	fake := &FakeVaultItemsService{DeleteFunc: func(ctx context.Context, key string, body kernel.VaultItemDeleteParams, opts ...option.RequestOption) error {
-		t.Fatal("delete must not be called without confirmation")
-		return nil
-	}}
-	v := VaultsCmd{items: fake, prompter: interactive.NewPrompterWithTerminal(false)}
-
-	err := v.ItemsDelete(context.Background(), VaultItemsDeleteInput{Vault: "payments", Key: "wallet"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "delete vault item 'wallet'")
-	assert.Contains(t, err.Error(), "--yes")
-}
-
-func TestVaultItemsDelete_ScopesToVault(t *testing.T) {
-	buf := capturePtermOutput(t)
-	var got kernel.VaultItemDeleteParams
-	fake := &FakeVaultItemsService{DeleteFunc: func(ctx context.Context, key string, body kernel.VaultItemDeleteParams, opts ...option.RequestOption) error {
-		got = body
-		return nil
-	}}
-	v := VaultsCmd{items: fake, prompter: interactive.NewPrompterWithTerminal(false)}
-
-	require.NoError(t, v.ItemsDelete(context.Background(), VaultItemsDeleteInput{Vault: "payments", Key: "wallet", SkipConfirm: true}))
-	assert.Equal(t, "payments", got.IDOrName)
-	assert.Contains(t, buf.String(), "Deleted vault item: wallet")
-}
-
-func TestVaultItemsGet_SendsWaitAndExpand(t *testing.T) {
-	_ = capturePtermOutput(t)
-	var got kernel.VaultItemGetParams
-	fake := &FakeVaultItemsService{GetFunc: func(ctx context.Context, key string, params kernel.VaultItemGetParams, opts ...option.RequestOption) (*kernel.VaultItemUnion, error) {
-		got = params
-		return &kernel.VaultItemUnion{ID: "i1", Key: key, Type: "wallet"}, nil
-	}}
-	v := VaultsCmd{items: fake}
-	require.NoError(t, v.ItemsGet(context.Background(), VaultItemsGetInput{
-		Vault:  "payments",
-		Key:    "wallet",
-		Wait:   30,
-		Expand: []string{"payment_methods, ", ""},
-	}))
-
-	assert.Equal(t, "payments", got.IDOrName)
-	assert.Equal(t, int64(30), got.Wait.Value)
-	assert.Equal(t, []string{"payment_methods"}, got.Expand, "comma-separated entries are split and blanks dropped")
-}
-
-func TestVaultItemsGet_OmitsUnsetWaitAndExpand(t *testing.T) {
-	_ = capturePtermOutput(t)
-	var got kernel.VaultItemGetParams
-	fake := &FakeVaultItemsService{GetFunc: func(ctx context.Context, key string, params kernel.VaultItemGetParams, opts ...option.RequestOption) (*kernel.VaultItemUnion, error) {
-		got = params
-		return &kernel.VaultItemUnion{ID: "i1", Key: key, Type: "wallet"}, nil
-	}}
-	v := VaultsCmd{items: fake}
-	require.NoError(t, v.ItemsGet(context.Background(), VaultItemsGetInput{Vault: "payments", Key: "wallet"}))
-
-	assert.False(t, got.Wait.Valid())
-	assert.Empty(t, got.Expand)
-}
-
-func TestVaultItemsGet_RendersOperationsAndAction(t *testing.T) {
-	buf := capturePtermOutput(t)
-	item := vaultItemFromJSON(t, `{
-		"id":"i1",
-		"key":"wallet",
-		"type":"wallet",
-		"spec":{"provider":"agentcard"},
-		"state":{"provider":"agentcard","status":"pending_authorization"},
-		"action":{"name":"card_enrollment","url":"https://vault.example.com/enroll"},
-		"available_operations":[{"type":"authorize","description":"Authorize the wallet."}],
-		"available_expansions":[{"type":"payment_methods","description":"Live payment methods."}],
-		"created_at":"1970-01-01T00:00:00Z",
-		"updated_at":"1970-01-01T00:00:00Z"
-	}`)
-	fake := &FakeVaultItemsService{GetFunc: func(ctx context.Context, key string, params kernel.VaultItemGetParams, opts ...option.RequestOption) (*kernel.VaultItemUnion, error) {
-		return &item, nil
-	}}
-	v := VaultsCmd{items: fake}
-	require.NoError(t, v.ItemsGet(context.Background(), VaultItemsGetInput{Vault: "payments", Key: "wallet"}))
-
-	out := buf.String()
-	assert.Contains(t, out, "pending_authorization")
-	assert.Contains(t, out, "card_enrollment")
-	assert.Contains(t, out, "https://vault.example.com/enroll")
-	assert.Contains(t, out, "authorize")
-	assert.Contains(t, out, "payment_methods")
-	assert.Contains(t, out, "Authorize the wallet.", "operation descriptions say which operation to invoke next")
-}
-
-func TestVaultItemsCreate_RejectsUnknownType(t *testing.T) {
-	_ = capturePtermOutput(t)
-	v := VaultsCmd{items: &FakeVaultItemsService{}}
-	err := v.ItemsCreate(context.Background(), VaultItemsCreateInput{Vault: "payments", Key: "k", Type: "cheque", Spec: "{}"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid --type")
-}
-
-func TestVaultItemsCreate_RequiresSpec(t *testing.T) {
-	_ = capturePtermOutput(t)
-	v := VaultsCmd{items: &FakeVaultItemsService{}}
-	err := v.ItemsCreate(context.Background(), VaultItemsCreateInput{Vault: "payments", Key: "k", Type: "wallet"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "must specify one of --spec or --spec-file")
-}
-
-func TestVaultItemsCreate_RejectsInvalidJSON(t *testing.T) {
-	_ = capturePtermOutput(t)
-	v := VaultsCmd{items: &FakeVaultItemsService{}}
-	err := v.ItemsCreate(context.Background(), VaultItemsCreateInput{Vault: "payments", Key: "k", Type: "wallet", Spec: "{not json"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid JSON in spec")
-}
-
-func TestVaultItemsCreate_WalletSpec(t *testing.T) {
-	_ = capturePtermOutput(t)
-	var got kernel.VaultItemUpsertParams
-	fake := &FakeVaultItemsService{UpsertFunc: func(ctx context.Context, key string, params kernel.VaultItemUpsertParams, opts ...option.RequestOption) (*kernel.VaultItemUnion, error) {
-		got = params
-		return &kernel.VaultItemUnion{ID: "i1", Key: key, Type: "wallet"}, nil
-	}}
-	v := VaultsCmd{items: fake}
-	require.NoError(t, v.ItemsCreate(context.Background(), VaultItemsCreateInput{
-		Vault: "payments",
-		Key:   "wallet",
-		Type:  "WALLET",
-		Spec:  `{"provider":"link","authorization":{"method":"oauth","client":{"type":"kernel_managed"}}}`,
-	}))
-
-	assert.Equal(t, "payments", got.IDOrName)
-	require.NotNil(t, got.OfWallet)
-	assert.Nil(t, got.OfCard)
-
-	body, err := json.Marshal(got.OfWallet.Spec)
+func TestVaultCommandConstruction(t *testing.T) {
+	for _, path := range []string{"create", "list", "get", "delete", "items list", "items get", "items delete", "items events", "wallets create", "wallets payment-methods", "cards create", "cards update", "items invoke"} {
+		t.Run(path, func(t *testing.T) {
+			cmd, remaining, err := newVaultsCommand().Find(strings.Fields(path))
+			require.NoError(t, err)
+			require.Empty(t, remaining)
+			assert.NotNil(t, cmd.RunE)
+			assert.NotNil(t, cmd.PreRunE)
+			assert.NotNil(t, cmd.Args)
+			if cmd.Name() == "delete" {
+				assert.NotNil(t, cmd.Flags().Lookup("yes"))
+			} else {
+				require.NotNil(t, cmd.Flags().Lookup("output"))
+				assert.Contains(t, cmd.Flags().Lookup("output").Usage, "display-safe")
+			}
+		})
+	}
+	cmd, _, err := rootCmd.Find([]string{"vaults", "items", "invoke"})
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"provider":"link","authorization":{"method":"oauth","client":{"type":"kernel_managed"}}}`, string(body))
+	assert.False(t, isAuthExempt(cmd))
+	for _, unsupported := range []string{"rename", "update", "items put", "items action", "wallets callback", "cards pay", "cards authorize"} {
+		cmd, remaining, _ := newVaultsCommand().Find(strings.Fields(unsupported))
+		assert.True(t, len(remaining) > 0 || cmd.RunE == nil, unsupported)
+	}
 }
 
-func TestVaultItemsCreate_CardSpec(t *testing.T) {
-	_ = capturePtermOutput(t)
-	var got kernel.VaultItemUpsertParams
-	fake := &FakeVaultItemsService{UpsertFunc: func(ctx context.Context, key string, params kernel.VaultItemUpsertParams, opts ...option.RequestOption) (*kernel.VaultItemUnion, error) {
-		got = params
-		return &kernel.VaultItemUnion{ID: "i1", Key: key, Type: "card"}, nil
-	}}
-	v := VaultsCmd{items: fake}
-	require.NoError(t, v.ItemsCreate(context.Background(), VaultItemsCreateInput{
-		Vault: "payments",
-		Key:   "card",
-		Type:  "card",
-		Spec:  `{"provider":"agentcard","wallet":"my-wallet","merchant":"Acme","amount":1250,"currency":"USD"}`,
-	}))
+func TestVaultRequiredAndInvalidFlags(t *testing.T) {
+	t.Setenv("KERNEL_PROJECT", "project-test")
+	client := vaultTestClient(t, func(w http.ResponseWriter, r *http.Request) { t.Error("invalid input reached API") })
+	tests := []struct {
+		args string
+		want string
+	}{
+		{"vaults create", "required flag"},
+		{"vaults create --name=", "--name"},
+		{"vaults create --name=bad/name", "--name"},
+		{"vaults create --name=..", "--name"},
+		{"vaults get", "accepts 1 arg"},
+		{"vaults get bad%2Fname", "vault ID or name"},
+		{"vaults items get checkout bad/key", "item key"},
+		{"vaults list --limit 0", "--limit"},
+		{"vaults list --limit 101", "--limit"},
+		{"vaults list --offset -1", "--offset"},
+		{"vaults list -o yaml", "output"},
+		{"vaults items get checkout wallet-1 --wait -1", "--wait"},
+		{"vaults items get checkout wallet-1 --wait 61", "--wait"},
+		{"vaults items events checkout wallet-1 --wait 61", "--wait"},
+		{"vaults items get checkout wallet-1 --expand secret", "--expand"},
+		{"vaults wallets create checkout wallet-1", "required flag"},
+		{"vaults wallets create checkout wallet-1 --provider unknown --spec {}", "--provider"},
+		{"vaults wallets create checkout wallet-1 --provider link", "required flag"},
+		{"vaults cards create checkout order-1 --provider link", "required flag"},
+		{"vaults cards update checkout order-1 --spec {}", "required flag"},
+		{"vaults wallets create checkout wallet-1 --provider link --user-id usr_123", "--user-id"},
+		{"vaults wallets create checkout wallet-1 --provider agentcard --user-id wrong", "--user-id"},
+		{"vaults cards create checkout order-1", "required flag"},
+		{"vaults delete checkout", "--yes"},
+		{"vaults items delete checkout order-1", "--yes"},
+		{"vaults cards create checkout order-1 --domain shop.example", "unknown flag"},
+		{"vaults create --name checkout --project-id project-test", "unknown flag"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.args, func(t *testing.T) {
+			_, _, err := executeVaultCommand(t, client, strings.Fields(tt.args)...)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.want)
+		})
+	}
+}
 
-	require.NotNil(t, got.OfCard)
-	assert.Nil(t, got.OfWallet)
+func TestVaultCommandsWithoutProject(t *testing.T) {
+	t.Setenv("KERNEL_PROJECT", "")
+	tests := []struct {
+		args     []string
+		response string
+		calls    int
+	}{
+		{[]string{"create", "--name", "checkout"}, vaultFixture, 1},
+		{[]string{"list"}, "[" + vaultFixture + "]", 1},
+		{[]string{"get", "checkout"}, vaultFixture, 1},
+		{[]string{"delete", "checkout", "--yes"}, "", 1},
+		{[]string{"items", "list", "checkout"}, "[" + requestedCardFixture + "]", 1},
+		{[]string{"items", "get", "checkout", "order-1"}, requestedCardFixture, 1},
+		{[]string{"items", "delete", "checkout", "order-1", "--yes"}, "", 1},
+		{[]string{"items", "events", "checkout", "order-1"}, "[]", 1},
+		{[]string{"wallets", "create", "checkout", "wallet-1", "--provider", "link", "--spec", linkWalletSpecFixture}, connectedWalletFixture, 1},
+		{[]string{"wallets", "payment-methods", "checkout", "wallet-1"}, connectedWalletFixture, 1},
+		{append([]string{"cards", "create", "checkout", "order-1"}, linkCardArgs()...), requestedCardFixture, 1},
+		{append([]string{"cards", "update", "checkout", "order-1"}, linkCardArgs()...), requestedCardFixture, 1},
+		{[]string{"items", "invoke", "checkout", "order-1", "authorize"}, requestedCardFixture, 2},
+	}
+	for _, tt := range tests {
+		t.Run(strings.Join(tt.args[:min(2, len(tt.args))], " "), func(t *testing.T) {
+			calls := 0
+			client := vaultTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				assert.Empty(t, r.Header.Get("X-Kernel-Project"))
+				if r.Method == http.MethodDelete {
+					w.WriteHeader(http.StatusNoContent)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.Header().Set("X-Has-More", "false")
+				w.Header().Set("X-Next-Offset", "0")
+				_, _ = io.WriteString(w, tt.response)
+			})
+			_, _, err := executeVaultCommand(t, client, append([]string{"vaults"}, tt.args...)...)
+			require.NoError(t, err)
+			assert.Equal(t, tt.calls, calls)
+		})
+	}
+}
 
-	body, err := json.Marshal(got.OfCard.Spec)
+func linkCardArgs() []string {
+	return []string{"--provider", "link", "--spec", fmt.Sprintf(`{"wallet":"wallet-1","amount":1234,"currency":"USD","merchant_name":"Example Shop","payment_method_id":"pm-1","merchant_url":"https://shop.example","context":%q}`, strings.Repeat("Purchase purpose. ", 7))}
+}
+
+func TestVaultSpecValidation(t *testing.T) {
+	t.Setenv("KERNEL_PROJECT", "")
+	client := vaultTestClient(t, func(w http.ResponseWriter, r *http.Request) { t.Error("invalid JSON reached API") })
+	for _, path := range []string{"wallets create", "cards create", "cards update"} {
+		for _, spec := range []string{"", "null", "[]", "42", `"text"`, "{", "{} {}", `{"provider":"agentcard"}`, `{"provider":null}`, `{"provider":1}`} {
+			t.Run(path+"/"+spec, func(t *testing.T) {
+				args := append([]string{"vaults"}, strings.Fields(path)...)
+				args = append(args, "checkout", "item-1", "--provider", "link", "--spec", spec)
+				_, _, err := executeVaultCommand(t, client, args...)
+				require.Error(t, err)
+			})
+		}
+	}
+}
+
+func TestVaultCreateScopeAndImmutableName(t *testing.T) {
+	t.Setenv("KERNEL_PROJECT", "env-project")
+	project := "env-project"
+	client := vaultTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/vaults", r.URL.Path)
+		assert.Equal(t, project, r.Header.Get("X-Kernel-Project"))
+		body, _ := io.ReadAll(r.Body)
+		assert.JSONEq(t, `{"name":"checkout"}`, string(body))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, vaultFixture)
+	})
+	out, human, err := executeVaultCommand(t, client, "vaults", "create", "--name", "checkout", "-o", "json")
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"provider":"agentcard","wallet":"my-wallet","merchant":"Acme","amount":1250,"currency":"USD"}`, string(body))
-}
-
-func TestVaultItemsCreate_SpecFile(t *testing.T) {
-	_ = capturePtermOutput(t)
-	path := filepath.Join(t.TempDir(), "spec.json")
-	require.NoError(t, os.WriteFile(path, []byte("  {\"provider\":\"agentcard\",\"user_id\":\"usr_123\"}\n"), 0o600))
-
-	var got kernel.VaultItemUpsertParams
-	fake := &FakeVaultItemsService{UpsertFunc: func(ctx context.Context, key string, params kernel.VaultItemUpsertParams, opts ...option.RequestOption) (*kernel.VaultItemUnion, error) {
-		got = params
-		return &kernel.VaultItemUnion{ID: "i1", Key: key, Type: "wallet"}, nil
-	}}
-	v := VaultsCmd{items: fake}
-	require.NoError(t, v.ItemsCreate(context.Background(), VaultItemsCreateInput{
-		Vault:    "payments",
-		Key:      "wallet",
-		Type:     "wallet",
-		SpecFile: path,
-	}))
-
-	require.NotNil(t, got.OfWallet)
-	body, err := json.Marshal(got.OfWallet.Spec)
+	assert.JSONEq(t, vaultFixture, out)
+	assert.Empty(t, human)
+	project = "flag-project"
+	_, human, err = executeVaultCommand(t, client, "--project", project, "vaults", "create", "--name", "checkout")
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"provider":"agentcard","user_id":"usr_123"}`, string(body))
+	assert.Contains(t, human, "Name (immutable)")
+	assert.Contains(t, human, "checkout")
 }
 
-func TestVaultItemsUpdate_SendsCardSpec(t *testing.T) {
-	_ = capturePtermOutput(t)
-	var got kernel.VaultItemUpdateParams
-	fake := &FakeVaultItemsService{UpdateFunc: func(ctx context.Context, key string, params kernel.VaultItemUpdateParams, opts ...option.RequestOption) (*kernel.VaultItemUnion, error) {
-		got = params
-		return &kernel.VaultItemUnion{ID: "i1", Key: key, Type: "card"}, nil
-	}}
-	v := VaultsCmd{items: fake}
-	require.NoError(t, v.ItemsUpdate(context.Background(), VaultItemsUpdateInput{
-		Vault: "payments",
-		Key:   "card",
-		Spec:  `{"provider":"agentcard","wallet":"my-wallet","merchant":"Acme","amount":500,"currency":"USD"}`,
-	}))
-
-	assert.Equal(t, "payments", got.IDOrName)
-	body, err := json.Marshal(got.Spec)
+func TestVaultListPaginationAndEmptyJSON(t *testing.T) {
+	t.Setenv("KERNEL_PROJECT", "project-test")
+	body, hasMore, next := "["+vaultFixture+"]", "true", "21"
+	client := vaultTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/vaults", r.URL.Path)
+		assert.Equal(t, "1", r.URL.Query().Get("limit"))
+		assert.Equal(t, "20", r.URL.Query().Get("offset"))
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Has-More", hasMore)
+		w.Header().Set("X-Next-Offset", next)
+		_, _ = io.WriteString(w, body)
+	})
+	out, _, err := executeVaultCommand(t, client, "vaults", "list", "--limit", "1", "--offset", "20", "-o", "json")
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"provider":"agentcard","wallet":"my-wallet","merchant":"Acme","amount":500,"currency":"USD"}`, string(body))
+	assert.JSONEq(t, `{"vaults":[`+vaultFixture+`],"next_offset":21}`, out)
+	_, human, err := executeVaultCommand(t, client, "vaults", "list", "--limit", "1", "--offset", "20")
+	require.NoError(t, err)
+	assert.Contains(t, human, `kernel --project "project-test" vaults list --limit 1 --offset 21`)
+	t.Setenv("KERNEL_PROJECT", "")
+	_, human, err = executeVaultCommand(t, client, "vaults", "list", "--limit", "1", "--offset", "20")
+	require.NoError(t, err)
+	assert.Contains(t, human, "kernel vaults list --limit 1 --offset 21")
+	assert.NotContains(t, human, "--project")
+	body, hasMore, next = "[]", "false", "0"
+	out, _, err = executeVaultCommand(t, client, "vaults", "list", "--limit", "1", "--offset", "20", "-o", "json")
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"vaults":[]}`, out)
 }
 
-func TestVaultItemsUpdate_RequiresSpec(t *testing.T) {
-	_ = capturePtermOutput(t)
-	v := VaultsCmd{items: &FakeVaultItemsService{}}
-	err := v.ItemsUpdate(context.Background(), VaultItemsUpdateInput{Vault: "payments", Key: "card"})
+func TestVaultWalletRequestMapping(t *testing.T) {
+	t.Setenv("KERNEL_PROJECT", "project-test")
+	for _, tt := range []struct {
+		provider, userID, spec string
+	}{
+		{"link", "", `{"provider":"link","authorization":{"method":"oauth","client":{"type":"kernel_managed"}}}`},
+		{"agentcard", "", `{"provider":"agentcard"}`},
+		{"agentcard", "usr_enrolled", `{"provider":"agentcard","user_id":"usr_enrolled"}`},
+	} {
+		t.Run(tt.provider+tt.userID, func(t *testing.T) {
+			client := vaultTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, http.MethodPut, r.Method)
+				assert.Equal(t, "/vaults/checkout/items/wallet-1", r.URL.Path)
+				body, _ := io.ReadAll(r.Body)
+				assert.JSONEq(t, `{"type":"wallet","spec":`+tt.spec+`}`, string(body))
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, connectedWalletFixture)
+			})
+			args := []string{"vaults", "wallets", "create", "checkout", "wallet-1", "--provider", tt.provider, "--spec", tt.spec, "-o", "json"}
+			out, human, err := executeVaultCommand(t, client, args...)
+			require.NoError(t, err)
+			assert.JSONEq(t, connectedWalletFixture, out)
+			assert.Empty(t, human)
+		})
+	}
+}
+
+func TestVaultCardRequestMapping(t *testing.T) {
+	t.Setenv("KERNEL_PROJECT", "project-test")
+	for _, operation := range []string{"create", "update"} {
+		for _, provider := range []string{"link", "agentcard"} {
+			t.Run(operation+provider, func(t *testing.T) {
+				calls := 0
+				client := vaultTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+					calls++
+					expectedMethod := http.MethodPut
+					if operation == "update" {
+						expectedMethod = http.MethodPatch
+					}
+					assert.Equal(t, expectedMethod, r.Method)
+					assert.Equal(t, "/vaults/checkout/items/order-1", r.URL.Path)
+					var body map[string]json.RawMessage
+					require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+					if operation == "create" {
+						assert.JSONEq(t, `"card"`, string(body["type"]))
+						assert.Len(t, body, 2)
+					} else {
+						assert.Len(t, body, 1)
+					}
+					if provider == "link" {
+						assert.JSONEq(t, fmt.Sprintf(`{"provider":"link","wallet":"wallet-1","amount":1234,"currency":"USD","merchant_name":"Example Shop","merchant_url":"https://shop.example","payment_method_id":"pm-1","context":%q}`, strings.Repeat("Purchase purpose. ", 7)), string(body["spec"]))
+					} else {
+						assert.JSONEq(t, `{"provider":"agentcard","wallet":"wallet-1","amount":1234,"currency":"usd","merchant":"Example Shop","card_id":"vc_chosen"}`, string(body["spec"]))
+					}
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = io.WriteString(w, requestedCardFixture)
+				})
+				flags := linkCardArgs()
+				if provider == "agentcard" {
+					flags = []string{"--provider", provider, "--spec", `{"wallet":"wallet-1","amount":1234,"currency":"usd","merchant":"Example Shop","card_id":"vc_chosen"}`}
+				}
+				args := append([]string{"vaults", "cards", operation, "checkout", "order-1", "-o", "json"}, flags...)
+				out, human, err := executeVaultCommand(t, client, args...)
+				require.NoError(t, err)
+				assert.JSONEq(t, requestedCardFixture, out)
+				assert.Empty(t, human)
+				assert.Equal(t, 1, calls, "card writes must not authorize implicitly")
+			})
+		}
+	}
+}
+
+func TestVaultInvokeRequiresAdvertisedOperation(t *testing.T) {
+	t.Setenv("KERNEL_PROJECT", "project-test")
+	for _, state := range []string{"requested", "pending_authorization", "ready", "consumed", "expired", "declined"} {
+		for _, advertised := range []bool{false, true} {
+			t.Run(fmt.Sprint(state, advertised), func(t *testing.T) {
+				getCalls, postCalls := 0, 0
+				body := strings.ReplaceAll(requestedCardFixture, `"status":"requested"`, `"status":"`+state+`"`)
+				if !advertised {
+					body = strings.ReplaceAll(body, `[{"type":"authorize","description":"Use only after explicit user approval."}]`, `[]`)
+				}
+				client := vaultTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					if r.Method == http.MethodGet {
+						getCalls++
+						_, _ = io.WriteString(w, body)
+						return
+					}
+					postCalls++
+					assert.Equal(t, http.MethodPost, r.Method)
+					assert.Equal(t, "/vaults/checkout/items/order-1/operations", r.URL.Path)
+					payload, _ := io.ReadAll(r.Body)
+					assert.JSONEq(t, `{"type":"authorize"}`, string(payload))
+					_, _ = io.WriteString(w, body)
+				})
+				_, _, err := executeVaultCommand(t, client, "vaults", "items", "invoke", "checkout", "order-1", "authorize", "-o", "json")
+				assert.Equal(t, 1, getCalls)
+				if advertised {
+					require.NoError(t, err)
+					assert.Equal(t, 1, postCalls)
+				} else {
+					require.ErrorContains(t, err, "not advertised in available_operations")
+					assert.Zero(t, postCalls)
+				}
+			})
+		}
+	}
+}
+
+func TestVaultNoSDKRetriesAndAPIErrorMessages(t *testing.T) {
+	t.Setenv("KERNEL_PROJECT", "project-test")
+	for _, status := range []int{409, 429, 500} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			calls := 0
+			client := vaultTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				w.Header().Set("Content-Type", "application/json")
+				if r.Method == http.MethodGet {
+					_, _ = io.WriteString(w, requestedCardFixture)
+					return
+				}
+				w.WriteHeader(status)
+				_, _ = io.WriteString(w, `{"message":"Authorization service unavailable","code":"authorization_failed"}`)
+			})
+			out, _, err := executeVaultCommand(t, client, "vaults", "items", "invoke", "checkout", "order-1", "authorize", "-o", "json")
+			require.Error(t, err)
+			assert.Equal(t, 2, calls)
+			assert.Empty(t, out)
+			var apiErr *kernel.Error
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, status, apiErr.StatusCode)
+			assert.Equal(t, "authorization_failed: Authorization service unavailable", util.CleanedUpSdkError{Err: err}.Error())
+		})
+	}
+}
+
+func TestVaultInvalidProjectErrors(t *testing.T) {
+	t.Setenv("KERNEL_PROJECT", "")
+	commands := [][]string{
+		{"list"}, {"get", "checkout"}, {"create", "--name", "checkout"},
+		{"items", "list", "checkout"}, {"items", "get", "checkout", "order-1"},
+		{"items", "events", "checkout", "order-1"},
+		{"wallets", "create", "checkout", "wallet-1", "--provider", "link", "--spec", linkWalletSpecFixture},
+		{"wallets", "payment-methods", "checkout", "wallet-1"},
+		append([]string{"cards", "create", "checkout", "order-1"}, linkCardArgs()...),
+		append([]string{"cards", "update", "checkout", "order-1"}, linkCardArgs()...),
+		{"items", "invoke", "checkout", "order-1", "authorize"},
+	}
+	for _, project := range []string{"doesntexist", "abcdefghijklmnopqrstuvwx"} {
+		for _, args := range commands {
+			t.Run(project+"/"+strings.Join(args[:min(2, len(args))], " "), func(t *testing.T) {
+				calls := 0
+				client := vaultTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+					calls++
+					assert.Equal(t, project, r.Header.Get("X-Kernel-Project"))
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusNotFound)
+					_, _ = io.WriteString(w, `{"code":"project_not_found","message":"Project not found or inactive"}`)
+				})
+				out, human, err := executeVaultCommand(t, client, append([]string{"--project", project, "vaults"}, args...)...)
+				require.Error(t, err)
+				assert.Equal(t, "project_not_found: Project not found or inactive", util.CleanedUpSdkError{Err: err}.Error())
+				assert.Equal(t, 1, calls)
+				assert.Empty(t, out)
+				assert.NotContains(t, human, "Deleted")
+			})
+		}
+	}
+}
+
+func TestVaultPlainTextAPIError(t *testing.T) {
+	t.Setenv("KERNEL_PROJECT", "")
+	client := vaultTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "Credential is scoped to a different project", http.StatusForbidden)
+	})
+	out, _, err := executeVaultCommand(t, client, "vaults", "list", "--project", "other-project", "-o", "json")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "must specify one of --spec or --spec-file")
+	assert.Empty(t, out)
+	assert.Contains(t, util.CleanedUpSdkError{Err: err}.Error(), "Credential is scoped to a different project")
+	assert.NotContains(t, err.Error(), "withheld")
 }
 
-func TestVaultItemsPerformOperation_SendsType(t *testing.T) {
-	_ = capturePtermOutput(t)
-	var got kernel.VaultItemPerformOperationParams
-	fake := &FakeVaultItemsService{PerformOperationFunc: func(ctx context.Context, key string, params kernel.VaultItemPerformOperationParams, opts ...option.RequestOption) (*kernel.VaultItemUnion, error) {
-		got = params
-		return &kernel.VaultItemUnion{ID: "i1", Key: key, Type: "card"}, nil
-	}}
-	v := VaultsCmd{items: fake}
-	require.NoError(t, v.ItemsPerformOperation(context.Background(), VaultItemsPerformOperationInput{
-		Vault: "payments",
-		Key:   "card",
-		Type:  "Authorize",
-	}))
-
-	assert.Equal(t, "payments", got.IDOrName)
-	assert.Equal(t, kernel.VaultItemPerformOperationParamsTypeAuthorize, got.Type)
+func TestVaultGetWaitExpansionAndEvents(t *testing.T) {
+	t.Setenv("KERNEL_PROJECT", "project-test")
+	client := vaultTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/vaults/checkout/items/wallet-1":
+			assert.Equal(t, "60", r.URL.Query().Get("wait"))
+			assert.Equal(t, "payment_methods", r.URL.Query().Get("expand"))
+			_, _ = io.WriteString(w, connectedWalletFixture)
+		case "/vaults/checkout/items/order-1/events":
+			assert.Equal(t, "60", r.URL.Query().Get("wait"))
+			assert.Equal(t, "event-before", r.URL.Query().Get("after"))
+			_, _ = io.WriteString(w, `[{"id":"event-next","name":"payment_failed","browser_id":"browser-1","created_at":"2026-09-01T00:00:00Z","data":{"reason":"declined","outcome_reason":"provider_error","provider_http_status":402,"provider_decline_code":"insufficient_funds","actual_currency":"usd","provider_response":{"card_number":"SECRET"}}}]`)
+		default:
+			t.Errorf("unexpected request: %s", r.URL)
+		}
+	})
+	out, _, err := executeVaultCommand(t, client, "vaults", "items", "get", "checkout", "wallet-1", "--wait", "60", "--expand", "payment_methods", "-o", "json")
+	require.NoError(t, err)
+	assert.JSONEq(t, connectedWalletFixture, out)
+	args := []string{"vaults", "items", "events", "checkout", "order-1", "--wait", "60", "--after", "event-before"}
+	out, _, err = executeVaultCommand(t, client, append(args, "-o", "json")...)
+	require.NoError(t, err)
+	assert.NotContains(t, out, "SECRET")
+	assert.Contains(t, out, "declined")
+	assert.Contains(t, out, `"provider_http_status": 402`)
+	assert.Contains(t, out, `"outcome_reason": "provider_error"`)
+	assert.Contains(t, out, `"actual_currency": "usd"`)
+	_, human, err := executeVaultCommand(t, client, args...)
+	require.NoError(t, err)
+	assert.Contains(t, human, "--after event-next")
+	assert.Contains(t, human, "payment_failed")
+	assert.Contains(t, human, "insufficient_funds")
+	assert.NotContains(t, human, "SECRET")
 }
 
-func TestVaultItemsPerformOperation_RequiresType(t *testing.T) {
-	_ = capturePtermOutput(t)
-	v := VaultsCmd{items: &FakeVaultItemsService{}}
-	err := v.ItemsPerformOperation(context.Background(), VaultItemsPerformOperationInput{Vault: "payments", Key: "card", Type: " "})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--type is required")
+func TestVaultDeleteResponses(t *testing.T) {
+	t.Setenv("KERNEL_PROJECT", "project-test")
+	for _, path := range []string{"vaults delete checkout --yes", "vaults items delete checkout order-1 --yes"} {
+		for _, response := range []struct {
+			status int
+			code   string
+		}{
+			{204, ""}, {404, "not_found"}, {404, "project_not_found"}, {403, "forbidden"}, {409, "conflict"}, {500, "internal_error"},
+		} {
+			t.Run(fmt.Sprintf("%s/%d/%s", path, response.status, response.code), func(t *testing.T) {
+				calls := 0
+				client := vaultTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+					calls++
+					assert.Equal(t, http.MethodDelete, r.Method)
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(response.status)
+					if response.code != "" {
+						_, _ = fmt.Fprintf(w, `{"code":%q,"message":"API error details"}`, response.code)
+					}
+				})
+				out, human, err := executeVaultCommand(t, client, strings.Fields(path)...)
+				assert.Equal(t, 1, calls)
+				assert.Empty(t, out)
+				if response.status == http.StatusNoContent || response.status == http.StatusNotFound {
+					require.NoError(t, err)
+					assert.Contains(t, human, "Deleted or not found: vault")
+					assert.Contains(t, human, "checkout")
+				} else {
+					require.Error(t, err)
+					assert.Equal(t, response.code+": API error details", util.CleanedUpSdkError{Err: err}.Error())
+					assert.Empty(t, human)
+				}
+			})
+		}
+	}
 }
 
-func TestVaultItemsEvents_SendsAfterAndWait(t *testing.T) {
-	buf := capturePtermOutput(t)
-	var got kernel.VaultItemEventsParams
-	fake := &FakeVaultItemsService{EventsFunc: func(ctx context.Context, key string, params kernel.VaultItemEventsParams, opts ...option.RequestOption) (*[]kernel.VaultItemEvent, error) {
-		got = params
-		events := []kernel.VaultItemEvent{{
-			ID:        "e1",
-			Name:      "wallet_authorization_started",
-			BrowserID: "b1",
-			CreatedAt: time.Unix(0, 0),
-		}}
-		return &events, nil
-	}}
-	v := VaultsCmd{items: fake}
-	require.NoError(t, v.ItemsEvents(context.Background(), VaultItemsEventsInput{
-		Vault: "payments",
-		Key:   "wallet",
-		After: "e0",
-		Wait:  10,
-	}))
-
-	assert.Equal(t, "payments", got.IDOrName)
-	assert.Equal(t, "e0", got.After.Value)
-	assert.Equal(t, int64(10), got.Wait.Value)
-
-	out := buf.String()
-	assert.Contains(t, out, "e1")
-	assert.Contains(t, out, "wallet_authorization_started")
-	assert.Contains(t, out, "b1")
+func TestVaultEmptyItemLists(t *testing.T) {
+	t.Setenv("KERNEL_PROJECT", "project-test")
+	for _, path := range []string{"vaults items list checkout", "vaults items events checkout order-1"} {
+		client := vaultTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `[]`)
+		})
+		out, _, err := executeVaultCommand(t, client, append(strings.Fields(path), "-o", "json")...)
+		require.NoError(t, err)
+		assert.JSONEq(t, `[]`, out)
+	}
 }
 
-func TestVaultItemsEvents_Empty(t *testing.T) {
-	buf := capturePtermOutput(t)
-	v := VaultsCmd{items: &FakeVaultItemsService{}}
-	require.NoError(t, v.ItemsEvents(context.Background(), VaultItemsEventsInput{Vault: "payments", Key: "wallet"}))
-	assert.Contains(t, buf.String(), "No events found for item 'wallet'")
-}
-
-func TestVaultItemsList_RendersRows(t *testing.T) {
-	buf := capturePtermOutput(t)
-	item := vaultItemFromJSON(t, `{
-		"id":"i1",
-		"key":"card",
-		"type":"card",
-		"spec":{"provider":"agentcard","merchant":"Acme"},
-		"state":{"provider":"agentcard","status":"ready"},
-		"created_at":"1970-01-01T00:00:00Z",
-		"updated_at":"1970-01-01T00:00:00Z"
-	}`)
-	fake := &FakeVaultItemsService{ListFunc: func(ctx context.Context, idOrName string, opts ...option.RequestOption) (*[]kernel.VaultItemUnion, error) {
-		items := []kernel.VaultItemUnion{item}
-		return &items, nil
-	}}
-	v := VaultsCmd{items: fake}
-	require.NoError(t, v.ItemsList(context.Background(), VaultItemsListInput{Vault: "payments"}))
-
-	out := buf.String()
-	assert.Contains(t, out, "card")
-	assert.Contains(t, out, "agentcard")
-	assert.Contains(t, out, "ready")
-}
-
-func TestVaultItemsList_Empty(t *testing.T) {
-	buf := capturePtermOutput(t)
-	v := VaultsCmd{items: &FakeVaultItemsService{}}
-	require.NoError(t, v.ItemsList(context.Background(), VaultItemsListInput{Vault: "payments"}))
-	assert.Contains(t, buf.String(), "No items found in vault 'payments'")
-}
-
-func TestFormatVaultReferences(t *testing.T) {
-	assert.Empty(t, formatVaultReferences(nil), "no vaults means the row is omitted entirely")
-	assert.Equal(t, "payments, v2", formatVaultReferences([]kernel.VaultReference{
-		{ID: "v1", Name: "payments"},
-		{ID: "v2"},
-	}), "names are preferred, IDs are the fallback")
+func TestVaultOpenActionOnlyWhenRequested(t *testing.T) {
+	capturePtermOutput(t)
+	for _, actionURL := range []string{"", "https://provider.example/approval", "javascript:alert(1)", "https://user:secret@provider.example"} {
+		var item kernel.VaultItemUnion
+		body := strings.TrimSuffix(connectedWalletFixture, "}") + fmt.Sprintf(`,"action":{"name":"link_oauth","url":%q}}`, actionURL)
+		require.NoError(t, json.Unmarshal([]byte(body), &item))
+		opened := ""
+		c := VaultsCmd{openURL: func(url string) error { opened = url; return nil }, prompter: interactive.NewPrompterWithTerminal(false)}
+		require.NoError(t, c.showItem(&item, "", false))
+		assert.Empty(t, opened)
+		err := c.showItem(&item, "", true)
+		if strings.HasPrefix(actionURL, "https://provider.example") {
+			require.NoError(t, err)
+			assert.Equal(t, actionURL, opened)
+		} else if actionURL == "" {
+			require.NoError(t, err)
+		} else {
+			require.Error(t, err)
+			assert.Empty(t, opened)
+		}
+	}
 }
