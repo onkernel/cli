@@ -149,6 +149,15 @@ func renderOrgLimits(limits *kernel.OrgLimits) {
 		rows = append(rows, []string{"Min Health Check Interval", fmt.Sprintf("%ds", limits.MinHealthCheckIntervalSeconds)})
 	}
 
+	// Vault limits are plan-derived and, like the managed auth rows above, only
+	// returned by newer API versions. A null max_vaults means unlimited.
+	if orgLimitFieldPresent(limits.JSON.MaxVaults) {
+		rows = append(rows, []string{"Max Vaults", formatProjectLimitValue(limits.MaxVaults, limits.JSON.MaxVaults)})
+	}
+	if orgLimitFieldPresent(limits.JSON.VaultsUsed) {
+		rows = append(rows, []string{"Vaults Used", fmt.Sprintf("%d", limits.VaultsUsed)})
+	}
+
 	PrintTableNoPad(rows, true)
 }
 
@@ -207,6 +216,7 @@ func orgEntitlementRows(entitlements *kernel.OrgEntitlements) pterm.TableData {
 		{"Limit", "Max concurrent browsers", fmt.Sprintf("%d", limits.MaxConcurrentBrowsers)},
 		{"Limit", "Max concurrent invocations", fmt.Sprintf("%d", limits.MaxConcurrentInvocations)},
 		{"Limit", "Default max concurrent invocations per app", fmt.Sprintf("%d", limits.DefaultMaxConcurrentInvocationsPerApp)},
+		{"Limit", "Max vaults", formatEntitlementLimitValue(limits.MaxVaults, limits.JSON.MaxVaults)},
 	}
 }
 
@@ -256,7 +266,7 @@ var orgLimitsCmd = &cobra.Command{
 var orgLimitsGetCmd = &cobra.Command{
 	Use:   "get",
 	Short: "Get organization limits",
-	Long:  "Show the organization's effective limits: the concurrency limit, the default per-project cap applied to projects without an explicit override, and the plan-derived managed auth limits along with current auth connection usage.",
+	Long:  "Show the organization's effective limits: the concurrency limit, the default per-project cap applied to projects without an explicit override, and the plan-derived managed auth and vault limits along with current auth connection and vault usage.",
 	Args:  cobra.NoArgs,
 	RunE:  runOrgLimitsGet,
 }
