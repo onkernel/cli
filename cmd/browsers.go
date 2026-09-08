@@ -436,6 +436,7 @@ type BrowsersCmd struct {
 	computer   BrowserComputerService
 	playwright BrowserPlaywrightService
 	telemetry  BrowserTelemetryService
+	webmcp     BrowserWebMCPService
 }
 
 type BrowsersListInput struct {
@@ -2950,6 +2951,7 @@ func init() {
 	addJSONOutputFlag(playwrightExecute)
 	playwrightRoot.AddCommand(playwrightExecute)
 	browsersCmd.AddCommand(playwrightRoot)
+	browsersCmd.AddCommand(newBrowsersWebMCPCommand())
 
 	// Add flags for create command
 	addJSONOutputFlag(browsersCreateCmd)

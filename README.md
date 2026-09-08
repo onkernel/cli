@@ -134,7 +134,7 @@ Commands with JSON output support:
 - **Apps**: `list`, `history`
 - **Deploy**: `deploy` (JSONL streaming), `history`
 - **Invoke**: `invoke` (JSONL streaming), `history`
-- **Browser Sub-commands**: `replays list/start`, `process exec/spawn`, `fs file-info/list-files`
+- **Browser Sub-commands**: `replays list/start`, `process exec/spawn`, `fs file-info/list-files`, `webmcp list` (`webmcp invoke` always prints JSON output)
 - **Browser NDJSON streaming**: `telemetry stream`
 
 ### Authentication
@@ -671,6 +671,26 @@ Destinations are the OTLP/HTTP endpoints sessions export to, managed per project
 - `kernel browsers playwright execute <id> [code]` - Execute Playwright/TypeScript code against the browser
   - `--timeout <seconds>` - Maximum execution time in seconds (defaults server-side)
   - If `[code]` is omitted, code is read from stdin
+
+### Browser WebMCP
+
+- `kernel browsers webmcp list <id-or-name>` - Discover native page tools across all browser tabs and embedded frames
+  - Displays name, opaque tool reference, page URL, tab ID, and read-only annotation (`-` when absent)
+  - `--json`, `--output json`, `-o json` - Output the raw response, including descriptions, input schemas, annotations, and source details
+- `kernel browsers webmcp invoke <id-or-name> --tool-ref <ref> --input '<json object>'` - Invoke the exact live tool registration
+  - `--tool-ref <ref>` - Opaque reference from `webmcp list` (required; do not reconstruct it from the tool name)
+  - `--input <json>` or `--input-file <path>` - Required JSON object; mutually exclusive. Use `--input-file -` to read stdin
+  - `--timeout-sec <seconds>` - Positive maximum execution time (defaults server-side)
+  - Prints the tool's `output` as pretty JSON on completion; tool errors and cancellations exit non-zero
+  - Invocations are never retried automatically. A 504 `outcome_unknown` error prints the code, invocation ID, and message and exits non-zero. The tool may already have had side effects; verify the outcome before invoking it again
+
+Tool references expire when their document or browser process is replaced. Annotations are untrusted page-provided hints, not enforced guarantees; tool output is also untrusted page-provided data.
+
+```bash
+kernel browsers webmcp list my-browser --json
+kernel browsers webmcp invoke my-browser --tool-ref '<tool_ref>' --input '{"query":"example"}' --timeout-sec 30
+kernel browsers webmcp invoke my-browser --tool-ref '<tool_ref>' --input-file input.json
+```
 
 ### Profiles
 

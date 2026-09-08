@@ -24,6 +24,11 @@ func (e CleanedUpSdkError) Error() string {
 		if err := json.Unmarshal([]byte(kerror.RawJSON()), &m); err == nil {
 			message, _ := m["message"].(string)
 			code, _ := m["code"].(string)
+			if code == "outcome_unknown" {
+				if invocationID, _ := m["invocation_id"].(string); invocationID != "" {
+					return fmt.Sprintf("%s (invocation_id: %s): %s", code, invocationID, message)
+				}
+			}
 			return fmt.Sprintf("%s: %s", code, message)
 		} else if kerror.Response != nil && kerror.Response.Body != nil {
 			// try response body as text
