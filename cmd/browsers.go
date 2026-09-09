@@ -463,6 +463,7 @@ type BrowsersCmd struct {
 	playwright BrowserPlaywrightService
 	webmcp     BrowserWebmcpService
 	telemetry  BrowserTelemetryService
+	webmcp     BrowserWebMCPService
 }
 
 type BrowsersListInput struct {
@@ -3093,6 +3094,7 @@ func init() {
 	addJSONOutputFlag(playwrightExecute)
 	playwrightRoot.AddCommand(playwrightExecute)
 	browsersCmd.AddCommand(playwrightRoot)
+	browsersCmd.AddCommand(newBrowsersWebMCPCommand())
 
 	// webmcp
 	webmcpRoot := &cobra.Command{Use: "webmcp", Short: "Discover and invoke native page (WebMCP) tools"}
