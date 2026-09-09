@@ -94,12 +94,6 @@ type BrowserPlaywrightService interface {
 	Execute(ctx context.Context, idOrName string, body kernel.BrowserPlaywrightExecuteParams, opts ...option.RequestOption) (res *kernel.BrowserPlaywrightExecuteResponse, err error)
 }
 
-// BrowserWebmcpService defines the subset we use for WebMCP tool discovery and invocation.
-type BrowserWebmcpService interface {
-	InvokeTool(ctx context.Context, idOrName string, body kernel.BrowserWebmcpInvokeToolParams, opts ...option.RequestOption) (res *kernel.InvocationResult, err error)
-	ListTools(ctx context.Context, idOrName string, opts ...option.RequestOption) (res *kernel.ToolsResponse, err error)
-}
-
 // BrowserComputerService defines the subset we use for OS-level mouse & screen.
 type BrowserComputerService interface {
 	Batch(ctx context.Context, idOrName string, body kernel.BrowserComputerBatchParams, opts ...option.RequestOption) (err error)
@@ -461,7 +455,6 @@ type BrowsersCmd struct {
 	logs       BrowserLogService
 	computer   BrowserComputerService
 	playwright BrowserPlaywrightService
-	webmcp     BrowserWebmcpService
 	telemetry  BrowserTelemetryService
 	webmcp     BrowserWebMCPService
 }
@@ -1804,113 +1797,6 @@ func (b BrowsersCmd) PlaywrightExecute(ctx context.Context, in BrowsersPlaywrigh
 	return nil
 }
 
-// WebMCP
-type BrowsersWebmcpListToolsInput struct {
-	Identifier string
-	Output     string
-}
-
-func (b BrowsersCmd) WebmcpListTools(ctx context.Context, in BrowsersWebmcpListToolsInput) error {
-	if err := validateJSONOutput(in.Output); err != nil {
-		return err
-	}
-
-	if b.webmcp == nil {
-		pterm.Error.Println("webmcp service not available")
-		return nil
-	}
-	br, err := b.browsers.Get(ctx, in.Identifier, kernel.BrowserGetParams{})
-	if err != nil {
-		return util.CleanedUpSdkError{Err: err}
-	}
-	res, err := b.webmcp.ListTools(ctx, br.SessionID)
-	if err != nil {
-		return util.CleanedUpSdkError{Err: err}
-	}
-
-	if in.Output == "json" {
-		return util.PrintPrettyJSON(res)
-	}
-
-	if res == nil || len(res.Tools) == 0 {
-		pterm.Info.Println("No WebMCP tools found")
-		return nil
-	}
-	rows := pterm.TableData{{"Name", "Tool Ref", "Page", "Frame", "Description"}}
-	for _, t := range res.Tools {
-		frame := "-"
-		if t.Source.Frame.URL != "" {
-			frame = truncateURL(t.Source.Frame.URL, 40)
-		}
-		rows = append(rows, []string{
-			t.Name,
-			t.ToolRef,
-			truncateURL(t.Source.PageURL, 40),
-			frame,
-			truncateURL(t.Description, 60),
-		})
-	}
-	PrintTableNoPad(rows, true)
-	return nil
-}
-
-type BrowsersWebmcpInvokeToolInput struct {
-	Identifier string
-	ToolRef    string
-	InputJSON  string
-	TimeoutSec int64
-	Output     string
-}
-
-func (b BrowsersCmd) WebmcpInvokeTool(ctx context.Context, in BrowsersWebmcpInvokeToolInput) error {
-	if err := validateJSONOutput(in.Output); err != nil {
-		return err
-	}
-
-	if b.webmcp == nil {
-		pterm.Error.Println("webmcp service not available")
-		return nil
-	}
-	toolInput := map[string]any{}
-	if strings.TrimSpace(in.InputJSON) != "" {
-		if err := json.Unmarshal([]byte(in.InputJSON), &toolInput); err != nil {
-			pterm.Error.Printf("Invalid --input JSON: %v\n", err)
-			return nil
-		}
-	}
-	br, err := b.browsers.Get(ctx, in.Identifier, kernel.BrowserGetParams{})
-	if err != nil {
-		return util.CleanedUpSdkError{Err: err}
-	}
-	req := kernel.InvokeRequestParam{ToolRef: in.ToolRef, Input: toolInput}
-	if in.TimeoutSec > 0 {
-		req.TimeoutSec = kernel.Opt(in.TimeoutSec)
-	}
-	res, err := b.webmcp.InvokeTool(ctx, br.SessionID, kernel.BrowserWebmcpInvokeToolParams{InvokeRequest: req})
-	if err != nil {
-		return util.CleanedUpSdkError{Err: err}
-	}
-
-	if in.Output == "json" {
-		return util.PrintPrettyJSON(res)
-	}
-
-	rows := pterm.TableData{{"Property", "Value"}, {"Invocation ID", res.InvocationID}, {"Status", string(res.Status)}}
-	PrintTableNoPad(rows, true)
-
-	if res.Output != nil {
-		bs, err := json.MarshalIndent(res.Output, "", "  ")
-		if err == nil {
-			pterm.Info.Println("output:")
-			fmt.Println(string(bs))
-		}
-	}
-	if res.ErrorText != "" {
-		pterm.Error.Printf("error: %s\n", res.ErrorText)
-	}
-	return nil
-}
-
 func (b BrowsersCmd) ProcessExec(ctx context.Context, in BrowsersProcessExecInput) error {
 	if err := validateJSONOutput(in.Output); err != nil {
 		return err
@@ -3096,19 +2982,6 @@ func init() {
 	browsersCmd.AddCommand(playwrightRoot)
 	browsersCmd.AddCommand(newBrowsersWebMCPCommand())
 
-	// webmcp
-	webmcpRoot := &cobra.Command{Use: "webmcp", Short: "Discover and invoke native page (WebMCP) tools"}
-	webmcpListTools := &cobra.Command{Use: "list-tools <id_or_name>", Short: "List WebMCP tools across every open tab and embedded frame", Args: cobra.ExactArgs(1), RunE: runBrowsersWebmcpListTools}
-	addJSONOutputFlag(webmcpListTools)
-	webmcpInvoke := &cobra.Command{Use: "invoke-tool <id_or_name>", Short: "Invoke a discovered WebMCP tool and wait for its result", Args: cobra.ExactArgs(1), RunE: runBrowsersWebmcpInvokeTool}
-	webmcpInvoke.Flags().String("tool-ref", "", "Opaque tool reference from 'browsers webmcp list-tools'")
-	webmcpInvoke.Flags().String("input", "", "Tool input as a JSON object (defaults to {}); use '-' to read from stdin")
-	webmcpInvoke.Flags().Int64("timeout-sec", 0, "Maximum time to wait for the tool result in seconds (1-120, default 60)")
-	_ = webmcpInvoke.MarkFlagRequired("tool-ref")
-	addJSONOutputFlag(webmcpInvoke)
-	webmcpRoot.AddCommand(webmcpListTools, webmcpInvoke)
-	browsersCmd.AddCommand(webmcpRoot)
-
 	// Add flags for create command
 	addJSONOutputFlag(browsersCreateCmd)
 	browsersCreateCmd.Flags().BoolP("stealth", "s", false, "Launch browser in stealth mode to avoid detection")
@@ -3706,41 +3579,6 @@ func runBrowsersPlaywrightExecute(cmd *cobra.Command, args []string) error {
 	output, _ := cmd.Flags().GetString("output")
 	b := BrowsersCmd{browsers: &svc, playwright: &svc.Playwright}
 	return b.PlaywrightExecute(cmd.Context(), BrowsersPlaywrightExecuteInput{Identifier: args[0], Code: strings.TrimSpace(code), Timeout: timeout, Output: output})
-}
-
-func runBrowsersWebmcpListTools(cmd *cobra.Command, args []string) error {
-	client := getKernelClient(cmd)
-	svc := client.Browsers
-	output, _ := cmd.Flags().GetString("output")
-	b := BrowsersCmd{browsers: &svc, webmcp: &svc.Webmcp}
-	return b.WebmcpListTools(cmd.Context(), BrowsersWebmcpListToolsInput{Identifier: args[0], Output: output})
-}
-
-func runBrowsersWebmcpInvokeTool(cmd *cobra.Command, args []string) error {
-	client := getKernelClient(cmd)
-	svc := client.Browsers
-	toolRef, _ := cmd.Flags().GetString("tool-ref")
-	inputJSON, _ := cmd.Flags().GetString("input")
-	timeoutSec, _ := cmd.Flags().GetInt64("timeout-sec")
-	output, _ := cmd.Flags().GetString("output")
-
-	if inputJSON == "-" {
-		data, err := io.ReadAll(os.Stdin)
-		if err != nil {
-			pterm.Error.Printf("failed to read stdin: %v\n", err)
-			return nil
-		}
-		inputJSON = string(data)
-	}
-
-	b := BrowsersCmd{browsers: &svc, webmcp: &svc.Webmcp}
-	return b.WebmcpInvokeTool(cmd.Context(), BrowsersWebmcpInvokeToolInput{
-		Identifier: args[0],
-		ToolRef:    toolRef,
-		InputJSON:  inputJSON,
-		TimeoutSec: timeoutSec,
-		Output:     output,
-	})
 }
 
 func runBrowsersFSNewDirectory(cmd *cobra.Command, args []string) error {

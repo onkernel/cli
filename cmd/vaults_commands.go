@@ -75,7 +75,7 @@ JSON output preserves returned public fields but omits unknown/opaque provider d
 	}
 
 	create := &cobra.Command{Use: "create --name <name>", Short: "Create or retrieve a vault by immutable name", Args: cobra.NoArgs, PreRunE: vaultPreRun,
-		Long: "Create or retrieve a vault by immutable name.\nRetrieving an existing vault by name is idempotent and returns the existing vault.",
+		Long: "Create or retrieve a vault by immutable name.\nFree organizations can store up to 3 non-deleted vaults across all projects; paid plans and active trials have no vault cap.\nRetrieving an existing vault by name succeeds even at the limit.\nSee kernel org limits get for the current cap and usage.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name, _ := cmd.Flags().GetString("name")
 			return getVaultsHandler(cmd).Create(cmd.Context(), name, vaultOutput(cmd))
